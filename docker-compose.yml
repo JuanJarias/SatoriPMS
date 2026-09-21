@@ -1,0 +1,74 @@
+version: '3.9'
+
+services:
+  # ── Base de datos ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: satori_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-satori}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-satori_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-satoripms}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-satori}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Caché y bloqueos ───────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: satori_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Orquestación del chatbot ───────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: satori_n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-admin123}
+      - N8N_HOST=0.0.0.0
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./flows/n8n:/home/node/.n8n/workflows:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Backend API (se agrega en Sprint 1 — TASK-07) ──────
+  # api:
+  #   build: ./apps/api
+  #   container_name: satori_api
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     DATABASE_URL: postgresql://satori:satori_dev@postgres:5432/satoripms
+  #     REDIS_URL: redis://redis:6379
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  n8n_data:

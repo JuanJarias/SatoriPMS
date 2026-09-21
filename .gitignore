@@ -1,0 +1,38 @@
+# ── Entorno ──────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Node / npm ───────────────────────────────────────────
+node_modules/
+dist/
+build/
+.pnp
+.pnp.js
+
+# ── Java / Gradle ────────────────────────────────────────
+.gradle/
+build/
+*.class
+*.jar
+*.war
+
+# ── Docker ───────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── IDEs ─────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+
+# ── Cobertura de pruebas ─────────────────────────────────
+coverage/
+.nyc_output/

@@ -1,0 +1,40 @@
+name: "⚙️ Tarea Técnica (TASK)"
+description: Tarea de infraestructura, arquitectura, DevOps o deuda técnica sin valor de usuario directo
+title: "[TASK-XX] [Módulo] - "
+labels: ["type: task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Tarea Técnica
+        Para tareas de arquitectura, DevOps, migración, configuración o deuda técnica.
+        **Formato del título**: `[TASK-XX] [Módulo/Épica] - Descripción concisa`
+
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto y motivación
+      placeholder: "¿Por qué es necesaria esta tarea? ¿Qué problema resuelve?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos de implementación
+      value: |
+        - [ ] Paso 1
+        - [ ] Paso 2
+        - [ ] Paso 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: dod
+    attributes:
+      label: Definition of Done
+      value: |
+        - [ ] Implementado y commiteado
+        - [ ] Documentado si cambia la API, el esquema o la infraestructura
+        - [ ] PR revisado y aprobado por otro integrante
+        - [ ] CI en verde

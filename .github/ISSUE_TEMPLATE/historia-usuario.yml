@@ -1,0 +1,59 @@
+name: "👤 Historia de Usuario (HU)"
+description: Funcionalidad expresada desde la perspectiva del usuario, con criterios Gherkin
+title: "[HU-XX] [Épica] - "
+labels: ["type: hu"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Historia de Usuario
+        **Formato del título**: `[HU-XX] [Nombre Épica] - Verbo en infinitivo + resultado observable`
+
+  - type: textarea
+    id: historia
+    attributes:
+      label: Historia
+      value: |
+        Como **[rol]**
+        Quiero **[acción]**
+        Para **[beneficio]**
+    validations:
+      required: true
+
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación (Gherkin)
+      description: Un criterio por escenario, en formato Dado/Cuando/Entonces
+      value: |
+        - [ ] **Dado** que [contexto inicial]
+              **Cuando** [acción del usuario o evento]
+              **Entonces** [resultado observable]
+
+        - [ ] **Dado** que [otro contexto]
+              **Cuando** [otra acción]
+              **Entonces** [otro resultado]
+    validations:
+      required: true
+
+  - type: textarea
+    id: notas
+    attributes:
+      label: Notas técnicas
+      placeholder: "Referencias a suscripciones WebSocket, endpoints, dependencias de BD, etc."
+
+  - type: input
+    id: dependencias
+    attributes:
+      label: Dependencias (issues)
+      placeholder: "Depende de #12 (gateway WebSocket) y #15 (login JWT)"
+
+  - type: textarea
+    id: dod
+    attributes:
+      label: Definition of Done
+      value: |
+        - [ ] Todos los criterios de aceptación verificados
+        - [ ] Probado en móvil si tiene interfaz de usuario
+        - [ ] PR revisado y aprobado por otro integrante
+        - [ ] CI en verde

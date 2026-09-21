@@ -1,0 +1,20 @@
+# SatoriPMS — Code Owners
+# Todo el código requiere revisión de al menos un miembro del equipo
+
+# Regla global: cualquier cambio requiere al menos 1 revisor del equipo
+* @JuanJarias @Gafoxx @Esteban-GV
+
+# Frontend
+apps/web/ @JuanJarias @Gafoxx @Esteban-GV
+
+# Backend
+apps/api/ @JuanJarias @Gafoxx @Esteban-GV
+
+# n8n workflows
+flows/n8n/ @JuanJarias @Gafoxx @Esteban-GV
+
+# Base de datos — revisión obligatoria de todos
+db/migrations/ @JuanJarias @Gafoxx @Esteban-GV
+
+# CI/CD y configuración crítica
+.github/ @JuanJarias @Gafoxx @Esteban-GV
