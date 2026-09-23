@@ -1,0 +1,9 @@
+-- V3__seed_products.sql.example
+--
+-- Mismo patrón que V2__seed_rooms.sql.example — copia como
+-- V3__seed_products.sql, llena con los productos/precios reales del
+-- hotel (desayuno, snacks, etc.), y el archivo real queda fuera de git.
+
+INSERT INTO product (name, price, stock) VALUES
+('Producto de ejemplo 1', 20000, 100),
+('Producto de ejemplo 2', 10000, 100);

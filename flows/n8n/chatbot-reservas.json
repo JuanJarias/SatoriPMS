@@ -1,0 +1,199 @@
+{
+  "name": "Chatbot Reservas Satori",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-simulado",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "whatsapp-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraer wa_id y mensaje\nreturn [{ json: { wa_id: $input.item.json.body.From, message: $input.item.json.body.Body } }];"
+      },
+      "id": "2",
+      "name": "Code Parsing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "key": "='chat:' + $json.wa_id"
+      },
+      "id": "3",
+      "name": "Redis Get State",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.state || 'inicio' }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "inicio"
+            },
+            {
+              "value2": "eligiendo-fechas"
+            }
+          ]
+        }
+      },
+      "id": "4",
+      "name": "Switch State",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://api:8080/api/rooms/availability",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "checkIn", "value": "2026-10-12"},
+            {"name": "checkOut", "value": "2026-10-15"},
+            {"name": "adults", "value": "2"},
+            {"name": "children", "value": "0"},
+            {"name": "pet", "value": "false"}
+          ]
+        }
+      },
+      "id": "5",
+      "name": "API Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { response: 'Tenemos disponibles...' } }];"
+      },
+      "id": "6",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "='chat:' + $('Code Parsing').item.json.wa_id",
+        "value": "eligiendo-habitacion",
+        "options": {
+          "expire": "ttl",
+          "ttl": 3600
+        }
+      },
+      "id": "7",
+      "name": "Redis Set State",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.response }}"
+      },
+      "id": "8",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1650, 200]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code Parsing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Parsing": {
+      "main": [
+        [
+          {
+            "node": "Redis Get State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Get State": {
+      "main": [
+        [
+          {
+            "node": "Switch State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch State": {
+      "main": [
+        [
+          {
+            "node": "API Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Backend": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Redis Set State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Set State": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "chatbot-reservas-1234"
+}

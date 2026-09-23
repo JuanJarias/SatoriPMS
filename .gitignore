@@ -17,6 +17,7 @@ build/
 *.class
 *.jar
 *.war
+target/
 
 # ── Docker ───────────────────────────────────────────────
 docker-compose.override.yml
@@ -36,3 +37,10 @@ npm-debug.log*
 # ── Cobertura de pruebas ─────────────────────────────────
 coverage/
 .nyc_output/
+
+
+# ── Seeds reales por hotel (datos de negocio reales: nombres, precios) ──
+# Cualquier V*__seed_*.sql es el archivo REAL de un despliegue específico;
+# las plantillas .sql.example sí se versionan y muestran el formato.
+apps/api/src/main/resources/db/migration/V*__seed_*.sql
+!apps/api/src/main/resources/db/migration/V*__seed_*.sql.example

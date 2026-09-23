@@ -1,0 +1,28 @@
+# docker-compose.tunnel.yml
+#
+# Este archivo SOLO existe para exponer n8n a internet durante desarrollo
+# con ngrok. No es parte de la infraestructura real del proyecto.
+#
+# Uso (junto con el compose principal, no solo):
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d
+#
+# Cuando el proyecto pase a un VPS con dominio propio:
+#   1. Deja de usar este archivo (vuelve a `docker compose up -d` a secas).
+#   2. Cambia N8N_HOST y N8N_WEBHOOK_URL en el .env por el dominio real.
+#   3. Borra este archivo si ya no lo necesitas, o consérvalo para debug local.
+#   Nada más cambia — ni docker-compose.yml, ni n8n, ni el backend saben
+#   que existió ngrok.
+
+services:
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: satori_ngrok
+    restart: unless-stopped
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command:
+      - "http"
+      - "n8n:5678"
+      - "--domain=${NGROK_DOMAIN}"
+    depends_on:
+      - n8n
