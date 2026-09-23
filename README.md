@@ -3,6 +3,44 @@
 **Sistema de gestión hotelera (PMS) para Torre Satori — Sevilla, Valle del Cauca**
 Proyecto Integrador II · 8vo Semestre · Equipo de 3
 
+## Inicio rápido
+
+Antes de arrancar necesitas:
+- Docker + Docker Compose
+- Node.js 20+
+- Java 21
+- Copiar [.env.example](.env.example) a `.env` y completar los valores reales
+
+Comandos básicos en orden:
+
+```bash
+git clone https://github.com/JuanJarias/SatoriPMS.git
+cd SatoriPMS
+cp .env.example .env
+# editar .env con tus datos
+
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d
+# o, si no necesitas ngrok:
+# docker compose up -d
+
+cd apps/web
+npm install
+npm run dev
+```
+
+Esto levanta la infraestructura del proyecto (Postgres, Redis, n8n y API) y luego arranca el frontend en `http://localhost:5173`.
+
+### Opción simplificada con script
+
+Desde la raíz del proyecto:
+
+```bash
+chmod +x start-dev.sh
+./start-dev.sh
+```
+
+El script crea `.env` si todavía no existe, pregunta si necesitas ngrok, levanta Docker, instala las dependencias y arranca el frontend.
+
 ---
 
 ## Progreso del proyecto
