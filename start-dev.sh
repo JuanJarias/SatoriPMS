@@ -44,4 +44,15 @@ case "$use_ngrok" in
 
 cd "$ROOT_DIR/apps/web"
 npm install
+
+echo
+echo "Infraestructura y frontend preparados. Enlaces disponibles:"
+echo "  Web:    http://localhost:5173"
+echo "  API:    http://localhost:8080"
+echo "  n8n:    http://localhost:5678"
+if [[ "$use_ngrok" =~ ^(s|S|y|Y|si|SI)$ ]]; then
+  echo "  Webhook: ${N8N_WEBHOOK_URL:-revisa N8N_WEBHOOK_URL en .env}"
+fi
+echo
+
 npm run dev

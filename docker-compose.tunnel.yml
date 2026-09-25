@@ -23,6 +23,6 @@ services:
     command:
       - "http"
       - "n8n:5678"
-      - "--domain=${NGROK_DOMAIN}"
+      - "--url=https://${NGROK_DOMAIN}"
     depends_on:
       - n8n

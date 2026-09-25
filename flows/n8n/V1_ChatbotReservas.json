@@ -1,0 +1,1048 @@
+{
+  "name": "SatoriPMS — V1_ChatbotReservas",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "whatsapp-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "41ee4b17-e51b-42a8-9aad-afe5fbffc3d4",
+      "name": "Webhook GET Verificación",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        1424,
+        2576
+      ],
+      "webhookId": "whatsapp-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "7d926ffb-ff64-4ebf-958a-3ee0ff011b87",
+      "name": "Responder Desafío GET",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1632,
+        2576
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst value = body && body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value;\nconst message = value && value.messages && value.messages[0];\nif (!message) return [{ json: { skip: true } }];\nconst contact = value.contacts && value.contacts[0];\nlet text = '[no-texto]';\nif (message.type === 'text') text = ((message.text && message.text.body) || '').trim();\nelse if (message.type === 'interactive') text = String((message.interactive && message.interactive.button_reply && message.interactive.button_reply.id) || (message.interactive && message.interactive.list_reply && message.interactive.list_reply.id) || (message.interactive && message.interactive.button_reply && message.interactive.button_reply.title) || '').trim();\nelse if (message.type === 'button') text = ((message.button && message.button.text) || '').trim();\nreturn [{ json: { skip: false, wa_id: message.from, message_type: message.type, message_text: text, message_id: message.id, sender_name: (contact && contact.profile && contact.profile.name) || 'Huésped' } }];"
+      },
+      "id": "9df031ac-be06-4fd5-9aee-374427153144",
+      "name": "Parsear Mensaje Meta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        2784
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "value",
+        "key": "={{ 'session:' + $json.wa_id }}",
+        "keyType": "string",
+        "options": {}
+      },
+      "id": "8fa533aa-1028-4917-bf6e-8822ff49eee4",
+      "name": "Redis Obtener Sesión",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        2768
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "redis": {
+          "id": "nbnU5viNmZNWAOZ9",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Parsear Mensaje Meta').first().json;\nconst raw = $input.first().json.value;\nlet S = {};\nif (typeof raw === 'string' && raw.trim()) { try { S = JSON.parse(raw); } catch (e) { S = {}; } }\nelse if (raw && typeof raw === 'object') { S = raw; }\nif (!S || typeof S !== 'object' || Array.isArray(S)) S = {};\nconst norm = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\nconst t = norm(p.message_text);\nconst state = S.state || 'menu';\nconst step = S.step || 'inicio';\nconst RESTART = ['hola','menu','inicio','reiniciar','start','hi','hello','buenas','buenos dias','buenas tardes','buenas noches'];\nconst restartRequested = RESTART.includes(t);\nconst agentActive = !restartRequested && (S.agent_active === true || S.agent_active === 'true');\nconst AGENT = /\\b(agente|recepcionista|humano)\\b/;\nconst textual = ['text','interactive','button'].includes(p.message_type);\nlet route = state + ':' + step;\nif (!textual) route = 'no_texto';\nelse if (restartRequested) route = 'menu:inicio';\nelse if (AGENT.test(t) && state !== 'escribir_resena') route = 'escalamiento:inicio';\nelse if (state === 'escalamiento') route = 'menu:inicio';\nreturn [{ json: { wa_id: p.wa_id, sender_name: p.sender_name, message_text: p.message_text, message_type: p.message_type, agent_active: agentActive, session: S, route } }];"
+      },
+      "id": "af1837d8-9bd0-45cf-b636-24f3300a1f65",
+      "name": "Cargar Sesión y Detectar Ruta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        2768
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "agent",
+              "leftValue": "={{ $json.agent_active }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3de9d95a-e379-456c-b9d8-070a3dd10949",
+      "name": "¿Agente Activo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2480,
+        2768
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nconst MENU_OPC = '*1* 📅 Hacer una reserva\\n*2* 🤖 Reservar con asistente IA\\n*3* ⭐ Ver reseñas del hotel\\n*4* ✍️ Escribir una reseña\\n*5* 👤 Hablar con un agente\\n*6* ❌ Cancelar una reserva';\nconst msg = '¡Hola, ' + sender_name + ' ☕! 👋 Bienvenido al asistente de *Satori Hotel* 🏨\\n\\n¿En qué puedo ayudarte?\\n\\n' + MENU_OPC + '\\n\\nResponde con el número de tu elección.';\nreturn [{ json: { wa_id, sender_name, response_text: msg, session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "f6755cce-dc18-41a6-b2f5-b59e73a3c928",
+      "name": "H Menú Principal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        2720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nreturn [{ json: { wa_id: J.wa_id, response_text: J.response_text || 'Entendido. Procesando...', redis_key: 'session:' + J.wa_id, redis_value: JSON.stringify(J.session || { state: 'menu', step: 'inicio' }) } }];"
+      },
+      "id": "5fe60601-332f-48b1-ba85-39d9bccd0244",
+      "name": "Preparar Salida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4016,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst text = String(J.message_text || '').trim();\nconst m = text.replace(/[\\uFE0F\\u20E3]/g, '').match(/^\\D*([1-6])\\D*$/);\nreturn [{ json: Object.assign({}, J, { opcion: m ? m[1] : 'invalido' }) }];"
+      },
+      "id": "a9a0ae43-6adf-4ed8-845d-09975a383f4a",
+      "name": "H Menú Evaluador Opción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3072,
+        2272
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o1",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "1 Reserva"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o2",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "2 IA"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o3",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "3 Reseñas"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o4",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "4",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "4 Escribir reseña"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o5",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "5",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "5 Agente"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o6",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "6",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "6 Cancelar"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Inválido"
+        }
+      },
+      "id": "efb1e744-3cd9-48c1-b432-2e2e52217231",
+      "name": "Switch Opción Seleccionada",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        3232,
+        2192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nreturn [{ json: { wa_id, sender_name, response_text: '📅 ¡Perfecto! Iniciemos tu reserva.\\n\\n¿Cuál es tu fecha de *llegada*?\\nFormato: AAAA-MM-DD\\nEjemplo: _2026-10-12_', session: { state: 'reserva', step: 'checkin', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "40857951-7640-4894-bce8-f3393d738fbe",
+      "name": "H F1 Inicio Reserva",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nreturn [{ json: { wa_id, sender_name, response_text: '🚧 Esa opción estará disponible muy pronto. Escribe *menú* para volver al inicio.', session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "41023733-4c11-4bac-a50b-cfc9c16aaa87",
+      "name": "H En Construcción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        2256
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nconst prev = J.session || {};\nreturn [{ json: { wa_id, sender_name, response_text: '👤 En un momento un miembro de nuestro equipo de *Satori Hotel* continuará esta conversación contigo. ¡Gracias por tu paciencia! ☕', session: { state: 'escalamiento', step: 'atendido', agent_active: true, wa_id, sender_name, reservation_draft: prev.reservation_draft || {} } } }];"
+      },
+      "id": "b8dedc64-9afd-4f44-b189-5f8aebd1ad22",
+      "name": "H Escalar a Agente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        2400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/notifications/agent-request' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ wa_id: $json.wa_id, name: $json.sender_name, context: 'Solicitud de agente desde WhatsApp' }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "d804c99c-ec9b-4016-a0dd-27d6a03d7f9c",
+      "name": "Notificar Agente (API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4000,
+        2400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nconst text = String(J.message_text || '').trim();\nconst hoyCO = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);\nconst parseDate = (s) => { s = String(s || '').trim(); const m = s.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/); if (!m) return null; const iso = m[1] + '-' + m[2].padStart(2,'0') + '-' + m[3].padStart(2,'0'); return isNaN(new Date(iso + 'T00:00:00Z')) ? null : iso; };\nconst draft = (J.session && J.session.reservation_draft) || {};\nconst f = parseDate(text);\nif (!f) return [{ json: { wa_id, sender_name, response_text: '⚠️ No reconocí la fecha. Usa el formato AAAA-MM-DD (Ejemplo: 2026-10-12)', session: { state: 'reserva', step: 'checkin', agent_active: false, wa_id, sender_name, reservation_draft: draft } } }];\nif (f < hoyCO) return [{ json: { wa_id, sender_name, response_text: '⚠️ La fecha de llegada no puede estar en el pasado. ¿Cuál es tu fecha de llegada?', session: { state: 'reserva', step: 'checkin', agent_active: false, wa_id, sender_name, reservation_draft: draft } } }];\nreturn [{ json: { wa_id, sender_name, response_text: '✅ Llegada: *' + f + '*\\n\\n¿Cuál es la fecha de *salida*?\\nFormato: AAAA-MM-DD', session: { state: 'reserva', step: 'checkout', agent_active: false, wa_id, sender_name, reservation_draft: { checkIn: f } } } }];"
+      },
+      "id": "1329dfd7-7dcb-4962-8879-95fd3cb545a9",
+      "name": "H F1 CheckIn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        2896
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nconst text = String(J.message_text || '').trim();\nconst draft = (J.session && J.session.reservation_draft) || {};\nconst parseDate = (s) => { s = String(s || '').trim(); const m = s.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/); if (!m) return null; const iso = m[1] + '-' + m[2].padStart(2,'0') + '-' + m[3].padStart(2,'0'); return isNaN(new Date(iso + 'T00:00:00Z')) ? null : iso; };\nconst f = parseDate(text);\nif (!f) return [{ json: { wa_id, sender_name, response_text: '⚠️ No reconocí la fecha. Usa el formato AAAA-MM-DD (Ejemplo: 2026-10-15)', session: { state: 'reserva', step: 'checkout', agent_active: false, wa_id, sender_name, reservation_draft: draft } } }];\nif (draft.checkIn && f <= draft.checkIn) return [{ json: { wa_id, sender_name, response_text: '⚠️ La fecha de salida debe ser posterior a la de llegada (*' + draft.checkIn + '*). ¿Cuál es tu fecha de salida?', session: { state: 'reserva', step: 'checkout', agent_active: false, wa_id, sender_name, reservation_draft: draft } } }];\nconst nd = Object.assign({}, draft, { checkOut: f });\nreturn [{ json: { wa_id, sender_name, response_text: '✅ Salida: *' + f + '*\\n\\n🔎 Estoy consultando las habitaciones disponibles del *' + (draft.checkIn || '?') + '* al *' + f + '*...\\n\\n_(Selección de habitación disponible próximamente.)_', session: { state: 'reserva', step: 'seleccion_habitacion', agent_active: false, wa_id, sender_name, reservation_draft: nd } } }];"
+      },
+      "id": "67595cb2-9f56-485b-a258-c6c084372e07",
+      "name": "H F1 CheckOut",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        3024
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nreturn [{ json: { wa_id, sender_name, response_text: '📎 Por ahora solo puedo procesar mensajes de texto. Escribe *menú* para ver las opciones.', session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "74a7df4a-9040-4fc6-93c1-8ff642225d46",
+      "name": "H No Texto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        3152
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ $json.redis_key }}",
+        "value": "={{ $json.redis_value }}",
+        "keyType": "string",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "ec0dbb72-e67f-477c-9c84-4d72b6f9baf3",
+      "name": "Redis Guardar Sesión",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        4256,
+        2736
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "redis": {
+          "id": "nbnU5viNmZNWAOZ9",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "menu:esperando_opcion",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "menu:esperando_opcion"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r0",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "menu:inicio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "menu:inicio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reserva:checkin",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reserva:checkin"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r3",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reserva:checkout",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reserva:checkout"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r4",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "escalamiento:inicio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "escalamiento:inicio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r5",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "no_texto",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "no_texto"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "En construcción"
+        }
+      },
+      "id": "3c462c1b-5ae9-4f66-a2fa-012774fbe62b",
+      "name": "Enrutar por Estado1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2864,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nreturn [{ json: { wa_id, sender_name, response_text: '⚠️ No entendí tu elección. Por favor responde con un número del *1* al *6*.', session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "631c8f4b-97e3-49dc-b18f-7dc2ae620347",
+      "name": "H Opción Inválida1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3632,
+        2560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + ($env.WHATSAPP_GRAPH_VERSION || 'v20.0') + '/' + $env.WHATSAPP_PHONE_ID + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.WHATSAPP_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: $('Preparar Salida').first().json.wa_id, type: 'text', text: { body: $('Preparar Salida').first().json.response_text, preview_url: false } }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "63263d3e-8638-40b6-8fd2-099500d7ca67",
+      "name": "Enviar Mensaje WhatsApp1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4528,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "40c4c39c-b27d-41db-8e62-7773d256ae13",
+      "name": "Webhook POST Mensajes",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        1424,
+        2784
+      ],
+      "webhookId": "whatsapp-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "126dc9fc-da11-4d35-929b-93fe9c6c4044",
+      "name": "¿Mensaje Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1856,
+        2784
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "13bcca22-df7a-49d9-a952-b5728fe7f8c6",
+      "name": "Pausa (Agente Atendiendo)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2672,
+        2624
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook GET Verificación": {
+      "main": [
+        [
+          {
+            "node": "Responder Desafío GET",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear Mensaje Meta": {
+      "main": [
+        [
+          {
+            "node": "¿Mensaje Válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Obtener Sesión": {
+      "main": [
+        [
+          {
+            "node": "Cargar Sesión y Detectar Ruta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargar Sesión y Detectar Ruta": {
+      "main": [
+        [
+          {
+            "node": "¿Agente Activo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Agente Activo?": {
+      "main": [
+        [
+          {
+            "node": "Pausa (Agente Atendiendo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enrutar por Estado1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Menú Principal": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Salida": {
+      "main": [
+        [
+          {
+            "node": "Redis Guardar Sesión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Menú Evaluador Opción": {
+      "main": [
+        [
+          {
+            "node": "Switch Opción Seleccionada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Opción Seleccionada": {
+      "main": [
+        [
+          {
+            "node": "H F1 Inicio Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H En Construcción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H En Construcción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H En Construcción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Escalar a Agente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H En Construcción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Opción Inválida1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H F1 Inicio Reserva": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H En Construcción": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Escalar a Agente": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notificar Agente (API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H F1 CheckIn": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H F1 CheckOut": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H No Texto": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Guardar Sesión": {
+      "main": [
+        [
+          {
+            "node": "Enviar Mensaje WhatsApp1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrutar por Estado1": {
+      "main": [
+        [
+          {
+            "node": "H Menú Evaluador Opción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Menú Principal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H F1 CheckIn",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H F1 CheckOut",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Escalar a Agente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H No Texto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H En Construcción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Opción Inválida1": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook POST Mensajes": {
+      "main": [
+        [
+          {
+            "node": "Parsear Mensaje Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Mensaje Válido?": {
+      "main": [
+        [
+          {
+            "node": "Redis Obtener Sesión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3810050d-0090-48f5-83c3-96d2116c8ab4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a2b2756b7d02dafdbab44931cfca775be6db84f775ed0cd81ff5c5cf2ade7177"
+  },
+  "nodeGroups": [],
+  "id": "jEf2NsZCpkuuf0Ff",
+  "tags": []
+}

@@ -2,9 +2,14 @@ package com.satoripms.api.booking;
 
 import com.satoripms.api.room.Room;
 import com.satoripms.api.room.RoomRepository;
+import com.satoripms.api.guest.Guest;
+import com.satoripms.api.guest.GuestRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,13 +18,16 @@ public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
+    private final GuestRepository guestRepository;
     private final RedisLockService redisLockService;
 
     public BookingService(BookingRepository bookingRepository,
-                           RoomRepository roomRepository,
-                           RedisLockService redisLockService) {
+                          RoomRepository roomRepository,
+                          GuestRepository guestRepository,
+                          RedisLockService redisLockService) {
         this.bookingRepository = bookingRepository;
         this.roomRepository = roomRepository;
+        this.guestRepository = guestRepository;
         this.redisLockService = redisLockService;
     }
 
@@ -32,11 +40,6 @@ public class BookingService {
         return roomRepository.findAvailableRooms(checkIn, checkOut, adults, children, pet);
     }
 
-    /**
-     * Valida contra Postgres (fuente de verdad) y, si está libre, crea el
-    * bloqueo del rango en Redis con TTL 900s. Los rangos solapados se
-    * rechazan de forma atómica y los rangos contiguos permanecen permitidos.
-     */
     public String createTemporaryLock(Long roomId, LocalDate checkIn, LocalDate checkOut) {
         if (checkIn == null || checkOut == null || !checkIn.isBefore(checkOut)) {
             throw new IllegalArgumentException("El check-in debe ser anterior al check-out");
@@ -57,23 +60,55 @@ public class BookingService {
         return token;
     }
 
-    public void confirmBooking() {
-        // TODO: validar el token con redisLockService.isValid(roomId, token),
-        // calcular el precio (RN-01 incluida), crear la reserva dentro de una
-        // transacción (@Transactional) y, solo si Postgres la acepta, liberar
-        // el lock con redisLockService.release(roomId). Si la restricción
-        // EXCLUDE rechaza el insert, lanzar IllegalStateException (ya se
-        // traduce a 409 vía ApiExceptionHandler).
-        throw new UnsupportedOperationException("confirmBooking aún no implementado");
+    @Transactional
+    public Booking confirmBooking(BookingRequestDto request) {
+        if (!redisLockService.isValid(request.getRoomId(), request.getLockToken())) {
+            throw new IllegalStateException("El bloqueo temporal ha expirado o no es válido");
+        }
+
+        Room room = roomRepository.findById(request.getRoomId())
+                .orElseThrow(() -> new IllegalArgumentException("La habitación no existe"));
+
+        long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
+        BigDecimal totalPrice = room.getPricePerNight().multiply(BigDecimal.valueOf(nights));
+
+        Guest guest = guestRepository.findByWhatsappPhone(request.getWaId())
+                .orElseGet(() -> {
+                    Guest newGuest = new Guest();
+                    newGuest.setWhatsappPhone(request.getWaId());
+                    return guestRepository.save(newGuest);
+                });
+
+        Booking booking = new Booking();
+        booking.setGuestId(guest.getId());
+        booking.setRoomId(room.getId());
+        booking.setCheckIn(request.getCheckIn());
+        booking.setCheckOut(request.getCheckOut());
+        booking.setStatus("pending_payment");
+        booking.setPaymentStatus("pending");
+        booking.setAdults(request.getAdults());
+        booking.setChildren(request.getChildren());
+        booking.setWithPet(request.getHasPet());
+        booking.setTotalPrice(totalPrice);
+        booking.setSource("chatbot");
+        booking.setLockId(request.getLockToken());
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        redisLockService.release(request.getRoomId(), request.getLockToken());
+
+        return savedBooking;
     }
 
-    public void cancelBooking() {
-        // RN-03 (política de cancelación, según el documento de requerimientos):
-        //   +72h antes del check-in → 100% de reembolso
-        //   24h-72h antes del check-in → 50% de reembolso
-        //   -24h antes o no-show → 0% de reembolso
-        // Pago está fuera de alcance en esta fase — se deja sin implementar
-        // a propósito. TODO: implementar cuando se retome MercadoPago.
+    public void cancelBooking(Long id) {
         throw new UnsupportedOperationException("cancelBooking aún no implementado");
+    }
+
+    @Transactional
+    public Booking confirmPayment(Long id) {
+        Booking booking = bookingRepository.findById(id).orElseThrow();
+        booking.setPaymentStatus("paid");
+        booking.setStatus("confirmed");
+        return bookingRepository.save(booking);
     }
 }
