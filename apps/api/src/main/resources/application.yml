@@ -31,3 +31,5 @@ satori:
   jwt:
     secret: ${JWT_SECRET:dev-secret-key-cambiar-en-produccion-1234567890}
     expiracion-ms: ${JWT_EXPIRATION_MS:86400000}
+  booking:
+    test-payment-enabled: ${BOOKING_TEST_PAYMENT_ENABLED:false}

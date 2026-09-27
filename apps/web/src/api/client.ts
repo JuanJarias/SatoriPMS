@@ -1,6 +1,6 @@
 const baseURL = (import.meta as ImportMeta & {
   env: { VITE_API_URL?: string };
-}).env.VITE_API_URL ?? '';
+}).env.VITE_API_URL ?? 'http://localhost:8080';
 
 type RequestConfig = RequestInit & { params?: Record<string, string> };
 

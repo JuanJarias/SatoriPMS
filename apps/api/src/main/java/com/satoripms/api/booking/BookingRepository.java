@@ -5,9 +5,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
+       List<Booking> findByReservationGroupId(UUID reservationGroupId);
+
+       List<Booking> findAllByOrderByCreatedAtDesc();
 
     @Query(value = "SELECT count(*) FROM booking b WHERE b.room_id = :roomId " +
            "AND b.stay_range && daterange(:checkIn, :checkOut) " +

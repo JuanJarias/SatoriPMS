@@ -5,6 +5,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "booking")
@@ -50,6 +51,12 @@ public class Booking {
 
     @Column(name = "lock_id")
     private String lockId;
+
+    @Column(name = "reservation_group_id")
+    private UUID reservationGroupId;
+
+    @Column(name = "companions")
+    private String companions;
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;

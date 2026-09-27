@@ -21,6 +21,9 @@ public class Guest {
 
     private String email;
 
+    @Column(name = "document_number")
+    private String documentNumber;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
