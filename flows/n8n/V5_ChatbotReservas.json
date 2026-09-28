@@ -542,8 +542,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2960,
-        1472
+        -2544,
+        1760
       ]
     },
     {
@@ -560,8 +560,8 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        -2784,
-        1472
+        -2368,
+        1760
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -596,8 +596,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -2608,
-        1472
+        -2192,
+        1760
       ]
     },
     {
@@ -610,8 +610,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        -2384,
-        1472
+        -1968,
+        1760
       ],
       "webhookId": "c48b0d28-8948-4714-849d-faf1a054852f"
     },
@@ -628,8 +628,8 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        -2176,
-        1472
+        -1760,
+        1760
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -648,8 +648,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1968,
-        1472
+        -1552,
+        1760
       ]
     },
     {
@@ -682,8 +682,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -1760,
-        1472
+        -1344,
+        1760
       ]
     },
     {
@@ -695,8 +695,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1552,
-        1376
+        -2384,
+        1952
       ]
     },
     {
@@ -724,8 +724,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -1344,
-        1376
+        -2176,
+        1952
       ]
     },
     {
@@ -738,8 +738,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        -1136,
-        1376
+        -1968,
+        1952
       ],
       "webhookId": "3cc811e7-93d1-43e9-8655-53ab4a0d5b19"
     },
@@ -756,8 +756,8 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        -928,
-        1376
+        -1760,
+        1952
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -776,8 +776,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -720,
-        1376
+        -1552,
+        1952
       ]
     },
     {
@@ -810,8 +810,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -512,
-        1376
+        -1344,
+        1952
       ]
     },
     {
@@ -824,8 +824,8 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        -304,
-        1280
+        -2384,
+        2144
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -891,7 +891,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -3120,
+        -2944,
         1136
       ]
     },
@@ -911,7 +911,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -2864,
+        -2688,
         1120
       ]
     },
@@ -1118,7 +1118,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst D = J.session?.reservation_draft || {};\nconst keep = (draft, step) => ({ state: 'reserva', step, agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: draft });\nconst reply = (message, session) => [{ json: { wa_id: J.wa_id, sender_name: J.sender_name, response_text: message, session, api_action: 'reply' } }];\nif (J.route === 'reserva:seleccion_habitacion') {\n  const rooms = Array.isArray(D.availableRooms) ? D.availableRooms : [];\n  const input = String(J.message_text || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n  const words = { uno: '1', un: '1', una: '1', dos: '2', tres: '3', cuatro: '4', cinco: '5', seis: '6', siete: '7', ocho: '8', nueve: '9', diez: '10' };\n  const digits = input.replace(/\\b(uno|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\\b/g, (word) => words[word]).match(/\\d+/g) || [];\n  const indices = [...new Set(digits.map(Number).filter((number) => number >= 1 && number <= rooms.length))];\n  const selected = indices.map((number) => rooms[number - 1]);\n  if (!selected.length) return reply('⚠️ No reconocí la selección. Responde con los números de la lista, separados por coma; por ejemplo: *1, 3*.', keep(D, 'seleccion_habitacion'));\n  return selected.map((room) => ({ json: Object.assign({}, J, { api_action: 'lock', roomId: room.id, checkIn: D.checkIn, checkOut: D.checkOut, selectedRooms: selected, lockRoom: room }) }));\n}\nif (D.step === 'confirmacion') {\n  const answer = String(J.message_text || '').toLowerCase().trim();\n  if (['confirmar', 'si', 'sí', 'reserva_confirmar', 'continuar'].includes(answer)) return [{ json: J }];\n  if (['cancelar', 'no', 'reserva_cancelar'].includes(answer)) return reply('Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} });\n  return reply('No entendí tu respuesta y no he confirmado ni cancelado la reserva. Responde *Sí, confirmar* o *No, cancelar*.', keep(D, 'confirmacion'));\n}\nif (D.step === 'acompanantes') {\n  const normalized = String(J.message_text || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n  const none = /^(ninguno|ninguna|ningun|no hay|nadie|solo yo|solo el titular)[.! ]*$/.test(normalized);\n  const expected = Math.max(0, Number(D.adults || 0) + Number(D.children || 0) - 1);\n  if (none && expected > 0) return reply('Antes indicaste que se hospedan ' + (expected + 1) + ' personas. ¿Cuáles son los nombres de tus ' + expected + ' acompañante(s)? Si cambió el número de huéspedes, vuelve a indicarlo.', keep(D, 'acompanantes'));\n  if (!none && expected === 0) return reply('Según los huéspedes registrados, solo se hospeda la persona titular. Indica *ninguno* o vuelve a escribir cuántos adultos y niños se hospedarán.', keep(D, 'huespedes'));\n}\nreturn [{ json: J }];"
+        "jsCode": "const J = $input.first().json;\nconst D = J.session?.reservation_draft || {};\nconst keep = (draft, step) => ({ state: 'reserva', step, agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: draft });\nconst reply = (message, session) => [{ json: { wa_id: J.wa_id, sender_name: J.sender_name, response_text: message, session, api_action: 'reply' } }];\n\nif (J.route === 'reserva:seleccion_habitacion') {\n  const rooms = Array.isArray(D.availableRooms) ? D.availableRooms : [];\n  const input = String(J.message_text || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n  const words = { uno: '1', un: '1', una: '1', dos: '2', tres: '3', cuatro: '4', cinco: '5', seis: '6', siete: '7', ocho: '8', nueve: '9', diez: '10' };\n  const digits = input.replace(/\\b(uno|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\\b/g, (word) => words[word]).match(/\\d+/g) || [];\n  const indices = [...new Set(digits.map(Number).filter((number) => number >= 1 && number <= rooms.length))];\n  const selected = indices.map((number) => rooms[number - 1]);\n  if (!selected.length) return reply('⚠️ No reconocí la selección. Responde con los números de la lista, separados por coma; por ejemplo: *1, 3*.', keep(D, 'seleccion_habitacion'));\n  return selected.map((room) => ({ json: Object.assign({}, J, { api_action: 'lock', roomId: room.id, checkIn: D.checkIn, checkOut: D.checkOut, selectedRooms: selected, lockRoom: room }) }));\n}\n\nif (D.step === 'confirmacion') {\n  const answer = String(J.message_text || '').toLowerCase().trim();\n  if (['confirmar', 'si', 'sí', 'reserva_confirmar', 'continuar'].includes(answer)) return [{ json: J }];\n  if (['cancelar', 'no', 'reserva_cancelar'].includes(answer)) return reply('Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} });\n  return reply('No entendí tu respuesta y no he confirmado ni cancelado la reserva. Responde *Sí, confirmar* o *No, cancelar*.', keep(D, 'confirmacion'));\n}\n\nif (D.step === 'acompanantes') {\n  const text = String(J.message_text || '');\n  const normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n  const none = /^(ninguno|ninguna|ningun|no hay|nadie|solo yo|solo el titular)[.! ]*$/.test(normalized);\n  const expected = Math.max(0, Number(D.adults || 0) + Number(D.children || 0) - 1);\n  \n  if (none && expected > 0) return reply('Antes indicaste que se hospedan ' + (expected + 1) + ' personas. ¿Cuáles son los nombres de tus ' + expected + ' acompañante(s)?', keep(D, 'acompanantes'));\n  \n  if (!none && expected === 0) return reply('Según los huéspedes registrados, solo se hospeda la persona titular. Indica *ninguno*.', keep(D, 'acompanantes'));\n  \n  if (!none && expected > 0) {\n    // Separa el texto usando comas, guiones, saltos de línea o la letra \"y/e\" para contar los nombres\n    const names = text.split(/,| y | e |\\n|-/).map(n => n.trim()).filter(n => n.length > 2);\n    \n    if (names.length !== expected) {\n      return reply(`⚠️ Indicaste que serían ${expected + 1} huéspedes en total (tú y ${expected} acompañante(s)). Por favor, escribe los ${expected} nombres separados por coma. Si la cantidad de huéspedes es incorrecta, escribe *menú* para reiniciar.`, keep(D, 'acompanantes'));\n    }\n  }\n}\n\nreturn [{ json: J }];"
       },
       "id": "55dee06b-240a-4f63-92d1-951ae4aa2203",
       "name": "H Validar y Seleccionar Habitaciones",
@@ -1138,8 +1138,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3216,
-        2464
+        -3136,
+        2448
       ]
     },
     {
@@ -1214,6 +1214,15 @@
       "parameters": {
         "method": "POST",
         "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/lock' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ waId: $json.wa_id, roomId: $json.roomId, checkIn: $json.checkIn, checkOut: $json.checkOut }) }}",
@@ -1240,8 +1249,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3216,
-        2640
+        -3136,
+        2128
       ]
     },
     {
@@ -1253,7 +1262,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3216,
+        -3136,
         2288
       ]
     },
@@ -1267,7 +1276,95 @@
       "typeVersion": 2,
       "position": [
         -3376,
-        2464
+        2448
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/confirm' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "e1ae3cb1-af87-4d34-9460-50660dec544e",
+      "name": "API Confirmar Reserva",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3136,
+        2640
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const request = $('H Procesar Reserva Paso').first().json;\n// Recibe la respuesta (sea exitosa o un JSON de error de tu backend)\nconst apiResponse = $input.first().json || {};\n\nlet text = '';\n\nif (apiResponse.reservationGroupId) {\n    // Éxito: la base de datos guardó la reserva correctamente\n    const code = String(apiResponse.reservationGroupId).split('-')[0].toUpperCase();\n    text = `🎉 ¡Tu reserva ha sido guardada con éxito bajo el código *${code}*!\\n\\nTe esperamos pronto en Satori Hotel. Escribe *menú* para iniciar otra consulta.`;\n} else {\n    // Error: la API rechazó la petición (ej. 400 Bad Request o 409 Conflict)\n    const errorMsg = apiResponse.error || apiResponse.message || 'Error desconocido';\n    text = `⚠️ Lo siento, no pudimos guardar tu reserva. Razón: *${errorMsg}*.\\n\\nSi te demoraste más de 15 minutos, el bloqueo se liberó. Escribe *menú* para intentar de nuevo.`;\n}\n\nreturn [{\n    json: {\n        wa_id: request.wa_id,\n        sender_name: request.sender_name,\n        response_text: text,\n        session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: request.wa_id, sender_name: request.sender_name, reservation_draft: {} }\n    }\n}];"
+      },
+      "id": "ddd8663a-3778-43b7-bb5c-4cc0952108fd",
+      "name": "H Reserva Exitosa",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2928,
+        2640
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "38b67ae9-4929-4d92-9825-80605ce5f608",
+                    "leftValue": "={{ $json.api_action }}",
+                    "rightValue": "confirm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Confirmar Reserva"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Mensaje Normal"
+        }
+      },
+      "id": "1131411e-7937-4fbf-b86e-007c363d48c5",
+      "name": "¿Confirmar en BD?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2928,
+        2448
       ]
     }
   ],
@@ -1831,7 +1928,7 @@
       "main": [
         [
           {
-            "node": "Preparar Salida",
+            "node": "¿Confirmar en BD?",
             "type": "main",
             "index": 0
           }
@@ -1906,6 +2003,46 @@
           }
         ]
       ]
+    },
+    "API Confirmar Reserva": {
+      "main": [
+        [
+          {
+            "node": "H Reserva Exitosa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Reserva Exitosa": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Confirmar en BD?": {
+      "main": [
+        [
+          {
+            "node": "API Confirmar Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -1913,7 +2050,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "24255922-9b8c-462a-bc41-88be540f377a",
+  "versionId": "c12cc871-661b-4510-b71d-1c008a74b394",
   "meta": {
     "instanceId": "a2b2756b7d02dafdbab44931cfca775be6db84f775ed0cd81ff5c5cf2ade7177"
   },

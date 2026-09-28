@@ -35,12 +35,22 @@ public class BookingService {
     }
 
     public boolean isAvailable(Long roomId, LocalDate checkIn, LocalDate checkOut) {
-        return bookingRepository.countConflictingBookings(roomId, checkIn, checkOut) == 0;
+        // 1. Verifica en SQL (reservas reales)
+        boolean dbAvailable = bookingRepository.countConflictingBookings(roomId, checkIn, checkOut) == 0;
+        
+        // 2. Verifica en Redis (bloqueos temporales)
+        return dbAvailable && !redisLockService.isLocked(roomId, checkIn, checkOut);
     }
 
     public List<Room> listAvailableRooms(LocalDate checkIn, LocalDate checkOut,
                                           Integer adults, Integer children, Boolean pet) {
-        return roomRepository.findAvailableRooms(checkIn, checkOut, adults, children, pet);
+        // 1. Trae las habitaciones libres según PostgreSQL/MySQL
+        List<Room> dbRooms = roomRepository.findAvailableRooms(checkIn, checkOut, adults, children, pet);
+        
+        // 2. Excluye de la lista las que están bloqueadas actualmente en Redis
+        return dbRooms.stream()
+                .filter(room -> !redisLockService.isLocked(room.getId(), checkIn, checkOut))
+                .toList();
     }
 
     public String createTemporaryLock(Long roomId, LocalDate checkIn, LocalDate checkOut) {

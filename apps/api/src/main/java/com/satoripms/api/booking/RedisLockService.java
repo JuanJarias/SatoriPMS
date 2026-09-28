@@ -5,6 +5,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -76,5 +77,34 @@ public class RedisLockService {
             List.of(buildIntervalsKey(roomId), buildMetadataPrefix(roomId)),
             token);
         return Long.valueOf(1L).equals(released);
+    }
+    
+   public boolean isLocked(Long roomId, LocalDate checkIn, LocalDate checkOut) {
+        // Script Lua que recorre los tokens activos de la habitación y verifica si las fechas se solapan
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>(
+            "local members = redis.call('zrange', KEYS[1], 0, -1) "
+            + "for _, existingToken in ipairs(members) do "
+            + "  local metadataKey = KEYS[2] .. existingToken "
+            + "  local existing = redis.call('hmget', metadataKey, 'checkIn', 'checkOut') "
+            + "  if existing[1] and existing[2] then "
+            + "    if tonumber(existing[2]) > tonumber(ARGV[1]) and tonumber(existing[1]) < tonumber(ARGV[2]) then "
+            + "      return 1 " // Retorna 1 si hay solapamiento (está bloqueada)
+            + "    end "
+            + "  else "
+            + "    redis.call('zrem', KEYS[1], existingToken) " // Limpia tokens huérfanos
+            + "  end "
+            + "end "
+            + "return 0", // Retorna 0 si está libre
+            Long.class
+        );
+
+        Long locked = redisTemplate.execute(
+            script,
+            List.of(buildIntervalsKey(roomId), buildMetadataPrefix(roomId)),
+            String.valueOf(checkIn.toEpochDay()),
+            String.valueOf(checkOut.toEpochDay())
+        );
+
+        return Long.valueOf(1L).equals(locked);
     }
 }
