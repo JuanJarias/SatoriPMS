@@ -141,6 +141,30 @@ public class BookingController {
         }
     }
 
+    @GetMapping("/bookings/group/{code}")
+    public ResponseEntity<?> getReservationDetails(@PathVariable String code) {
+        try {
+            return ResponseEntity.ok(bookingService.getReservationDetailsByCode(code));
+        } catch (java.util.NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/bookings/group/{code}/cancellation")
+    public ResponseEntity<?> cancelReservationGroup(@PathVariable String code) {
+        try {
+            return ResponseEntity.ok(bookingService.cancelReservationGroupByCode(code));
+        } catch (java.util.NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/bookings/{id}/payment-confirmation")
     public ResponseEntity<?> confirmPayment(@PathVariable Long id,
                                              @RequestBody(required = false) Map<String, Object> payment) {
@@ -154,6 +178,6 @@ public class BookingController {
     @PostMapping("/bookings/{id}/cancellation")
     public ResponseEntity<?> cancelBooking(@PathVariable Long id) {
         return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .body(Map.of("error", "cancelBooking no implementado todavía"));
+                .body(Map.of("error", "Por favor use POST /api/bookings/group/{code}/cancellation"));
     }
 }

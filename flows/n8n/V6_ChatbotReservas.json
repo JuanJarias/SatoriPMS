@@ -1,5 +1,5 @@
 {
-  "name": "V5_ChatbotReservas",
+  "name": "V6_ChatbotReservas",
   "nodes": [
     {
       "parameters": {
@@ -326,6 +326,30 @@
               },
               "renameOutput": true,
               "outputKey": "no_texto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r_rev",
+                    "leftValue": "={{ $json.session.state }}",
+                    "rightValue": "revisar_reserva",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "revisar_reserva"
             }
           ]
         },
@@ -1072,7 +1096,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + $env.GEMINI_API_KEY }}",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=' + $env.GEMINI_API_KEY }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.geminiRequest) }}",
@@ -1105,7 +1129,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst step = J.session?.step;\nconst original = String(J.message_text || '').trim();\nlet text = String(J.interpreted_answer || original).trim();\nif (J.session?.state === 'reserva' && step === 'confirmacion') {\n  const normalized = original.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[.,!?;:]/g, ' ').replace(/\\s+/g, ' ').trim();\n  const affirmative = /^(si( confirmo)?|si claro|claro( que si)?|confirmo|confirmar|continuar|correcto|de acuerdo|esta bien|listo|de una|por supuesto)$/.test(normalized);\n  const negative = /^(no|no gracias|cancelar|cancelo|cancelar reserva|mejor no)$/.test(normalized);\n  if (affirmative !== negative) text = affirmative ? 'confirmar' : 'cancelar';\n}\nif (J.session?.state === 'reserva' && step === 'huespedes') {\n  const words = { cero: '0', un: '1', uno: '1', una: '1', dos: '2', tres: '3', cuatro: '4', cinco: '5', seis: '6', siete: '7', ocho: '8', nueve: '9', diez: '10', once: '11', doce: '12', trece: '13', catorce: '14', quince: '15', dieciseis: '16', diecisiete: '17', dieciocho: '18', diecinueve: '19', veinte: '20' };\n  text = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\b(cero|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte)\\b/g, (word) => words[word]);\n}\nreturn [{ json: Object.assign({}, J, { message_text: text }) }];"
+        "jsCode": "const J = $input.first().json;\nconst step = J.session?.step;\nconst original = String(J.message_text || '').trim();\nlet text = String(J.interpreted_answer || original).trim();\nif (J.session?.state === 'reserva' && step === 'confirmacion') {\n  const normalized = original.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[.,!?;:]/g, ' ').replace(/\\s+/g, ' ').trim();\n  const affirmative = /^(si( confirmo)?|si claro|claro( que si)?|confirmo|confirmar|continuar|correcto|de acuerdo|esta bien|listo|de una|por supuesto)$/.test(normalized);\n  const negative = /^(no|no gracias|cancelar|cancelo|cancelar reserva|mejor no)$/.test(normalized);\n  if (affirmative !== negative) text = affirmative ? 'confirmar' : 'cancelar';\n}\nif (J.session?.state === 'reserva' && step === 'huespedes') {\n  // Normalizar sinonimos y sufijos antes de procesar numeros\n  text = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\n  // Aumentativos/diminutivos de adulto\n  text = text.replace(/\\badultit[ao]s?\\b|\\badultot[ao]s?\\b/g, 'adultos');\n  text = text.replace(/\\badult[ao]s?\\b/g, 'adultos');\n  // Sinonimos de nino\n  text = text.replace(/\\bni[n][ao]it[ao]s?\\b|\\bni[n][ao]s?\\b|\\bbebes?\\b|\\bchic[ao]s?\\b|\\bmenores?\\b|\\bpequen[ao]s?\\b/g, 'ninos');\n  const wordMap = {\n    cero:'0', un:'1', uno:'1', una:'1', dos:'2', tres:'3', cuatro:'4', cinco:'5',\n    seis:'6', siete:'7', ocho:'8', nueve:'9', diez:'10', once:'11', doce:'12',\n    trece:'13', catorce:'14', quince:'15', dieciseis:'16', diecisiete:'17',\n    dieciocho:'18', diecinueve:'19', veinte:'20'\n  };\n  text = text.replace(/\\b(cero|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte)\\b/g, w => wordMap[w]);\n}\nreturn [{ json: Object.assign({}, J, { message_text: text }) }];"
       },
       "id": "87385878-2014-432b-bf0c-e271d033a850",
       "name": "H Normalizar Respuesta",
@@ -1131,7 +1155,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst D = (J.session && J.session.reservation_draft) || {};\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase();\nconst keep = (draft, step) => ({ state: 'reserva', step, agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: draft });\nconst output = (response_text, session, extra = {}) => ({ json: Object.assign({ wa_id: J.wa_id, sender_name: J.sender_name, response_text, session }, extra) });\n\nif (J.route === 'reserva:seleccion_habitacion') {\n  const rooms = Array.isArray(D.availableRooms) ? D.availableRooms : [];\n  const number = Number((normalized.match(/\\d+/) || [])[0]);\n  const room = rooms.find((item, index) => String(item.id) === normalized.replace('room_', '') || String(item.id) === normalized || index + 1 === number);\n  if (!room) return [output('⚠️ No reconocí la habitación. Usa el botón de la lista o responde con su número.', keep(D, 'seleccion_habitacion'))];\n  const draft = Object.assign({}, D, { roomId: room.id, room, adults: 1, children: 0, hasPet: false });\n  return [output('🔒 Estoy bloqueando temporalmente la habitación seleccionada...', keep(draft, 'bloqueando'), { api_action: 'lock', roomId: room.id, checkIn: D.checkIn, checkOut: D.checkOut })];\n}\n\nif (D.step === 'huespedes') {\n  const numberTokens = (normalized.match(/\\d+/g) || []).map(Number);\n  const adultMatches = [...normalized.matchAll(/(\\d+)\\s*(adultos?|personas?|huespedes?)/g)];\n  const childMatches = [...normalized.matchAll(/(\\d+)\\s*(ninos?|niños?|menores?)/g)];\n  let adults = adultMatches.length ? Number(adultMatches[0][1]) : (numberTokens[0] ?? null);\n  let children = childMatches.length ? Number(childMatches[0][1]) : (numberTokens[1] ?? 0);\n  if (adults == null && numberTokens.length) adults = numberTokens[0];\n  if (children === 0 && numberTokens.length > 1 && !childMatches.length) children = numberTokens[1];\n  const max = Number(D.room && D.room.maxAdultsCapacity || 0) + Number(D.room && D.room.childrenCapacity || 0);\n  if (!adults || adults < 1 || children < 0) return [output('⚠️ Indica las personas así: *2 adultos y 1 niño*.', keep(D, 'huespedes'))];\n  if (max && adults + children > max) return [output('⚠️ Esa habitación admite máximo *' + max + ' personas* según su capacidad. Regresa a la selección escribiendo *menú* o elige otra habitación.', keep(D, 'seleccion_habitacion'))];\n  const base = Number(D.room && D.room.baseAdultsCapacity || 0);\n  const extraPrice = Number(D.room && D.room.extraGuestPrice || 0);\n  const extraGuests = Math.max(0, adults + children - base);\n  const draft = Object.assign({}, D, { adults, children, extraGuests, extraGuestPrice: extraPrice, extraTotal: extraGuests * extraPrice });\n\n  return [output(`✅ Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\nIndica el nombre completo de la persona que hará la reserva.`, keep(draft, 'nombre'))];\n}\n\nif (D.step === 'nombre') {\n  if (text.length < 3) return [output('⚠️ Indica un nombre completo válido.', keep(D, 'nombre'))];\n  return [output('Gracias. Ahora indica el número de identificación del titular de la reserva.', keep(Object.assign({}, D, { guestName: text }), 'identificacion'))];\n}\n\nif (D.step === 'identificacion') {\n  const document = text.replace(/\\s+/g, '').replace(/[^0-9]/g, '');\n  if (!/^\\d{6,10}$/.test(document)) return [output('⚠️ La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', keep(D, 'identificacion'))];\n  return [output('¿Viajas con mascota?', keep(Object.assign({}, D, { document }), 'mascota'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: '¿Viajas con mascota?' }, action: { buttons: [{ type: 'reply', reply: { id: 'pet_si', title: 'Sí' } }, { type: 'reply', reply: { id: 'pet_no', title: 'No' } }] } } } })];\n}\n\nif (D.step === 'mascota') {\n  const hasPet = ['si', 'sí', 'pet_si', 'yes'].includes(normalized);\n  const noPet = ['no', 'pet_no'].includes(normalized);\n  if (!hasPet && !noPet) return [output('Responde usando *Sí* o *No* para la mascota.', keep(D, 'mascota'))];\n  if (hasPet && D.room && D.room.allowsPets === false) return [output('⚠️ La habitación seleccionada no permite mascotas. Responde *No* o elige otra habitación.', keep(D, 'mascota'))];\n  return [output('¿Cuáles son los nombres de tus acompañantes? Si no hay, responde *ninguno*.', keep(Object.assign({}, D, { hasPet }), 'acompanantes'))];\n}\n\nif (D.step === 'acompanantes') {\n  const nights = Math.max(1, Math.round((new Date(D.checkOut) - new Date(D.checkIn)) / 86400000));\n  const nightly = Number(D.room && D.room.pricePerNight || 0);\n  const total = nights * nightly + Number(D.extraTotal || 0);\n  const draft = Object.assign({}, D, { companions: text, nights, total });\n\n  const summary = `🧾 *Resumen de tu reserva*\\n\\nHabitación: *${D.room.name || D.room.type} #${D.room.number}*\\nEntrada: *${D.checkIn}*\\nSalida: *${D.checkOut}*\\nHuéspedes: *${D.adults} adulto(s), ${D.children} niño(s)*\\nMascota: *${D.hasPet ? 'Sí' : 'No'}*\\nTitular: *${D.guestName}*\\nAcompañantes: *${text}*\\nNoches: *${nights}*\\nTotal estimado: *$${total.toFixed(2)}*\\n\\nEl bloqueo dura 15 minutos. El pago todavía no está habilitado en este flujo. ¿Deseas continuar?`;\n\n  return [output(summary, keep(draft, 'confirmacion'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: summary }, action: { buttons: [{ type: 'reply', reply: { id: 'reserva_confirmar', title: 'Continuar' } }, { type: 'reply', reply: { id: 'reserva_cancelar', title: 'Cancelar' } }] } } } })];\n}\n\nif (D.step === 'confirmacion') {\n  if (['si', 'sí', 'reserva_confirmar', 'confirmar', 'continuar'].includes(normalized)) {\n    const payload = {\n      waId: J.wa_id,\n      guestName: D.guestName,\n      guestDocument: D.document,\n      companions: D.companions || '',\n      checkIn: D.checkIn,\n      checkOut: D.checkOut,\n      adults: Number(D.adults || 0),\n      children: Number(D.children || 0),\n      hasPet: Boolean(D.hasPet),\n      rooms: Array.isArray(D.lockTokens) ? D.lockTokens.map((entry) => ({ roomId: entry.roomId, lockToken: entry.lockToken })) : [{ roomId: D.roomId, lockToken: D.lockToken }]\n    };\n    return [output('✅ Estoy guardando la reserva y validando el bloqueo. En breve te confirmo el estado.', { state: 'reserva', step: 'confirmando', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: Object.assign({}, D, { payload }) }, { api_action: 'confirm', payload })];\n  }\n  return [output('Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];\n}\n\nreturn [output('Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];"
+        "jsCode": "const J = $input.first().json;\nconst D = (J.session && J.session.reservation_draft) || {};\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase();\nconst keep = (draft, step) => ({ state: 'reserva', step, agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: draft });\nconst output = (response_text, session, extra = {}) => ({ json: Object.assign({ wa_id: J.wa_id, sender_name: J.sender_name, response_text, session }, extra) });\n\nif (J.route === 'reserva:seleccion_habitacion') {\n  const rooms = Array.isArray(D.availableRooms) ? D.availableRooms : [];\n  const number = Number((normalized.match(/\\d+/) || [])[0]);\n  const room = rooms.find((item, index) => String(item.id) === normalized.replace('room_', '') || String(item.id) === normalized || index + 1 === number);\n  if (!room) return [output('⚠️ No reconocí la habitación. Usa el botón de la lista o responde con su número.', keep(D, 'seleccion_habitacion'))];\n  const draft = Object.assign({}, D, { roomId: room.id, room, adults: 1, children: 0, hasPet: false });\n  return [output('🔒 Estoy bloqueando temporalmente la habitación seleccionada...', keep(draft, 'bloqueando'), { api_action: 'lock', roomId: room.id, checkIn: D.checkIn, checkOut: D.checkOut })];\n}\n\nif (D.step === 'huespedes') {\n  const numberTokens = (normalized.match(/\\d+/g) || []).map(Number);\n  const adultMatches = [...normalized.matchAll(/(\\d+)\\s*(adultos?|personas?|huespedes?)/g)];\n  const childMatches = [...normalized.matchAll(/(\\d+)\\s*(ninos?|niños?|menores?)/g)];\n  let adults = adultMatches.length ? Number(adultMatches[0][1]) : (numberTokens[0] ?? null);\n  let children = childMatches.length ? Number(childMatches[0][1]) : (numberTokens[1] ?? 0);\n  if (adults == null && numberTokens.length) adults = numberTokens[0];\n  if (children === 0 && numberTokens.length > 1 && !childMatches.length) children = numberTokens[1];\n  const max = Number(D.room && D.room.maxAdultsCapacity || 0) + Number(D.room && D.room.childrenCapacity || 0);\n  if (!adults || adults < 1 || children < 0) return [output('⚠️ Indica las personas así: *2 adultos y 1 niño*.', keep(D, 'huespedes'))];\n  if (max && adults + children > max) return [output('⚠️ Esa habitación admite máximo *' + max + ' personas* según su capacidad. Regresa a la selección escribiendo *menú* o elige otra habitación.', keep(D, 'seleccion_habitacion'))];\n  const base = Number(D.room && D.room.baseAdultsCapacity || 0);\n  const extraPrice = Number(D.room && D.room.extraGuestPrice || 0);\n  const extraGuests = Math.max(0, adults + children - base);\n  const draft = Object.assign({}, D, { adults, children, extraGuests, extraGuestPrice: extraPrice, extraTotal: extraGuests * extraPrice });\n\n  return [output(`✅ Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\nIndica el nombre completo de la persona que hará la reserva.`, keep(draft, 'nombre'))];\n}\n\nif (D.step === 'nombre') {\n  if (text.length < 3) return [output('⚠️ Indica un nombre completo válido.', keep(D, 'nombre'))];\n  return [output('Gracias. Ahora indica el número de identificación del titular de la reserva.', keep(Object.assign({}, D, { guestName: text }), 'identificacion'))];\n}\n\nif (D.step === 'identificacion') {\n  const document = text.replace(/\\s+/g, '').replace(/[^0-9]/g, '');\n  if (!/^\\d{6,10}$/.test(document)) return [output('⚠️ La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', keep(D, 'identificacion'))];\n  return [output('¿Viajas con mascota?', keep(Object.assign({}, D, { document }), 'mascota'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: '¿Viajas con mascota?' }, action: { buttons: [{ type: 'reply', reply: { id: 'pet_si', title: 'Sí' } }, { type: 'reply', reply: { id: 'pet_no', title: 'No' } }] } } } })];\n}\n\nif (D.step === 'mascota') {\n  const hasPet = ['si', 'sí', 'pet_si', 'yes'].includes(normalized);\n  const noPet = ['no', 'pet_no'].includes(normalized);\n  if (!hasPet && !noPet) return [output('Responde usando *Sí* o *No* para la mascota.', keep(D, 'mascota'))];\n  if (hasPet && D.room && D.room.allowsPets === false) return [output('⚠️ La habitación seleccionada no permite mascotas. Responde *No* o elige otra habitación.', keep(D, 'mascota'))];\n  return [output('¿Cuáles son los nombres de tus acompañantes? Si no hay, responde *ninguno*.', keep(Object.assign({}, D, { hasPet }), 'acompanantes'))];\n}\n\nif (D.step === 'acompanantes') {\n  // Aceptar cualquier texto libre; detectar respuestas de 'sin acompañantes'\n  const noCompanions = ['ninguno', 'no', 'solo yo', 'nadie', 'sin acompanantes',\n                        'no hay', 'no tengo', 'no viajan mas'].includes(normalized);\n  const companions = noCompanions ? '' : text;\n  const nights = Math.max(1, Math.round((new Date(D.checkOut) - new Date(D.checkIn)) / 86400000));\n  const nightly = Number(D.room && D.room.pricePerNight || 0);\n  const total = nights * nightly + Number(D.extraTotal || 0);\n  const draft = Object.assign({}, D, { companions: companions, nights, total });\n\n\n  const summary = `🧾 *Resumen de tu reserva*\\n\\nHabitación: *${D.room.name || D.room.type} #${D.room.number}*\\nEntrada: *${D.checkIn}*\\nSalida: *${D.checkOut}*\\nHuéspedes: *${D.adults} adulto(s), ${D.children} niño(s)*\\nMascota: *${D.hasPet ? 'Sí' : 'No'}*\\nTitular: *${D.guestName}*\\nAcompañantes: *${text}*\\nNoches: *${nights}*\\nTotal estimado: *$${total.toFixed(2)}*\\n\\nEl bloqueo dura 15 minutos. El pago todavía no está habilitado en este flujo. ¿Deseas continuar?`;\n\n  return [output(summary, keep(draft, 'confirmacion'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: summary }, action: { buttons: [{ type: 'reply', reply: { id: 'reserva_confirmar', title: 'Continuar' } }, { type: 'reply', reply: { id: 'reserva_cancelar', title: 'Cancelar' } }] } } } })];\n}\n\nif (D.step === 'confirmacion') {\n  if (['si', 'sí', 'reserva_confirmar', 'confirmar', 'continuar'].includes(normalized)) {\n    const payload = {\n      waId: J.wa_id,\n      guestName: D.guestName,\n      guestDocument: D.document,\n      companions: D.companions || '',\n      checkIn: D.checkIn,\n      checkOut: D.checkOut,\n      adults: Number(D.adults || 0),\n      children: Number(D.children || 0),\n      hasPet: Boolean(D.hasPet),\n      rooms: Array.isArray(D.lockTokens) ? D.lockTokens.map((entry) => ({ roomId: entry.roomId, lockToken: entry.lockToken })) : [{ roomId: D.roomId, lockToken: D.lockToken }]\n    };\n    return [output('✅ Estoy guardando la reserva y validando el bloqueo. En breve te confirmo el estado.', { state: 'reserva', step: 'confirmando', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: Object.assign({}, D, { payload }) }, { api_action: 'confirm', payload })];\n  }\n  return [output('Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];\n}\n\nreturn [output('Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];"
       },
       "id": "31ea5d92-668d-4e49-9d2f-8e508ac832cc",
       "name": "H Procesar Reserva Paso",
@@ -1285,16 +1309,11 @@
         "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/confirm' }}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            {
-              "name": "ngrok-skip-browser-warning",
-              "value": "true"
-            }
-          ]
+          "parameters": []
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "jsonBody": "={{ $json.payload }}",
         "options": {
           "timeout": 20000
         }
@@ -1311,7 +1330,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const request = $('H Procesar Reserva Paso').first().json;\n// Recibe la respuesta (sea exitosa o un JSON de error de tu backend)\nconst apiResponse = $input.first().json || {};\n\nlet text = '';\n\nif (apiResponse.reservationGroupId) {\n    // Éxito: la base de datos guardó la reserva correctamente\n    const code = String(apiResponse.reservationGroupId).split('-')[0].toUpperCase();\n    text = `🎉 ¡Tu reserva ha sido guardada con éxito bajo el código *${code}*!\\n\\nTe esperamos pronto en Satori Hotel. Escribe *menú* para iniciar otra consulta.`;\n} else {\n    // Error: la API rechazó la petición (ej. 400 Bad Request o 409 Conflict)\n    const errorMsg = apiResponse.error || apiResponse.message || 'Error desconocido';\n    text = `⚠️ Lo siento, no pudimos guardar tu reserva. Razón: *${errorMsg}*.\\n\\nSi te demoraste más de 15 minutos, el bloqueo se liberó. Escribe *menú* para intentar de nuevo.`;\n}\n\nreturn [{\n    json: {\n        wa_id: request.wa_id,\n        sender_name: request.sender_name,\n        response_text: text,\n        session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: request.wa_id, sender_name: request.sender_name, reservation_draft: {} }\n    }\n}];"
+        "jsCode": "const apiResponse = $input.first().json || {};\nconst source = (() => { try { return $('H Procesar Reserva Paso').first().json; } catch(e) { return {}; } })();\n\nlet text = '';\n\nif (apiResponse.reservationGroupId) {\n    const code = String(apiResponse.reservationGroupId).split('-')[0].toUpperCase();\n    text = `\\uD83C\\uDF89 \\u00a1Tu reserva ha sido guardada con \\u00e9xito bajo el c\\u00f3digo *${code}*!\\n\\nTe esperamos pronto en Satori Hotel. Escribe *men\\u00fa* para iniciar otra consulta.`;\n} else {\n    // Extraer el mensaje del error correctamente (puede ser string u objeto)\n    let errorMsg = apiResponse.error || apiResponse.message || apiResponse.detail;\n    if (errorMsg && typeof errorMsg === 'object') errorMsg = errorMsg.message || JSON.stringify(errorMsg);\n    if (!errorMsg) errorMsg = JSON.stringify(apiResponse);\n    text = `\\u26a0\\uFE0F Lo siento, no pudimos guardar tu reserva. Raz\\u00f3n: ${errorMsg}.\\n\\nSi te demoraste m\\u00e1s de 15 minutos, el bloqueo se liber\\u00f3. Escribe *men\\u00fa* para intentar de nuevo.`;\n}\n\nreturn [{\n    json: {\n        wa_id: source.wa_id || '',\n        sender_name: source.sender_name || '',\n        response_text: text,\n        session: { state: 'menu', step: 'esperando_opcion', agent_active: false,\n                   wa_id: source.wa_id || '', sender_name: source.sender_name || '', reservation_draft: {} }\n    }\n}];"
       },
       "id": "ddd8663a-3778-43b7-bb5c-4cc0952108fd",
       "name": "H Reserva Exitosa",
@@ -1365,6 +1384,170 @@
       "position": [
         -2928,
         2448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nconst msg = `🔎 *Consulta y Cancelación de Reservas*\\n\\nPor favor, escribe el *código de tu reserva* (los 8 caracteres que recibiste al reservar, por ejemplo: *41560C98*).\\n\\n💡 _Puedes escribir *menú* en cualquier momento para volver al inicio._`;\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: msg,\n        session: {\n            state: 'revisar_reserva',\n            step: 'pedir_codigo',\n            agent_active: false,\n            wa_id,\n            sender_name,\n            review_draft: {}\n        }\n    }\n}];"
+      },
+      "id": "5fde2399-e7d7-4501-8c8f-e48f5c79d568",
+      "name": "H F1 Inicio Revisar Reserva",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst S = J.session || {};\nconst draft = S.review_draft || {};\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n\nconst keep = (newDraft, nextStep) => ({\n    state: 'revisar_reserva',\n    step: nextStep,\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    review_draft: newDraft\n});\n\nconst reset = () => ({\n    state: 'menu',\n    step: 'esperando_opcion',\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    reservation_draft: {}\n});\n\nconst reply = (msg, newSession, extra = {}) => [{\n    json: Object.assign({\n        wa_id: J.wa_id,\n        sender_name: J.sender_name,\n        response_text: msg,\n        session: newSession,\n        api_action: 'reply'\n    }, extra)\n}];\n\n// PASO 1: Ingreso de Código\nif (S.step === 'pedir_codigo') {\n    const codeMatch = text.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase();\n    if (!codeMatch || codeMatch.length < 6) {\n        return reply('⚠️ El código debe tener al menos 6 caracteres alfanuméricos (ejemplo: *41560C98*). Inténtalo de nuevo o escribe *menú* para cancelar.', S);\n    }\n    return [{\n        json: Object.assign({}, J, {\n            api_action: 'get_booking',\n            search_code: codeMatch,\n            session: keep(Object.assign({}, draft, { inputCode: codeMatch }), 'buscando')\n        })\n    }];\n}\n\n// PASO 2: Opciones sobre la Reserva (Cancelar o Salir)\nif (S.step === 'opciones_reserva') {\n    if (['1', 'cancelar', 'cancelar reserva', 'si', 'sí', 'eliminar'].includes(normalized)) {\n        const res = draft.reservation || {};\n        const policy = res.refundPolicy || {};\n        const hours = policy.hoursUntilCheckin != null ? policy.hoursUntilCheckin : 0;\n        const policyDesc = policy.policyDescription || 'Según políticas de Torre Satori';\n        const refundAmt = policy.estimatedRefund != null ? Number(policy.estimatedRefund).toFixed(2) : '0.00';\n\n        const msg = `⚠️ *Políticas de Cancelación (Torre Satori)*\\n\\n• Más de 72h antes: Reembolso del 100%.\\n• Entre 24h y 72h antes: Reembolso del 50%.\\n• Menos de 24h o no-show: Sin reembolso (0%).\\n\\n📊 *Para tu reserva (${draft.code}):*\\n• Tiempo restante: *${hours} horas hasta check-in*\\n• Política aplicable: *${policyDesc}*\\n• Reembolso estimado: *$${refundAmt}*\\n\\n🔴 *¿Confirmas la cancelación definitiva de tu reserva?*\\nEsta acción liberará las habitaciones de inmediato y no se puede deshacer.\\n\\nResponde *Sí, confirmar* para cancelar o *No* para mantener tu reserva.`;\n\n        return reply(msg, keep(draft, 'confirmar_cancelacion'));\n    }\n    \n    return reply('Operación finalizada. Tu reserva sigue activa. Escribe *menú* para ver más opciones.', reset());\n}\n\n// PASO 3: Doble Confirmación de Cancelación\nif (S.step === 'confirmar_cancelacion') {\n    const isAffirmative = /^(si|sí|confirmar|si confirmar|si, confirmar|cancelar|de acuerdo|afirmativo|proceder)$/i.test(normalized);\n    const isNegative = /^(no|no cancelar|mantener|cancelar no|volver|menu|inicio|no gracias)$/i.test(normalized);\n\n    if (isAffirmative) {\n        return [{\n            json: Object.assign({}, J, {\n                api_action: 'cancel_booking',\n                cancel_code: draft.code,\n                session: keep(draft, 'cancelando')\n            })\n        }];\n    }\n\n    if (isNegative) {\n        return reply(`✅ Tu reserva *${draft.code}* sigue activa y protegida. ¡Te esperamos en Satori Hotel! Escribe *menú* para volver al inicio.`, reset());\n    }\n\n    return reply('No entendí tu respuesta. Por favor responde *Sí, confirmar* para cancelar la reserva o *No* para mantenerla.', S);\n}\n\nreturn reply('Escribe *menú* para volver al inicio.', reset());"
+      },
+      "id": "70b8cec5-c09d-4970-9e38-98ebbcc23d62",
+      "name": "H Normalizar Revisar Reserva",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c1",
+                    "leftValue": "={{ $json.api_action }}",
+                    "rightValue": "get_booking",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Consultar Reserva"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c2",
+                    "leftValue": "={{ $json.api_action }}",
+                    "rightValue": "cancel_booking",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cancelar Reserva"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Respuesta Normal"
+        }
+      },
+      "id": "3bf7ea57-b810-41d5-a551-48462af72f3f",
+      "name": "¿Acción Revisar Reserva?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        800,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/group/' + $json.search_code }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "650b7cf1-120c-4519-ad63-5ea9123adba5",
+      "name": "API Consultar Reserva",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1050,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/group/' + $json.cancel_code + '/cancellation' }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "c04975e0-7302-4d6e-b68e-966e35733810",
+      "name": "API Cancelar Reserva",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1050,
+        1700
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const apiResponse = $input.first().json || {};\nconst source = $('H Normalizar Revisar Reserva').first().json;\nconst wa_id = source.wa_id;\nconst sender_name = source.sender_name;\nconst codeSearched = source.search_code;\n\n// Caso Error 404 o error del backend\nif (!apiResponse.code && !apiResponse.reservationGroupId) {\n    const errorMsg = apiResponse.error || 'No se encontró ninguna reserva activa con ese código';\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: `⚠️ *Reserva no encontrada*\\n\\n${errorMsg}.\\n\\nPor favor verifica el código e inténtalo de nuevo, o escribe *menú* para volver al inicio.`,\n            session: {\n                state: 'revisar_reserva',\n                step: 'pedir_codigo',\n                agent_active: false,\n                wa_id,\n                sender_name,\n                review_draft: {}\n            }\n        }\n    }];\n}\n\n// Caso Éxito\nconst res = apiResponse;\nconst roomNames = Array.isArray(res.rooms) ? res.rooms.map(r => `#${r.number} (${r.name || r.type})`).join(', ') : 'Habitación reservada';\nconst total = res.totalPrice != null ? Number(res.totalPrice).toFixed(2) : '0.00';\n\nlet msg = `📋 *Información de tu Reserva*\\n\\n• Código: *${res.code}*\\n• Titular: *${res.guestName || sender_name}*\\n• Estado: *${res.statusLabel}* (${res.paymentStatusLabel})\\n• Entrada: *${res.checkIn}*\\n• Salida: *${res.checkOut}* (${res.nights} noche(s))\\n• Habitaciones: *${roomNames}*\\n• Huéspedes: *${res.adults} adulto(s), ${res.children} niño(s)*\\n• Acompañantes: *${res.companions || 'Ninguno'}*\\n• Mascota: *${res.withPet ? 'Sí' : 'No'}*\\n• Total: *$${total}*`;\n\nif (res.status === 'cancelled') {\n    msg += `\\n\\nℹ️ Esta reserva se encuentra *Cancelada*. No es posible realizar modificaciones. Escribe *menú* para volver al inicio.`;\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: msg,\n            session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }\n        }\n    }];\n}\n\nif (!res.canCancel) {\n    msg += `\\n\\nℹ️ Esta reserva ya no puede ser cancelada automáticamente (fecha límite vencida o finalizada). Escribe *menú* para volver al inicio.`;\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: msg,\n            session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }\n        }\n    }];\n}\n\nmsg += `\\n\\n¿Qué deseas hacer?\\n1️⃣ *Cancelar reserva*\\n2️⃣ *Volver al menú*`;\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: msg,\n        session: {\n            state: 'revisar_reserva',\n            step: 'opciones_reserva',\n            agent_active: false,\n            wa_id,\n            sender_name,\n            review_draft: {\n                code: res.code,\n                reservation: res,\n                refundPolicy: res.refundPolicy\n            }\n        }\n    }\n}];"
+      },
+      "id": "7855a941-25c5-4d19-bf82-eb3278d5b2e0",
+      "name": "H Formatear Consulta Reserva",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const apiResponse = $input.first().json || {};\nconst source = $('H Normalizar Revisar Reserva').first().json;\nconst wa_id = source.wa_id;\nconst sender_name = source.sender_name;\n\nif (apiResponse.status !== 'cancelled') {\n    const errorMsg = apiResponse.error || 'No se pudo procesar la cancelación';\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: `⚠️ *Error al cancelar*\\n\\n${errorMsg}.\\n\\nEscribe *menú* para volver al inicio o *agente* para contactar a recepción.`,\n            session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }\n        }\n    }];\n}\n\nconst res = apiResponse;\nconst freed = Array.isArray(res.freedRoomNumbers) ? res.freedRoomNumbers.map(n => '#' + n).join(', ') : '';\nconst refundAmt = res.refundAmount != null ? Number(res.refundAmount).toFixed(2) : '0.00';\n\nconst msg = `✅ *Reserva Cancelada con Éxito*\\n\\n• Código: *${res.code}*\\n• Estado: *Cancelada*\\n• Habitaciones liberadas: *${freed}*\\n• Política: *${res.policyDescription}*\\n• Reembolso: *${res.refundPercentage}% ($${refundAmt})*\\n\\nTus habitaciones han sido liberadas inmediatamente. Lamentamos que no puedas acompañarnos y esperamos verte pronto en Satori Hotel.\\n\\nEscribe *menú* para iniciar una nueva consulta.`;\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: msg,\n        session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }\n    }\n}];"
+      },
+      "id": "59efee05-69f9-4ba7-82ac-7e95ab54ae16",
+      "name": "H Formatear Cancelación Exitosa",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        1700
       ]
     }
   ],
@@ -1562,7 +1745,7 @@
         ],
         [
           {
-            "node": "H Normalizar Paso Reserva",
+            "node": "H Normalizar Revisar Reserva",
             "type": "main",
             "index": 0
           }
@@ -1619,7 +1802,7 @@
         ],
         [
           {
-            "node": "H Escalar a Agente",
+            "node": "H F1 Inicio Revisar Reserva",
             "type": "main",
             "index": 0
           }
@@ -2035,6 +2218,97 @@
             "index": 0
           }
         ],
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H F1 Inicio Revisar Reserva": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Normalizar Revisar Reserva": {
+      "main": [
+        [
+          {
+            "node": "¿Acción Revisar Reserva?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Acción Revisar Reserva?": {
+      "main": [
+        [
+          {
+            "node": "API Consultar Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "API Cancelar Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Consultar Reserva": {
+      "main": [
+        [
+          {
+            "node": "H Formatear Consulta Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Formatear Consulta Reserva": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Cancelar Reserva": {
+      "main": [
+        [
+          {
+            "node": "H Formatear Cancelación Exitosa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Formatear Cancelación Exitosa": {
+      "main": [
         [
           {
             "node": "Preparar Salida",

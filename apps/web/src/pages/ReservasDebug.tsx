@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 
@@ -30,22 +30,40 @@ type Room = {
   id: number;
   number: string;
   name: string;
+  type: string;
   pricePerNight: number;
+  maxAdultsCapacity: number;
+  childrenCapacity: number;
+  allowsPets: boolean;
+};
+
+const statusColors: Record<string, string> = {
+  pending_payment: '#f59e0b',
+  confirmed: '#22c55e',
+  cancelled: '#ef4444',
+  finished: '#6b7280',
+};
+
+const paymentColors: Record<string, string> = {
+  pending: '#f59e0b',
+  paid: '#22c55e',
+  refunded: '#3b82f6',
 };
 
 export default function ReservasDebug() {
   const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [form, setForm] = useState({
     waId: '573001234567',
-    guestName: 'Ana García',
-    guestDocument: '12345678',
+    guestName: '',
+    guestDocument: '',
     companions: '',
-    checkIn: '2026-12-15',
-    checkOut: '2026-12-17',
+    checkIn: '',
+    checkOut: '',
     adults: 2,
-    children: 1,
+    children: 0,
     hasPet: false,
-    roomId: 1,
+    roomId: 0,
   });
 
   const { data: rooms = [] } = useQuery({
@@ -70,128 +88,174 @@ export default function ReservasDebug() {
 
   const mutation = useMutation({
     mutationFn: async () => {
+      setMutationError(null);
+      const selectedRoomId = Number(form.roomId);
+      if (!selectedRoomId) throw new Error('Selecciona una habitación');
+
+      // Step 1: Lock the room
       const lock = await apiClient.post<{ lockToken: string }>('/api/bookings/lock', {
-        roomId: Number(form.roomId),
+        roomId: selectedRoomId,
         checkIn: form.checkIn,
         checkOut: form.checkOut,
       });
-      return apiClient.post('/api/bookings/confirm', { ...payload, rooms: [{
-        roomId: Number(form.roomId),
-        lockToken: lock.data.lockToken,
-      }] });
+
+      // Step 2: Confirm the booking
+      return apiClient.post('/api/bookings/confirm', {
+        waId: form.waId,
+        guestName: form.guestName,
+        guestDocument: form.guestDocument,
+        companions: form.companions || null,
+        checkIn: form.checkIn,
+        checkOut: form.checkOut,
+        adults: Number(form.adults),
+        children: Number(form.children),
+        hasPet: Boolean(form.hasPet),
+        rooms: [{
+          roomId: selectedRoomId,
+          lockToken: lock.data.lockToken,
+        }],
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reservas-debug'] });
-      setForm((current) => ({ ...current, guestName: '', guestDocument: '' }));
+      queryClient.invalidateQueries({ queryKey: ['rooms-debug'] });
+      setForm(c => ({ ...c, guestName: '', guestDocument: '', companions: '' }));
+    },
+    onError: (err: Error) => {
+      setMutationError(err.message || 'Error desconocido');
     },
   });
 
-  const payload = useMemo(() => ({
-    waId: form.waId,
-    guestName: form.guestName,
-    guestDocument: form.guestDocument,
-    companions: form.companions,
-    checkIn: form.checkIn,
-    checkOut: form.checkOut,
-    adults: Number(form.adults),
-    children: Number(form.children),
-    hasPet: Boolean(form.hasPet),
-    rooms: [],
-  }), [form]);
-
-  if (isLoading) {
-    return <div style={{ padding: 24 }}>Cargando reservas...</div>;
-  }
-
-  if (isError) {
-    return <div style={{ padding: 24, color: 'crimson' }}>Error: {String(error)}</div>;
-  }
+  const canSubmit = form.guestName.trim().length > 0
+    && /^\d{6,10}$/.test(form.guestDocument)
+    && form.checkIn && form.checkOut
+    && form.checkIn < form.checkOut
+    && Number(form.roomId) > 0
+    && rooms.length > 0
+    && !mutation.isPending;
 
   return (
-    <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Reservas en BD (debug)</h1>
-      <p style={{ marginBottom: 20, color: '#444' }}>
-        Esta vista refleja directamente lo que existe en la base de datos. Sirve para verificar que se están guardando las reservas y que quedan visibles correctamente.
-      </p>
+    <div style={{ padding: '24px 32px', fontFamily: "'Inter', 'Segoe UI', sans-serif", maxWidth: 1200, margin: '0 auto' }}>
+      <header style={{ marginBottom: 32 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, color: '#111827' }}>
+          🏨 SatoriPMS — Reservas
+        </h1>
+        <p style={{ color: '#6b7280', marginTop: 4, fontSize: 14 }}>
+          Vista de verificación: datos directamente desde PostgreSQL. Se actualiza cada 5 segundos.
+        </p>
+      </header>
 
-      <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18, marginTop: 0, marginBottom: 12 }}>Guardar reserva de prueba</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-          <label>waId<input value={form.waId} onChange={(e) => setForm({ ...form, waId: e.target.value })} style={fieldStyle} /></label>
-          <label>Nombre<input value={form.guestName} onChange={(e) => setForm({ ...form, guestName: e.target.value })} style={fieldStyle} /></label>
-          <label>Identificación<input value={form.guestDocument} inputMode="numeric" pattern="[0-9]{6,10}" maxLength={10} onChange={(e) => setForm({ ...form, guestDocument: e.target.value.replace(/\D/g, '') })} style={fieldStyle} /></label>
-          <label>Check-in<input type="date" value={form.checkIn} onChange={(e) => setForm({ ...form, checkIn: e.target.value })} style={fieldStyle} /></label>
-          <label>Check-out<input type="date" value={form.checkOut} onChange={(e) => setForm({ ...form, checkOut: e.target.value })} style={fieldStyle} /></label>
-          <label>Adultos<input type="number" min={1} value={form.adults} onChange={(e) => setForm({ ...form, adults: Number(e.target.value) })} style={fieldStyle} /></label>
-          <label>Niños<input type="number" min={0} value={form.children} onChange={(e) => setForm({ ...form, children: Number(e.target.value) })} style={fieldStyle} /></label>
-          <label>Habitación<select value={form.roomId} onChange={(e) => setForm({ ...form, roomId: Number(e.target.value) })} style={fieldStyle}>
-            {rooms.length === 0 && <option value={form.roomId}>No hay habitaciones disponibles</option>}
-            {rooms.map(room => <option key={room.id} value={room.id}>#{room.number} · {room.name} · ${room.pricePerNight}</option>)}
-          </select></label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked={form.hasPet} onChange={(e) => setForm({ ...form, hasPet: e.target.checked })} />
-            Mascota
-          </label>
-          <label style={{ gridColumn: '1 / -1' }}>Acompañantes<input value={form.companions} onChange={(e) => setForm({ ...form, companions: e.target.value })} style={fieldStyle} /></label>
+      {/* ── Formulario ── */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 28, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>
+          ✍️ Crear reserva desde la web
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+          <Field label="WhatsApp ID" value={form.waId} onChange={v => setForm({ ...form, waId: v })} />
+          <Field label="Nombre completo *" value={form.guestName} onChange={v => setForm({ ...form, guestName: v })} />
+          <Field label="Identificación * (6-10 dígitos)" value={form.guestDocument} onChange={v => setForm({ ...form, guestDocument: v.replace(/\D/g, '') })} maxLength={10} />
+          <Field label="Check-in *" type="date" value={form.checkIn} onChange={v => setForm({ ...form, checkIn: v })} />
+          <Field label="Check-out *" type="date" value={form.checkOut} onChange={v => setForm({ ...form, checkOut: v })} />
+          <Field label="Adultos" type="number" value={String(form.adults)} onChange={v => setForm({ ...form, adults: Number(v) || 1 })} />
+          <Field label="Niños" type="number" value={String(form.children)} onChange={v => setForm({ ...form, children: Number(v) || 0 })} />
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Habitación *</label>
+            <select value={form.roomId} onChange={e => setForm({ ...form, roomId: Number(e.target.value) })} style={fieldStyle}>
+              <option value={0}>— Seleccionar —</option>
+              {rooms.map(room => (
+                <option key={room.id} value={room.id}>
+                  #{room.number} · {room.name} · ${Number(room.pricePerNight).toLocaleString('es-CO')}/noche
+                </option>
+              ))}
+            </select>
+            {form.checkIn && form.checkOut && rooms.length === 0 && (
+              <span style={{ fontSize: 11, color: '#f59e0b' }}>No hay habitaciones disponibles para esas fechas</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 24 }}>
+            <input type="checkbox" id="pet" checked={form.hasPet} onChange={e => setForm({ ...form, hasPet: e.target.checked })} />
+            <label htmlFor="pet" style={{ fontSize: 13 }}>🐾 Con mascota</label>
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Field label="Acompañantes (nombres)" value={form.companions} onChange={v => setForm({ ...form, companions: v })} />
+          </div>
         </div>
 
-        <div style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !/^\d{6,10}$/.test(form.guestDocument) || rooms.length === 0}
-            style={{ background: '#111827', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer' }}
+            disabled={!canSubmit}
+            style={{
+              background: canSubmit ? '#111827' : '#9ca3af',
+              color: '#fff', border: 'none', borderRadius: 8,
+              padding: '10px 20px', cursor: canSubmit ? 'pointer' : 'not-allowed',
+              fontWeight: 600, fontSize: 14, transition: 'background 0.2s',
+            }}
           >
-            {mutation.isPending ? 'Guardando...' : 'Guardar reserva'}
+            {mutation.isPending ? '⏳ Guardando...' : '💾 Guardar reserva'}
           </button>
-          {mutation.isSuccess && <span style={{ color: '#15803d' }}>Reserva guardada correctamente.</span>}
-          {mutation.isError && <span style={{ color: '#b91c1c' }}>No se pudo guardar la reserva.</span>}
+          {mutation.isSuccess && <span style={{ color: '#15803d', fontWeight: 600 }}>✅ Reserva guardada correctamente.</span>}
+          {mutation.isError && <span style={{ color: '#b91c1c', fontWeight: 600 }}>❌ {mutationError}</span>}
         </div>
       </div>
 
-      {(!data || data.length === 0) ? (
-        <div style={{ padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
-          No hay reservas guardadas por ahora.
+      {/* ── Tabla de reservas ── */}
+      {isLoading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>Cargando reservas...</div>
+      ) : isError ? (
+        <div style={{ padding: 24, color: 'crimson', background: '#fef2f2', borderRadius: 8 }}>
+          ❌ Error al cargar reservas: {String(error)}
+        </div>
+      ) : (!data || data.length === 0) ? (
+        <div style={{ padding: 20, background: '#f9fafb', borderRadius: 8, textAlign: 'center', color: '#6b7280' }}>
+          No hay reservas guardadas por ahora. Crea una desde el formulario o desde WhatsApp.
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#111827', color: '#fff' }}>
-                <th style={{ padding: 8, border: '1px solid #d1d5db', textAlign: 'left' }}>ID</th>
-                <th style={{ padding: 8, border: '1px solid #d1d5db', textAlign: 'left' }}>Grupo</th>
-                <th style={{ padding: 8, border: '1px solid #d1d5db', textAlign: 'left' }}>Estado</th>
-                <th style={{ padding: 8, border: '1px solid #d1d5db', textAlign: 'left' }}>Pago</th>
-                <th style={{ padding: 8, border: '1px solid #d1d5db', textAlign: 'left' }}>Habitación</th>
-                <th style={{ padding: 8, border: '1px solid #d1d5db', textAlign: 'left' }}>Huésped</th>
-                <th style={{ padding: 8, border: '1px solid #d1d5db', textAlign: 'left' }}>Fechas</th>
-                <th style={{ padding: 8, border: '1px solid #d1d5db', textAlign: 'left' }}>Ocupación</th>
-                <th style={{ padding: 8, border: '1px solid #d1d5db', textAlign: 'left' }}>Total</th>
+                {['ID', 'Estado', 'Pago', 'Habitación', 'Huésped', 'Fechas', 'Ocupación', 'Total', 'Fuente'].map(h => (
+                  <th key={h} style={thStyle}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {data.map(row => (
-                <tr key={row.id} style={{ background: '#fff' }}>
-                  <td style={{ padding: 8, border: '1px solid #e5e7eb' }}>{row.id}</td>
-                  <td style={{ padding: 8, border: '1px solid #e5e7eb' }}>{row.reservationGroupId ?? '-'}</td>
-                  <td style={{ padding: 8, border: '1px solid #e5e7eb' }}>{row.status}</td>
-                  <td style={{ padding: 8, border: '1px solid #e5e7eb' }}>{row.paymentStatus}</td>
-                  <td style={{ padding: 8, border: '1px solid #e5e7eb' }}>
-                    {row.roomNumber ?? row.roomId}
-                    {row.roomName ? ` · ${row.roomName}` : ''}
+              {data.map((row, i) => (
+                <tr key={row.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                  <td style={tdStyle}><strong>{row.id}</strong></td>
+                  <td style={tdStyle}>
+                    <span style={{ ...badgeStyle, background: statusColors[row.status] || '#6b7280' }}>
+                      {row.status}
+                    </span>
                   </td>
-                  <td style={{ padding: 8, border: '1px solid #e5e7eb' }}>
-                    {row.guestName ?? '-'}<br />
-                    {row.guestPhone ?? '-'}<br />
-                    {row.guestDocument ?? '-'}
+                  <td style={tdStyle}>
+                    <span style={{ ...badgeStyle, background: paymentColors[row.paymentStatus] || '#6b7280' }}>
+                      {row.paymentStatus}
+                    </span>
                   </td>
-                  <td style={{ padding: 8, border: '1px solid #e5e7eb' }}>
-                    {row.checkIn} → {row.checkOut}
+                  <td style={tdStyle}>
+                    <strong>{row.roomNumber ?? row.roomId}</strong>
+                    {row.roomName ? <><br /><span style={{ fontSize: 11, color: '#6b7280' }}>{row.roomName}</span></> : ''}
                   </td>
-                  <td style={{ padding: 8, border: '1px solid #e5e7eb' }}>
-                    {row.adults} adultos / {row.children} niños / {row.withPet ? 'con mascota' : 'sin mascota'}
+                  <td style={tdStyle}>
+                    <strong>{row.guestName ?? '—'}</strong><br />
+                    <span style={{ fontSize: 11, color: '#6b7280' }}>{row.guestPhone ?? '—'}</span><br />
+                    <span style={{ fontSize: 11, color: '#6b7280' }}>CC: {row.guestDocument ?? '—'}</span>
                   </td>
-                  <td style={{ padding: 8, border: '1px solid #e5e7eb' }}>{row.totalPrice}</td>
+                  <td style={tdStyle}>{row.checkIn} → {row.checkOut}</td>
+                  <td style={tdStyle}>
+                    {row.adults}A / {row.children}N
+                    {row.withPet ? ' 🐾' : ''}
+                    {row.companions ? <><br /><span style={{ fontSize: 11, color: '#6b7280' }}>{row.companions}</span></> : ''}
+                  </td>
+                  <td style={{ ...tdStyle, fontWeight: 700 }}>${Number(row.totalPrice).toLocaleString('es-CO')}</td>
+                  <td style={tdStyle}>
+                    <span style={{ ...badgeStyle, background: row.source === 'chatbot' ? '#8b5cf6' : '#3b82f6' }}>
+                      {row.source}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -202,11 +266,32 @@ export default function ReservasDebug() {
   );
 }
 
+function Field({ label, value, onChange, type = 'text', maxLength }: {
+  label: string; value: string; onChange: (v: string) => void;
+  type?: string; maxLength?: number;
+}) {
+  return (
+    <div>
+      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>{label}</label>
+      <input type={type} value={value} maxLength={maxLength}
+        onChange={e => onChange(e.target.value)} style={fieldStyle} />
+    </div>
+  );
+}
+
 const fieldStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 10px',
-  border: '1px solid #d1d5db',
-  borderRadius: 8,
-  marginTop: 6,
-  boxSizing: 'border-box',
+  width: '100%', padding: '8px 10px', border: '1px solid #d1d5db',
+  borderRadius: 8, boxSizing: 'border-box', fontSize: 14,
+};
+
+const thStyle: React.CSSProperties = {
+  padding: '10px 8px', border: '1px solid #374151', textAlign: 'left', fontSize: 12, fontWeight: 700,
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: '10px 8px', border: '1px solid #e5e7eb', verticalAlign: 'top',
+};
+
+const badgeStyle: React.CSSProperties = {
+  color: '#fff', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
 };

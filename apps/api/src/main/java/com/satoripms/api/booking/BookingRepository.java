@@ -4,6 +4,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
@@ -19,4 +21,15 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         @Param("checkIn") LocalDate checkIn, 
         @Param("checkOut") LocalDate checkOut
     );
+
+    List<Booking> findAllByOrderByCreatedAtDesc();
+
+    List<Booking> findByReservationGroupId(UUID reservationGroupId);
+
+    @Query("""
+        SELECT b FROM Booking b 
+        WHERE LOWER(CAST(b.reservationGroupId AS string)) LIKE LOWER(CONCAT(:code, '%'))
+        ORDER BY b.createdAt DESC
+    """)
+    List<Booking> findByReservationGroupCodePrefix(@Param("code") String code);
 }

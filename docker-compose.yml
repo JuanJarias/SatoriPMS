@@ -35,6 +35,7 @@ services:
 
   # ── Orquestación del chatbot ───────────────────────────
   n8n:
+    profiles: ["n8n"]
     image: n8nio/n8n:latest
     container_name: satori_n8n
     restart: unless-stopped
@@ -46,10 +47,10 @@ services:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-admin123}
-      - N8N_HOST=${N8N_HOST}
-      - N8N_PROTOCOL=${N8N_PROTOCOL:-https}
       - N8N_PORT=5678
-      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
+      - N8N_WEBHOOK_URL=${N8N_PUBLIC_URL}
+      - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL}
+      - N8N_PROXY_HOPS=1
       - GENERIC_TIMEZONE=America/Bogota
     volumes:
       - n8n_data:/home/node/.n8n

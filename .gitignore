@@ -44,3 +44,5 @@ coverage/
 # las plantillas .sql.example sí se versionan y muestran el formato.
 apps/api/src/main/resources/db/migration/V*__seed_*.sql
 !apps/api/src/main/resources/db/migration/V*__seed_*.sql.example
+# ── Logs de conversaciones locales (solo para desarrollo) ──
+chat/

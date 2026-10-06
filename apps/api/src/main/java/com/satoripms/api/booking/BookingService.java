@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.HashSet;
@@ -157,8 +158,13 @@ public class BookingService {
             }
             Room room = roomRepository.findById(roomLock.getRoomId())
                     .orElseThrow(() -> new IllegalArgumentException("La habitación no existe"));
+            // Solo verificamos en PostgreSQL (reservas reales). NO verificamos Redis
+            // porque el lock ya fue validado via isValid() arriba — el usuario YA
+            // posee ese lock, así que isLocked() retornaría true y se auto-rechazaría.
+            boolean dbAvailable = bookingRepository.countConflictingBookings(
+                    room.getId(), request.getCheckIn(), request.getCheckOut()) == 0;
             if (!Boolean.TRUE.equals(room.getActive()) || !"available".equals(room.getStatus())
-                    || !isAvailable(room.getId(), request.getCheckIn(), request.getCheckOut())) {
+                    || !dbAvailable) {
                 throw new IllegalStateException("Una habitación ya no está disponible");
             }
             if (Boolean.TRUE.equals(request.getHasPet()) && !Boolean.TRUE.equals(room.getAllowsPets())) {
@@ -236,8 +242,195 @@ public class BookingService {
                 paymentStatus);
     }
 
+    public ReservationDetailsDto getReservationDetailsByCode(String code) {
+        if (code == null || code.trim().isBlank()) {
+            throw new IllegalArgumentException("El código de reserva es obligatorio");
+        }
+        String cleanCode = code.trim().toLowerCase();
+        List<Booking> bookings = bookingRepository.findByReservationGroupCodePrefix(cleanCode);
+        if (bookings.isEmpty()) {
+            throw new java.util.NoSuchElementException("No se encontró ninguna reserva con el código: " + code.trim());
+        }
+
+        Booking first = bookings.get(0);
+        Guest guest = guestRepository.findById(first.getGuestId()).orElse(null);
+
+        List<ReservationDetailsDto.RoomSummaryDto> roomSummaries = new ArrayList<>();
+        BigDecimal totalGroupPrice = BigDecimal.ZERO;
+
+        for (Booking b : bookings) {
+            Room room = roomRepository.findById(b.getRoomId()).orElse(null);
+            totalGroupPrice = totalGroupPrice.add(b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
+            if (room != null) {
+                roomSummaries.add(ReservationDetailsDto.RoomSummaryDto.builder()
+                        .id(room.getId())
+                        .number(room.getNumber())
+                        .name(room.getName())
+                        .type(room.getType())
+                        .pricePerNight(room.getPricePerNight())
+                        .build());
+            }
+        }
+
+        long nights = ChronoUnit.DAYS.between(first.getCheckIn(), first.getCheckOut());
+        String codePrefix = first.getReservationGroupId() != null
+                ? first.getReservationGroupId().toString().substring(0, 8).toUpperCase()
+                : "RES-" + first.getId();
+
+        // Política de reembolso RN-03:
+        // Check-in se toma a las 15:00 del día de llegada
+        LocalDateTime checkInDateTime = first.getCheckIn().atTime(15, 0);
+        LocalDateTime now = LocalDateTime.now();
+        long hoursUntilCheckIn = ChronoUnit.HOURS.between(now, checkInDateTime);
+
+        int refundPct;
+        String policyDesc;
+        if (hoursUntilCheckIn > 72) {
+            refundPct = 100;
+            policyDesc = "Reembolso del 100% (+72h antes del check-in)";
+        } else if (hoursUntilCheckIn >= 24) {
+            refundPct = 50;
+            policyDesc = "Reembolso del 50% (entre 24h y 72h antes del check-in)";
+        } else {
+            refundPct = 0;
+            policyDesc = "Sin reembolso (menos de 24h antes del check-in)";
+        }
+
+        BigDecimal estimatedRefund = totalGroupPrice.multiply(BigDecimal.valueOf(refundPct))
+                .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+
+        boolean isActive = "confirmed".equalsIgnoreCase(first.getStatus()) || "pending_payment".equalsIgnoreCase(first.getStatus());
+        boolean canCancel = isActive && LocalDate.now().isBefore(first.getCheckOut());
+
+        String statusLabel = switch (first.getStatus().toLowerCase()) {
+            case "confirmed" -> "Confirmada";
+            case "pending_payment" -> "Pendiente de pago";
+            case "cancelled" -> "Cancelada";
+            case "finished" -> "Finalizada";
+            default -> first.getStatus();
+        };
+
+        String paymentStatusLabel = switch (first.getPaymentStatus().toLowerCase()) {
+            case "paid" -> "Pagada";
+            case "pending" -> "Pendiente de pago";
+            case "refunded" -> "Reembolsada";
+            case "refund_pending" -> "Reembolso en trámite";
+            case "cancelled" -> "Cancelada";
+            case "no_refund" -> "Sin reembolso";
+            default -> first.getPaymentStatus();
+        };
+
+        return ReservationDetailsDto.builder()
+                .code(codePrefix)
+                .reservationGroupId(first.getReservationGroupId())
+                .guestName(guest != null ? guest.getName() : null)
+                .guestPhone(guest != null ? guest.getWhatsappPhone() : null)
+                .guestDocument(guest != null ? guest.getDocumentNumber() : null)
+                .checkIn(first.getCheckIn())
+                .checkOut(first.getCheckOut())
+                .nights(nights)
+                .adults(first.getAdults())
+                .children(first.getChildren())
+                .companions(first.getCompanions())
+                .withPet(first.getWithPet())
+                .totalPrice(totalGroupPrice)
+                .status(first.getStatus())
+                .statusLabel(statusLabel)
+                .paymentStatus(first.getPaymentStatus())
+                .paymentStatusLabel(paymentStatusLabel)
+                .rooms(roomSummaries)
+                .canCancel(canCancel)
+                .refundPolicy(ReservationDetailsDto.RefundPolicyDto.builder()
+                        .hoursUntilCheckin(hoursUntilCheckIn)
+                        .refundPercentage(refundPct)
+                        .estimatedRefund(estimatedRefund)
+                        .policyDescription(policyDesc)
+                        .build())
+                .build();
+    }
+
+    @Transactional
+    public CancellationResponseDto cancelReservationGroupByCode(String code) {
+        if (code == null || code.trim().isBlank()) {
+            throw new IllegalArgumentException("El código de reserva es obligatorio");
+        }
+        String cleanCode = code.trim().toLowerCase();
+        List<Booking> bookings = bookingRepository.findByReservationGroupCodePrefix(cleanCode);
+        if (bookings.isEmpty()) {
+            throw new java.util.NoSuchElementException("No se encontró ninguna reserva con el código: " + code.trim());
+        }
+
+        Booking first = bookings.get(0);
+        if ("cancelled".equalsIgnoreCase(first.getStatus())) {
+            throw new IllegalStateException("Esta reserva ya se encuentra cancelada");
+        }
+
+        // Calcular política de reembolso RN-03
+        LocalDateTime checkInDateTime = first.getCheckIn().atTime(15, 0);
+        LocalDateTime now = LocalDateTime.now();
+        long hoursUntilCheckIn = ChronoUnit.HOURS.between(now, checkInDateTime);
+
+        int refundPct;
+        String policyDesc;
+        if (hoursUntilCheckIn > 72) {
+            refundPct = 100;
+            policyDesc = "Reembolso del 100% (+72h antes del check-in)";
+        } else if (hoursUntilCheckIn >= 24) {
+            refundPct = 50;
+            policyDesc = "Reembolso del 50% (entre 24h y 72h antes del check-in)";
+        } else {
+            refundPct = 0;
+            policyDesc = "Sin reembolso (menos de 24h antes del check-in)";
+        }
+
+        BigDecimal totalGroupPrice = BigDecimal.ZERO;
+        List<Long> cancelledIds = new ArrayList<>();
+        List<String> roomNumbers = new ArrayList<>();
+
+        String newPaymentStatus = "paid".equalsIgnoreCase(first.getPaymentStatus())
+                ? (refundPct > 0 ? "refunded" : "paid")
+                : "pending";
+
+        for (Booking b : bookings) {
+            b.setStatus("cancelled");
+            b.setPaymentStatus(newPaymentStatus);
+            totalGroupPrice = totalGroupPrice.add(b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
+            cancelledIds.add(b.getId());
+
+            Room room = roomRepository.findById(b.getRoomId()).orElse(null);
+            if (room != null) {
+                roomNumbers.add(room.getNumber());
+            }
+        }
+
+        bookingRepository.saveAll(bookings);
+        bookingRepository.flush();
+
+        BigDecimal refundAmount = totalGroupPrice.multiply(BigDecimal.valueOf(refundPct))
+                .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+
+        String codePrefix = first.getReservationGroupId() != null
+                ? first.getReservationGroupId().toString().substring(0, 8).toUpperCase()
+                : "RES-" + first.getId();
+
+        return CancellationResponseDto.builder()
+                .code(codePrefix)
+                .reservationGroupId(first.getReservationGroupId())
+                .status("cancelled")
+                .paymentStatus(newPaymentStatus)
+                .totalPrice(totalGroupPrice)
+                .refundPercentage(refundPct)
+                .refundAmount(refundAmount)
+                .policyDescription(policyDesc)
+                .cancelledBookingIds(cancelledIds)
+                .freedRoomNumbers(roomNumbers)
+                .cancelledAt(LocalDateTime.now())
+                .message("Tu reserva ha sido cancelada exitosamente y las habitaciones han sido liberadas.")
+                .build();
+    }
+
     public void cancelBooking(Long id) {
-        throw new UnsupportedOperationException("cancelBooking aún no implementado");
+        throw new UnsupportedOperationException("cancelBooking por ID individual no recomendado, use cancelReservationGroupByCode");
     }
 
     @Transactional
