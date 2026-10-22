@@ -46,3 +46,14 @@ apps/api/src/main/resources/db/migration/V*__seed_*.sql
 !apps/api/src/main/resources/db/migration/V*__seed_*.sql.example
 # ── Logs de conversaciones locales (solo para desarrollo) ──
 chat/
+
+# ── Archivos temporales de oficina y borradores ───────────
+.~lock.*#
+~$*
+scratch/
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+

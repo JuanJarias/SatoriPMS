@@ -8,29 +8,51 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Servicio de gestión de bloqueos temporales concurrentes utilizando Redis y scripts atómicos en Lua.
+ *
+ * Implementa la regla de negocio anti-doble reserva (RN-02): cuando un usuario inicia el proceso
+ * de selección de habitación, se genera un bloqueo de 15 minutos en memoria para evitar que
+ * otros huéspedes concurrentes reserven la misma habitación en fechas solapadas.
+ */
 @Service
 public class RedisLockService {
 
     private final StringRedisTemplate redisTemplate;
     private final long lockTtlSeconds;
 
+    /**
+     * Constructor con inyección del template de Redis y TTL configurable.
+     *
+     * @param redisTemplate  Template de operaciones Redis en formato String
+     * @param lockTtlSeconds Tiempo de vida del bloqueo en segundos (por defecto 900s = 15 minutos)
+     */
     public RedisLockService(StringRedisTemplate redisTemplate,
-                             @Value("${satori.redis.bloqueo-ttl-segundos:900}") long lockTtlSeconds) {
+                            @Value("${satori.redis.bloqueo-ttl-segundos:900}") long lockTtlSeconds) {
         this.redisTemplate = redisTemplate;
         this.lockTtlSeconds = lockTtlSeconds;
     }
 
-        private String buildIntervalsKey(Long roomId) {
+    private String buildIntervalsKey(Long roomId) {
         return "lock:room:%d:intervals".formatted(roomId);
     }
 
-        private String buildMetadataPrefix(Long roomId) {
+    private String buildMetadataPrefix(Long roomId) {
         return "lock:room:%d:metadata:".formatted(roomId);
     }
 
-        /** Registra el intervalo solo si no se solapa con otro lock activo. */
-        public boolean tryLock(Long roomId, java.time.LocalDate checkIn,
-                   java.time.LocalDate checkOut, String token) {
+    /**
+     * Intenta adquirir un bloqueo atómico sobre una habitación para un rango de fechas dado.
+     * Ejecuta un script Lua en Redis que limpia tokens expirados y valida si el nuevo rango
+     * se solapa con algún intervalo previamente bloqueado.
+     *
+     * @param roomId   Identificador de la habitación
+     * @param checkIn  Fecha de llegada
+     * @param checkOut Fecha de salida
+     * @param token    Token UUID único identificador del bloqueo del usuario
+     * @return true si el bloqueo fue adquirido exitosamente, false si hay solapamiento
+     */
+    public boolean tryLock(Long roomId, LocalDate checkIn, LocalDate checkOut, String token) {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>(
             "local members = redis.call('zrange', KEYS[1], 0, -1) "
                 + "for _, existingToken in ipairs(members) do "
@@ -56,14 +78,28 @@ public class RedisLockService {
         return Long.valueOf(1L).equals(acquired);
     }
 
-        public boolean isValid(Long roomId, String token) {
+    /**
+     * Comprueba si un token de bloqueo específico sigue siendo válido y activo en Redis.
+     *
+     * @param roomId Identificador de la habitación
+     * @param token  Token UUID del bloqueo
+     * @return true si la metadata del bloqueo existe con fechas de check-in y check-out válidas
+     */
+    public boolean isValid(Long roomId, String token) {
         List<Object> values = redisTemplate.opsForHash()
             .multiGet(buildMetadataPrefix(roomId) + token, List.of("checkIn", "checkOut"));
         return values != null && values.size() == 2
             && values.get(0) != null && values.get(1) != null;
-        }
+    }
 
-        /** Solo libera el intervalo si todavía pertenece al token indicado. */
+    /**
+     * Libera un bloqueo temporal previamente adquirido, eliminando su clave en el Sorted Set
+     * y su Hash de metadatos en Redis.
+     *
+     * @param roomId Identificador de la habitación
+     * @param token  Token UUID del bloqueo
+     * @return true si el bloqueo fue liberado exitosamente, false si ya no existía
+     */
     public boolean release(Long roomId, String token) {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>(
             "local metadataKey = KEYS[2] .. ARGV[1] "
@@ -71,16 +107,24 @@ public class RedisLockService {
                 + "redis.call('del', metadataKey) "
                 + "return redis.call('zrem', KEYS[1], ARGV[1]) "
                 + "else return 0 end",
-                Long.class);
+            Long.class);
         Long released = redisTemplate.execute(
             script,
             List.of(buildIntervalsKey(roomId), buildMetadataPrefix(roomId)),
             token);
         return Long.valueOf(1L).equals(released);
     }
-    
-   public boolean isLocked(Long roomId, LocalDate checkIn, LocalDate checkOut) {
-        // Script Lua que recorre los tokens activos de la habitación y verifica si las fechas se solapan
+
+    /**
+     * Verifica si una habitación se encuentra actualmente bloqueada por cualquier token activo
+     * en un rango de fechas específico.
+     *
+     * @param roomId   Identificador de la habitación
+     * @param checkIn  Fecha de llegada
+     * @param checkOut Fecha de salida
+     * @return true si existe al menos un bloqueo activo que se solape con el rango consultado
+     */
+    public boolean isLocked(Long roomId, LocalDate checkIn, LocalDate checkOut) {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>(
             "local members = redis.call('zrange', KEYS[1], 0, -1) "
             + "for _, existingToken in ipairs(members) do "
@@ -88,13 +132,13 @@ public class RedisLockService {
             + "  local existing = redis.call('hmget', metadataKey, 'checkIn', 'checkOut') "
             + "  if existing[1] and existing[2] then "
             + "    if tonumber(existing[2]) > tonumber(ARGV[1]) and tonumber(existing[1]) < tonumber(ARGV[2]) then "
-            + "      return 1 " // Retorna 1 si hay solapamiento (está bloqueada)
+            + "      return 1 "
             + "    end "
             + "  else "
-            + "    redis.call('zrem', KEYS[1], existingToken) " // Limpia tokens huérfanos
+            + "    redis.call('zrem', KEYS[1], existingToken) "
             + "  end "
             + "end "
-            + "return 0", // Retorna 0 si está libre
+            + "return 0",
             Long.class
         );
 
