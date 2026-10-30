@@ -144,7 +144,7 @@ El canal principal de los huéspedes. n8n orquesta la conversación sin tomar de
 | **Escribir una reseña** | Captura de calificación (1–5 estrellas) y comentario tras el check-out. |
 | **Hablar con un agente** | Escalamiento a recepcionista humano con validación de horario de atención. |
 
-📄 Documentación completa: [`docs/modulos/chatbot_whatsapp.md`](docs/modulos/chatbot_whatsapp.md)
+📄 Documentación completa: [`docs/modulos/Chatbot.md`](docs/modulos/Chatbot.md)
 
 ---
 
@@ -163,7 +163,7 @@ Panel de recepción y administración. Dos roles: **Administrador** (acceso tota
 | **Reseñas y fidelización** | Panel de calificaciones y panel de huéspedes recurrentes. |
 | **Administración** | Usuarios, roles, recuperación de contraseña y auditoría de acciones. |
 
-📄 Documentación completa: [`docs/modulos/aplicacion_web.md`](docs/modulos/aplicacion_web.md)
+📄 Documentación completa: [`docs/modulos/AplicacionWeb.md`](docs/modulos/AplicacionWeb.md)
 
 ---
 
@@ -175,12 +175,13 @@ Monolito modular con arquitectura hexagonal. Es la **única fuente de verdad** p
 |---|---|---|
 | `/api/rooms/availability` | `GET` | Habitaciones libres para un rango de fechas |
 | `/api/bookings/lock` | `POST` | Bloqueo temporal de habitaciones (15 min en Redis) |
-| `/api/bookings/confirm` | `POST` | Creación de reservas en batch con estado `pending_payment` |
+| `/api/bookings/batch` | `POST` | Creación de reservas multi-habitación con abono 50% o 100% |
 | `/api/bookings/group/{code}` | `GET` | Consulta de reserva por código único de 8 caracteres |
-| `/api/bookings/group/{code}/cancellation` | `POST` | Cancelación con cálculo de reembolso (RN-03) |
-| `/api/bookings/{id}/payment-confirmation` | `POST` | Confirmación de pago vía webhook |
+| `/api/bookings/group/{code}/cancellation` | `POST` | Cancelación con cálculo de reembolso proporcional (RN-03) |
+| `/api/bookings/group/{code}/pay-remaining` | `POST` | Liquidación de saldo restante de la reserva |
+| `/api/reviews` | `GET/POST`| Consulta y creación de reseñas persistidas en base de datos |
 
-📄 Documentación completa: [`docs/modulos/backend_api.md`](docs/modulos/backend_api.md)
+📄 Documentación completa: [`docs/modulos/BackendAPI.md`](docs/modulos/BackendAPI.md)
 
 ---
 
@@ -191,13 +192,13 @@ PostgreSQL 16 con extensión `btree_gist`. La restricción central del sistema:
 ```sql
 CONSTRAINT no_overlapping_bookings EXCLUDE USING gist (
     room_id WITH =,
-    stay_range WITH &&
-) WHERE (status IN ('pending_payment', 'confirmed'))
+    daterange(check_in, check_out, '[)') WITH &&
+) WHERE (status IN ('CONFIRMED', 'CHECKED_IN'))
 ```
 
-Esta restricción impide —a nivel de motor, no de aplicación— que dos reservas activas se solapen para la misma habitación y fechas. Al cancelar una reserva, su estado pasa a `cancelled` y las fechas se liberan automáticamente sin eliminar el registro histórico.
+Esta restricción impide —a nivel de motor, no de aplicación— que dos reservas activas se solapen para la misma habitación y fechas. Al cancelar una reserva, su estado pasa a `CANCELLED` y las fechas se liberan automáticamente sin eliminar el registro histórico.
 
-📄 Documentación completa: [`docs/modulos/base_datos.md`](docs/modulos/base_datos.md)
+📄 Documentación completa: [`docs/modulos/Database.md`](docs/modulos/Database.md)
 
 ---
 
@@ -305,24 +306,27 @@ Para replicar el entorno de desarrollo localmente:
 
 ---
 
-## 10. Documentación del Proyecto
+## 10. Documentación y Diagramas del Proyecto
 
-| Documento | Contenido |
-|---|---|
-| [`docs/modulos/generalidades_nucleo.md`](docs/modulos/generalidades_nucleo.md) | Contexto, objetivos, alcance, épicas y reglas de negocio |
-| [`docs/modulos/chatbot_whatsapp.md`](docs/modulos/chatbot_whatsapp.md) | Especificación de todos los flujos conversacionales |
-| [`docs/modulos/aplicacion_web.md`](docs/modulos/aplicacion_web.md) | Vistas y funcionalidades del panel web |
-| [`docs/modulos/backend_api.md`](docs/modulos/backend_api.md) | Endpoints REST, módulos lógicos e integraciones |
-| [`docs/modulos/base_datos.md`](docs/modulos/base_datos.md) | Esquema, migraciones Flyway y restricciones de integridad |
-| [`docs/modulos/seguridad.md`](docs/modulos/seguridad.md) | JWT, roles, auditoría y Ley 1581 de 2012 |
-| [`docs/modulos/infraestructura.md`](docs/modulos/infraestructura.md) | Docker Compose, puertos y variables de entorno |
-| [`docs/modulos/tienda_inventario.md`](docs/modulos/tienda_inventario.md) | Catálogo, ventas y rotación de productos |
-| [`docs/modulos/facturacion_finanzas.md`](docs/modulos/facturacion_finanzas.md) | Ingresos, egresos, reportes y sueldos |
-| [`docs/modulos/resenas_fidelizacion.md`](docs/modulos/resenas_fidelizacion.md) | Reseñas de huéspedes y programa de fidelización |
-| [`docs/modulos/gestion_proyecto.md`](docs/modulos/gestion_proyecto.md) | Scrum, EDT, cronograma y matriz de riesgos |
-| [`docs/modulos/decisiones_pendientes.md`](docs/modulos/decisiones_pendientes.md) | Puntos abiertos por definir con el stakeholder |
-| [`docs/modulos/estado_actual.md`](docs/modulos/estado_actual.md) | **Avance real:** qué está implementado y qué falta |
-| [`docs/cambios_commit.md`](docs/cambios_commit.md) | Registro de cambios del commit actual |
+Índice central de la documentación en [`docs/README.md`](docs/README.md):
+
+| Sección / Módulo | Documento | Contenido Principal |
+|---|---|---|
+| **Arquitectura** | [`docs/Diagramas/README.md`](docs/Diagramas/README.md) | **Diagramas Oficiales:** Infraestructura Docker, flujo WhatsApp, doble candado y WebSockets |
+| **Presupuesto** | [`docs/Presupuesto/Presupuesto.md`](docs/Presupuesto/Presupuesto.md) | Modelo financiero oficial, libro Excel auditado y plan de contingencia ante crisis |
+| **Generalidades** | [`docs/modulos/GeneralidadesNucleo.md`](docs/modulos/GeneralidadesNucleo.md) | Contexto, objetivos, alcance, épicas y reglas de negocio RN-01 a RN-04 |
+| **Chatbot** | [`docs/modulos/Chatbot.md`](docs/modulos/Chatbot.md) | Especificación de los flujos conversacionales en WhatsApp y asistente IA |
+| **App Web** | [`docs/modulos/AplicacionWeb.md`](docs/modulos/AplicacionWeb.md) | Vistas, componentes y diseño del panel de recepción y administración |
+| **Backend API** | [`docs/modulos/BackendAPI.md`](docs/modulos/BackendAPI.md) | Endpoints REST, contratos DTO y arquitectura hexagonal en Spring Boot |
+| **Base de Datos** | [`docs/modulos/Database.md`](docs/modulos/Database.md) | Esquema PostgreSQL, migraciones Flyway y restricciones de exclusión `EXCLUDE` |
+| **Seguridad** | [`docs/modulos/Seguridad.md`](docs/modulos/Seguridad.md) | JWT, roles, auditoría y Ley 1581 de protección de datos personales |
+| **Infraestructura** | [`docs/modulos/Infraestructura.md`](docs/modulos/Infraestructura.md) | Docker Compose, puertos, redes aisladas y variables de entorno |
+| **Tienda** | [`docs/modulos/TiendaInventario.md`](docs/modulos/TiendaInventario.md) | Catálogo de productos, venta y rotación de insumos hoteleros |
+| **Finanzas** | [`docs/modulos/FacturacionFinanzas.md`](docs/modulos/FacturacionFinanzas.md) | Ingresos, egresos, reportes contables y cálculo de sueldos |
+| **Reseñas** | [`docs/modulos/ResenasFidelizacion.md`](docs/modulos/ResenasFidelizacion.md) | Reseñas de huéspedes, persistencia y programa de fidelización |
+| **Gestión** | [`docs/modulos/GestionProyecto.md`](docs/modulos/GestionProyecto.md) | Scrum, cronograma reorganizado en GitHub Projects #2 y matriz de riesgos |
+| **Estado Actual** | [`docs/modulos/EstadoActual.md`](docs/modulos/EstadoActual.md) | **Avance real:** Qué está construido, qué está probado y qué está pendiente |
+| **Historial** | [`docs/cambios_commit.md`](docs/cambios_commit.md) | Registro de cambios detallado por commit |
 
 ---
 

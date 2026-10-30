@@ -36,25 +36,20 @@
 
 ---
 
-### 3. Pendiente de Implementación (Próximos Sprints)
+### 3. Planificación y Estado en GitHub Projects
 
-- **Sprint 3 (Gestión Operativa y App Web):**
-  - Panel de habitaciones y calendario interactivo en tiempo real.
-  - Flujos operativos de Check-in (CU-03) y Check-out (CU-04) desde la web.
-  - Diseño UX/UI definitivo con Tailwind CSS.
-  - Canal WebSocket STOMP para sincronizar cambios entre backend y frontend.
-- **Sprint 4 (Comercio y Administración):**
-  - Pasarela de pagos MercadoPago Sandbox (webhook y links de pago).
-  - Módulo de tienda y catálogo de inventario (CU-05, CU-07, HU-14).
-  - Módulo de facturación, egresos y cálculo de sueldos (CU-06, HU-01, HU-07, HU-13).
-  - Panel web de moderación de reseñas (HU-10) y fidelización de huéspedes recurrentes (HU-12).
-  - Gestión de roles de usuario, login con JWT y tabla de auditoría (HU-05, HU-15).
-  - Aviso explícito de autorización y finalidad de datos personales en el chatbot (Ley 1581).
+El progreso y los sprints se gestionan en el tablero oficial [GitHub Projects #2](https://github.com/users/JuanJarias/projects/2) (44 ítems organizados en 5 sprints):
+
+- **Sprint 1 (23/09/2026 – 02/10/2026) · [Done]:** Diseño de la solución, arquitectura, modelo de base de datos relacional, estrategia de concurrencia (`DU-04`) y conexión inicial de WhatsApp API con n8n (`HU-00.1`).
+- **Sprint 2 (03/10/2026 – 16/10/2026) · [Done]:** Core de reservas en Chatbot WhatsApp (reserva guiada, disponibilidad, bloqueo temporal de 15 min RN-02, cálculo de precio total, cancelación en bot y confirmación automática).
+- **Sprint 3 (17/10/2026 – 30/10/2026) · [In Progress / Cierre]:** Gestión Operativa App Web y Asistente IA (check-in `CU-03`, check-out `CU-04`, calendario en tiempo real `HU-03`, reconexión socket `HU-03.1`, reserva manual `CU-08`, cancelación recepcionista `CU-02 Web`, rol Recepcionista `HU-05`, credenciales `HU-11`, escalamiento `HU-06`, recomendación IA Gemini `HU-09`, cargo extra RN-01 `CU-01.3`).
+- **Sprint 4 (31/10/2026 – 13/11/2026) · [Backlog / Repriorizado]:** Finanzas, Tienda, Reseñas, Pasarela y Auditoría (Pasarela de pagos `CU-01.5` y Auditoría `HU-15` priorizadas; módulos secundarios `HU-07`, `HU-13`, `CU-06`, `HU-01`, `CU-05`, `CU-07`, `HU-14`, `HU-12`, `HU-10` evaluados para diferimiento en escenario de crisis).
+- **Sprint 5 (14/11/2026 – 27/11/2026) · [Backlog]:** Aseguramiento de Calidad y Pruebas Transversales (`QA-01` a `QA-07`, con énfasis en `QA-05` prueba de concurrencia y sobreventa).
 
 ---
 
-### 4. Deuda Técnica Conocida
+### 4. Deuda Técnica Conocida y Observaciones
 
-- `ChatbotController.java` está vacío en el backend (las operaciones de chatbot se canalizan por los controladores de booking y review).
-- `ConversationController` retorno de escalación es un stub vacío; la gestión de estado de escalamiento reside actualmente en Redis.
-- Falta agregar validación criptográfica de firma SHA-256 de los webhooks entrantes de Meta.
+- `ConversationController`: el retorno de escalación es un stub; la gestión de estado de escalamiento y silenciamiento reside actualmente en Redis (`session:{waId}:agent_active`).
+- Falta agregar validación criptográfica de firma SHA-256 (`X-Hub-Signature-256`) en los webhooks entrantes de Meta.
+- La vista `ReservasDebug.tsx` de la app web debe integrarse al calendario interactivo definitivo con Tailwind CSS.

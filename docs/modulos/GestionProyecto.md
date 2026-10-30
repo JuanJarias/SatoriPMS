@@ -2,7 +2,16 @@
 
 ## 11.1 Metodología y Herramientas
 
-El proyecto se gestiona con Scrum en cinco sprints de dos semanas. El seguimiento se hace en GitHub Projects, con un Milestone por épica y el backlog organizado por historias de usuario y casos de uso. Al cierre de cada sprint se realiza una revisión con el Product Owner y el stakeholder para validar los entregables y reordenar el backlog.
+El proyecto se gestiona bajo el marco ágil Scrum en cinco sprints. El seguimiento en tiempo real y la gestión del backlog se realiza oficialmente en **GitHub Projects**:
+* **Tablero Oficial:** [GitHub Projects — SatoriPMS (Project #2)](https://github.com/users/JuanJarias/projects/2)
+* **Repositorio y Rama de Trabajo:** [`JuanJarias/SatoriPMS` (rama `feat/database-redis-setup`)](https://github.com/JuanJarias/SatoriPMS/tree/feat/database-redis-setup)
+
+El tablero cuenta con 3 vistas principales:
+1. **Backlog y planificación** (Table layout agrupado por Sprint).
+2. **Tablero de Progreso** (Board layout por estados: *Backlog*, *In Progress*, *Review*, *Done*).
+3. **Cronograma Sprints** (Roadmap layout por fechas de inicio y duración).
+
+Al cierre de cada sprint se realiza una sesión de Sprint Review con el Product Owner y el stakeholder para validar los entregables contra la Definición de Hecho (DoD) y repriorizar el backlog.
 
 ## 11.2 Estructura de Desglose de Trabajo (EDT)
 
@@ -22,15 +31,15 @@ La EDT combina dos criterios de descomposición: las fases del ciclo de vida y, 
 | 10 | Despliegue e Implementación | Poner el sistema en producción y capacitar al personal |
 | 11 | Documentación y Cierre | Dejar el conocimiento documentado y formalizar la entrega |
 
-## 11.3 Cronograma Scrum
+## 11.3 Cronograma Scrum Oficial (Reorganizado en GitHub Projects)
 
-| Sprint | Fechas | Contenido |
-|---|---|---|
-| 1 | 14/09 al 25/09/2026 | Arquitectura y base de datos, mockups UX/UI y backlog inicial |
-| 2 | 28/09 al 09/10/2026 | WhatsApp API, motor de reserva con IA y cancelaciones |
-| 3 | 12/10 al 23/10/2026 | Panel de la app web, check-in y check-out, finanzas y sueldos |
-| 4 | 26/10 al 06/11/2026 | Módulo de tienda, reseñas y fidelización, y gestión de roles |
-| 5 | 09/11 al 20/11/2026 | Pruebas de QA, despliegue en producción, capacitación y cierre |
+| Sprint | Fechas Oficiales | Duración | Estado GitHub | Foco Técnico e Issues Clave Asociadas |
+|---|---|---|---|---|
+| **Sprint 1** | 23/09/2026 al 02/10/2026 | 10 días | **Done** | **Diseño y Arquitectura de la Solución (7 issues):** DU-01 (Arquitectura), HU-00.1 (Conexión WhatsApp-n8n), DU-02 (Mockups UX/UI), DU-03 (Modelo BD relacional), DU-04 (Estrategia de concurrencia), DU-05 (Flujos chatbot), DU-06 (Seguridad y datos). |
+| **Sprint 2** | 03/10/2026 al 16/10/2026 | 14 días | **Done** | **Core de Reservas Chatbot WhatsApp (6 issues):** CU-01 (Reservar habitación), CU-01.1 (Disponibilidad por fechas), CU-01.2 (Bloqueo temporal 15 min RN-02), CU-01.4 (Precio total y confirmar), CU-02 (Cancelar en chatbot), HU-08 (Confirmación automática WhatsApp). |
+| **Sprint 3** | 17/10/2026 al 30/10/2026 | 14 días | **In Progress** | **Gestión Operativa Web y Asistente IA (11 issues):** CU-03 (Check-in), CU-04 (Check-out consumos), HU-03 (Calendario en tiempo real), HU-03.1 (Reconexión socket y sincronización), CU-08 (Reserva manual), CU-02 (Cancelar reserva web), HU-05 (Rol Recepcionista), HU-11 (Credenciales), HU-06 (Escalamiento a humano), HU-09 (Recomendación IA Gemini), CU-01.3 (Validar capacidad y cargo extra RN-01). |
+| **Sprint 4** | 31/10/2026 al 13/11/2026 | 14 días | **Backlog** | **Finanzas, Tienda, Reseñas, Pasarela y Auditoría (13 issues):** CU-01.5 (Pasarela de pago pruebas Colombia), HU-01 (Informe mensual Excel), CU-06 (Ingresos y egresos), HU-07 (Sueldo recepcionista), HU-13 (Egresos operativos), CU-05 (Vender producto tienda), CU-07 (Catálogo inventario), HU-14 (Rotación de stock), HU-02 (Consultar reseñas bot), HU-04 (Dejar reseña post check-out), HU-10 (Panel web reseñas), HU-12 (Huéspedes recurrentes), HU-15 (Log de auditoría). |
+| **Sprint 5** | 14/11/2026 al 27/11/2026 | 14 días | **Backlog** | **Aseguramiento de Calidad y Pruebas Transversales (7 issues):** QA-01 (Pruebas unitarias RN-01 a RN-04), QA-02 (Integración chatbot-API-BD-pagos), QA-03 (Pruebas funcionales CU-01 a CU-08), QA-04 (Rendimiento <3s), QA-05 (Concurrencia dos reservas simultáneas), QA-06 (Responsive móvil/escritorio), QA-07 (Usabilidad con usuarios reales). |
 
 ## 11.4 Equipo y Roles
 
