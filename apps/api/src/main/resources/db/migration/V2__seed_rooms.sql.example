@@ -1,0 +1,19 @@
+-- V2__seed_rooms.sql.example
+--
+-- PLANTILLA — este archivo SÍ se sube al repo, con datos de ejemplo
+-- inventados. Para usarlo:
+--   1. Copia este archivo como V2__seed_rooms.sql (mismo directorio,
+--      quitando el sufijo .example).
+--   2. Llena las filas con las habitaciones reales de TU hotel.
+--   3. V2__seed_rooms.sql queda fuera de git automáticamente (ver
+--      .gitignore) — así el repo no expone nombres/precios/capacidades
+--      reales del hotel, igual que .env vs .env.example.
+--   4. Corre `mvn flyway:migrate` (o el contenedor `api` al arrancar).
+--
+-- Si el archivo real no existe, Flyway simplemente no aplica esta
+-- migración — la tabla room queda vacía hasta que la crees, no rompe nada.
+
+INSERT INTO room (number, name, type, base_adults_capacity, max_adults_capacity, children_capacity, allows_pets, price_per_night, extra_guest_price) VALUES
+('EJ-1', 'Nombre de ejemplo 1', 'ESTANDAR', 2, 3, 1, TRUE, 100000, 20000),
+('EJ-2', 'Nombre de ejemplo 2', 'DELUXE',   2, 4, 2, TRUE, 150000, 25000),
+('EJ-3', 'Nombre de ejemplo 3', 'SUITE',    4, 6, 2, TRUE, 200000, 30000);

@@ -1,0 +1,1664 @@
+{
+  "name": "V3_ChatbotReservas",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "whatsapp-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8fd0845b-8c74-43eb-9a81-40bc0e8a15db",
+      "name": "Webhook GET Verificación",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -2464,
+        400
+      ],
+      "webhookId": "whatsapp-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "abfa0088-7e77-40a6-bc64-50dc7f4f3d57",
+      "name": "Responder Desafío GET",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -2256,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "options": {}
+      },
+      "id": "bada9061-5615-4c79-a8ec-035d20839033",
+      "name": "Webhook POST Mensajes",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -2464,
+        608
+      ],
+      "webhookId": "whatsapp-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst value = body && body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value;\nconst message = value && value.messages && value.messages[0];\nif (!message) return [{ json: { skip: true } }];\nconst contact = value.contacts && value.contacts[0];\nlet text = '[no-texto]';\nif (message.type === 'text') text = ((message.text && message.text.body) || '').trim();\nelse if (message.type === 'interactive') text = String((message.interactive && message.interactive.button_reply && message.interactive.button_reply.id) || (message.interactive && message.interactive.list_reply && message.interactive.list_reply.id) || (message.interactive && message.interactive.button_reply && message.interactive.button_reply.title) || '').trim();\nelse if (message.type === 'button') text = ((message.button && message.button.text) || '').trim();\nreturn [{ json: { skip: false, wa_id: message.from, message_type: message.type, message_text: text, message_id: message.id, sender_name: (contact && contact.profile && contact.profile.name) || 'Huésped' } }];"
+      },
+      "id": "1bd5b5b8-b42d-444c-998e-335ee78c4d51",
+      "name": "Parsear Mensaje Meta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2256,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f57ea85d-58aa-4fdd-b392-4ca9e3a7bb1e",
+      "name": "¿Mensaje Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2032,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "value",
+        "key": "={{ 'session:' + $json.wa_id }}",
+        "keyType": "string",
+        "options": {}
+      },
+      "id": "8af9241c-f686-45a2-bac0-8f3020f88dff",
+      "name": "Redis Obtener Sesión",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -1808,
+        592
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "redis": {
+          "id": "bvCkya9cebeAiyCR",
+          "name": "Redis account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Parsear Mensaje Meta').first().json;\nconst raw = $input.first().json.value;\nlet S = {};\nif (typeof raw === 'string' && raw.trim()) { try { S = JSON.parse(raw); } catch (e) { S = {}; } }\nelse if (raw && typeof raw === 'object') { S = raw; }\nif (!S || typeof S !== 'object' || Array.isArray(S)) S = {};\nconst norm = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\nconst t = norm(p.message_text);\nconst state = S.state || 'menu';\nconst step = S.step || 'inicio';\nconst RESTART = ['hola','menu','inicio','reiniciar','start','hi','hello','buenas','buenos dias','buenas tardes','buenas noches'];\nconst restartRequested = RESTART.includes(t);\nconst agentActive = !restartRequested && (S.agent_active === true || S.agent_active === 'true');\nconst AGENT = /\\b(agente|recepcionista|humano)\\b/;\nconst textual = ['text','interactive','button'].includes(p.message_type);\nlet route = state + ':' + step;\nif (!textual) route = 'no_texto';\nelse if (restartRequested) route = 'menu:inicio';\nelse if (AGENT.test(t) && state !== 'escribir_resena') route = 'escalamiento:inicio';\nelse if (state === 'escalamiento') route = 'menu:inicio';\nreturn [{ json: { wa_id: p.wa_id, sender_name: p.sender_name, message_text: p.message_text, message_type: p.message_type, agent_active: agentActive, session: S, route } }];"
+      },
+      "id": "4355c4f1-645d-4c78-b87c-67d599c02548",
+      "name": "Cargar Sesión y Detectar Ruta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1616,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "agent",
+              "leftValue": "={{ $json.agent_active }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4ddbb222-3c76-43ad-b07c-729155a69c2b",
+      "name": "¿Agente Activo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1408,
+        592
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "8bd1a9c0-fb3b-4659-81ca-89ad9fec5d9a",
+      "name": "Pausa (Agente Atendiendo)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "menu:esperando_opcion",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "menu:esperando_opcion"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r0",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "menu:inicio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "menu:inicio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reserva:checkin",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reserva:checkin"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r3",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reserva:checkout",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reserva:checkout"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r4",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "escalamiento:inicio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "escalamiento:inicio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r5",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "no_texto",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "no_texto"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "En construcción"
+        }
+      },
+      "id": "2e1a4df1-9aee-4287-bee1-5899ba67e031",
+      "name": "Enrutar por Estado1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1024,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst text = String(J.message_text || '').trim().toLowerCase();\nconst ids = { menu_reserva: '1', menu_ia: '2', menu_resenas: '3', menu_escribir_resena: '4', menu_agente: '5', menu_cancelar: '6' };\nconst normalized = ids[text] || text;\nconst m = normalized.replace(/[\\uFE0F\\u20E3]/g, '').match(/^\\D*([1-6])\\D*$/);\nreturn [{ json: Object.assign({}, J, { opcion: m ? m[1] : 'invalido' }) }];"
+      },
+      "id": "2cc35d3d-f6f9-43e6-a971-866d90ad935a",
+      "name": "H Menú Evaluador Opción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o1",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "1 Reserva"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o2",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "2 IA"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o3",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "3 Reseñas"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o4",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "4",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "4 Escribir reseña"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o6",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "6",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "6 Cancelar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o5",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "5",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "5 Agente"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Inválido"
+        }
+      },
+      "id": "95d83148-9b74-47aa-bdb2-2e7c37206524",
+      "name": "Switch Opción Seleccionada",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -656,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nreturn [{ json: { wa_id, sender_name, response_text: '📅 ¡Perfecto! Iniciemos tu reserva.\\n\\n¿Cuál es tu fecha de *llegada*?\\nFormato: AAAA-MM-DD\\nEjemplo: _2026-10-12_', session: { state: 'reserva', step: 'checkin', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "3738cc27-35d7-4c32-9ad4-c7d7ed784244",
+      "name": "H F1 Inicio Reserva",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst now = Date.now();\nconst session = Object.assign({}, J.session || { state: 'menu', step: 'inicio', agent_active: false }, { last_activity: now });\nreturn [{ json: { wa_id: J.wa_id, response_text: J.response_text || 'Entendido. Procesando...', response_payload: J.response_payload || null, redis_key: 'session:' + J.wa_id, redis_value: JSON.stringify(session), last_activity: now } }];"
+      },
+      "id": "a3907b31-fca1-4110-b6ef-1c1c17ee7a46",
+      "name": "Preparar Salida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ $json.redis_key }}",
+        "value": "={{ $json.redis_value }}",
+        "keyType": "string",
+        "expire": true,
+        "ttl": 660
+      },
+      "id": "8daf133d-e6fa-48fb-8c20-d3f48f334d29",
+      "name": "Redis Guardar Sesión",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        464,
+        560
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "redis": {
+          "id": "0zvUUyx53fcJGdM5",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + ($env.WHATSAPP_GRAPH_VERSION || 'v20.0') + '/' + $env.WHATSAPP_PHONE_ID + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.WHATSAPP_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: $('Preparar Salida').first().json.wa_id, ...($('Preparar Salida').first().json.response_payload || { type: 'text', text: { body: $('Preparar Salida').first().json.response_text, preview_url: false } }) }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "4b83bd9a-c145-4df7-b90c-020a744efcf9",
+      "name": "Enviar Mensaje WhatsApp1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10,
+        "unit": "minutes"
+      },
+      "id": "8e661536-39c0-4815-9e03-4f3510bc9a59",
+      "name": "Esperar 10 min Inactividad",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        864,
+        560
+      ],
+      "webhookId": "c48b0d28-8948-4714-849d-faf1a054852f"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "value",
+        "key": "={{ $('Preparar Salida').first().json.redis_key }}",
+        "keyType": "string",
+        "options": {}
+      },
+      "id": "44617218-27de-4be4-939a-5df9e3679796",
+      "name": "Redis Revisar Inactividad",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        1072,
+        560
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "redis": {
+          "id": "0zvUUyx53fcJGdM5",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.value;\nlet session = {};\ntry { session = typeof raw === 'string' ? JSON.parse(raw) : (raw || {}); } catch (error) {}\nconst stored = Number(session.last_activity || 0);\nconst mine = Number($('Preparar Salida').first().json.last_activity || 0);\n// Solo avisamos si la sesión sigue reflejando la actividad de ESTA ejecución.\n// Si el usuario respondió, una ejecución posterior sobrescribió last_activity y stored !== mine,\n// así el aviso no se envía. Esto garantiza que el aviso salga una sola vez y solo ante inactividad real.\nconst sameSession = stored > 0 && stored === mine;\nconst elapsed = Date.now() - stored >= 600000;\nreturn [{ json: { wa_id: $('Preparar Salida').first().json.wa_id, redis_key: $('Preparar Salida').first().json.redis_key, stale: sameSession && elapsed } }];"
+      },
+      "id": "c570d60d-ed4f-4bba-b61a-046bb23d5f65",
+      "name": "¿Sesión Inactiva 10 min?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "stale",
+              "leftValue": "={{ $json.stale }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fae130d7-bfb3-4300-acef-bc22627b70af",
+      "name": "¿Avisar Inactividad?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1488,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const wa_id = $json.wa_id;\nreturn [{ json: { wa_id, response_text: '⏳ Han pasado 10 minutos sin actividad. Mantendré tu sesión un minuto más; responde para continuar o la reiniciaré.' } }];"
+      },
+      "id": "c6adbc9c-2372-441a-bcd0-df13b09218bc",
+      "name": "H Aviso Inactividad",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + ($env.WHATSAPP_GRAPH_VERSION || 'v20.0') + '/' + $env.WHATSAPP_PHONE_ID + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.WHATSAPP_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: $json.wa_id, type: 'text', text: { body: $json.response_text, preview_url: false } }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "84e4def0-76b7-4175-9673-32bd8dbee9b5",
+      "name": "Enviar Aviso Inactividad",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1904,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "id": "33ecc795-47c6-452d-85b1-6a491ae12807",
+      "name": "Esperar 1 min para Limpiar",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        464
+      ],
+      "webhookId": "3cc811e7-93d1-43e9-8655-53ab4a0d5b19"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "value",
+        "key": "={{ $('Preparar Salida').first().json.redis_key }}",
+        "keyType": "string",
+        "options": {}
+      },
+      "id": "2eea77f4-62dc-4479-831f-ee3d80b97395",
+      "name": "Redis Confirmar Limpieza",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        464
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "redis": {
+          "id": "0zvUUyx53fcJGdM5",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.value;\nlet session = {};\ntry { session = typeof raw === 'string' ? JSON.parse(raw) : (raw || {}); } catch (error) {}\nconst stored = Number(session.last_activity || 0);\nconst mine = Number($('Preparar Salida').first().json.last_activity || 0);\n// Solo borramos si no hubo actividad nueva (misma sesión) y ya pasaron 11 min.\nconst sameSession = stored > 0 && stored === mine;\nconst elapsed = Date.now() - stored >= 660000;\nreturn [{ json: { redis_key: $('Preparar Salida').first().json.redis_key, stale: sameSession && elapsed } }];"
+      },
+      "id": "3a077f7f-c639-492f-aeb6-4aee62fd5feb",
+      "name": "¿Limpiar Sesión?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "stale",
+              "leftValue": "={{ $json.stale }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9ca3cfa5-8231-474f-800b-ccf1387dd70e",
+      "name": "¿Borrar Redis?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2736,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "={{ $json.redis_key }}"
+      },
+      "id": "0f769bf8-2545-46bf-a55d-f91a34581389",
+      "name": "Redis Borrar Sesión Inactiva",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2944,
+        368
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "redis": {
+          "id": "0zvUUyx53fcJGdM5",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nreturn [{ json: { wa_id, sender_name, response_text: '🚧 Esa opción estará disponible muy pronto. Escribe *menú* para volver al inicio.', session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "e4de5c66-0d0f-4d9c-a25a-6c18cbb342bb",
+      "name": "H En Construcción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nconst prev = J.session || {};\nconst hourCO = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Bogota', hour: '2-digit', hour12: false }).format(new Date()));\nconst available = hourCO >= 7 && hourCO < 23;\nif (!available) return [{ json: { wa_id, sender_name, agent_available: false, response_text: '🕘 En este momento recepción está fuera de horario. Atendemos todos los días de *7:00 a. m. a 11:00 p. m.*. Escribe *menú* para continuar con el asistente.', session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: prev.reservation_draft || {} } } }];\nreturn [{ json: { wa_id, sender_name, agent_available: true, response_text: '👤 En un momento un miembro de nuestro equipo de *Satori Hotel* continuará esta conversación contigo. ¡Gracias por tu paciencia! ☕', session: { state: 'escalamiento', step: 'atendido', agent_active: true, wa_id, sender_name, reservation_draft: prev.reservation_draft || {} } } }];"
+      },
+      "id": "4e99853e-19b8-48e6-a951-b3f37a50cc76",
+      "name": "H Escalar a Agente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "available",
+              "leftValue": "={{ $json.agent_available }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c35edddb-ef53-42a9-a654-691ca384bfa9",
+      "name": "¿Recepción Disponible?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        128,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/notifications/agent-request' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ wa_id: $json.wa_id, name: $json.sender_name, context: 'Solicitud de agente desde WhatsApp' }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "3784de0d-d8d6-4510-af49-f03598f1ff03",
+      "name": "Notificar Agente (API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        384,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nreturn [{ json: { wa_id, sender_name, response_text: '⚠️ No entendí tu elección. Por favor responde con un número del *1* al *6*.', session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "7d3fe967-2826-43a8-80b3-cbb2d35a7cd8",
+      "name": "H Opción Inválida1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nconst msg = '¡Hola, ' + sender_name + '\\n! Bienvenido al asistente de *Satori Hotel* \\n\\nSelecciona una opción para continuar.';\n// SOLUCIÓN: Se acortó \"Reservar con asistente IA\" a \"Asistente IA\" para no superar 24 caracteres\nconst rows = [\n  ['menu_reserva', 'Hacer una reserva', 'Reserva tradicional'], \n  ['menu_ia', 'Asistente IA', 'Próximamente'], \n  ['menu_resenas', 'Ver reseñas del hotel', 'Opiniones de huéspedes'], \n  ['menu_escribir_resena', 'Escribir una reseña', 'Comparte tu experiencia'], \n  ['menu_agente', 'Hablar con un agente', 'Recepción'], \n  ['menu_cancelar', 'Cancelar reserva', 'Consulta políticas']\n].map(([id, title, description]) => ({ id, title, description }));\n\nreturn [{ json: { wa_id, sender_name, response_text: msg, response_payload: { type: 'interactive', interactive: { type: 'list', body: { text: msg }, action: { button: 'Ver opciones', sections: [{ title: 'Satori Hotel', rows }] } } }, session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "239c97b9-80dc-49a0-8744-63ff1289be50",
+      "name": "H Menú Principal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nconst text = String(J.message_text || '').trim();\nconst hoyCO = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);\nconst parseDate = (s) => { s = String(s || '').trim(); const m = s.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/); if (!m) return null; const iso = m[1] + '-' + m[2].padStart(2,'0') + '-' + m[3].padStart(2,'0'); return isNaN(new Date(iso + 'T00:00:00Z')) ? null : iso; };\nconst draft = (J.session && J.session.reservation_draft) || {};\nconst f = parseDate(text);\nif (!f) return [{ json: { wa_id, sender_name, response_text: '⚠️ No reconocí la fecha. Usa el formato AAAA-MM-DD (Ejemplo: 2026-10-12)', session: { state: 'reserva', step: 'checkin', agent_active: false, wa_id, sender_name, reservation_draft: draft } } }];\nif (f < hoyCO) return [{ json: { wa_id, sender_name, response_text: '⚠️ La fecha de llegada no puede estar en el pasado. ¿Cuál es tu fecha de llegada?', session: { state: 'reserva', step: 'checkin', agent_active: false, wa_id, sender_name, reservation_draft: draft } } }];\nreturn [{ json: { wa_id, sender_name, response_text: '✅ Llegada: *' + f + '*\\n\\n¿Cuál es la fecha de *salida*?\\nFormato: AAAA-MM-DD', session: { state: 'reserva', step: 'checkout', agent_active: false, wa_id, sender_name, reservation_draft: { checkIn: f } } } }];"
+      },
+      "id": "40b0800f-b8df-4ed9-bb8d-63fbe6edd7cf",
+      "name": "H F1 CheckIn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nconst text = String(J.message_text || '').trim();\nconst draft = (J.session && J.session.reservation_draft) || {};\nconst parseDate = (s) => { s = String(s || '').trim(); const m = s.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/); if (!m) return null; const iso = m[1] + '-' + m[2].padStart(2,'0') + '-' + m[3].padStart(2,'0'); const date = new Date(iso + 'T00:00:00Z'); return !isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null; };\nconst checkIn = parseDate(draft.checkIn);\nif (!checkIn) return [{ json: { wa_id, sender_name, response_text: '⚠️ Perdí la fecha de llegada. Indícala nuevamente con formato AAAA-MM-DD (Ejemplo: 2026-10-12)', session: { state: 'reserva', step: 'checkin', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];\nconst f = parseDate(text);\nconst base = { state: 'reserva', step: 'checkout', agent_active: false, wa_id, sender_name, reservation_draft: Object.assign({}, draft, { checkIn }) };\nif (!f) return [{ json: { wa_id, sender_name, response_text: '⚠️ No reconocí la fecha. Usa el formato AAAA-MM-DD (Ejemplo: 2026-10-15)', session: base } }];\nif (f <= checkIn) return [{ json: { wa_id, sender_name, response_text: '⚠️ La fecha de salida debe ser posterior a la de llegada (*' + checkIn + '*). ¿Cuál es tu fecha de salida?', session: base } }];\nconst nd = Object.assign({}, draft, { checkIn, checkOut: f, adults: 1, children: 0, hasPet: false });\nreturn [{ json: { wa_id, sender_name, api_action: 'availability', checkIn: nd.checkIn, checkOut: nd.checkOut, adults: nd.adults, children: nd.children, pet: nd.hasPet, session: { state: 'reserva', step: 'seleccion_habitacion', agent_active: false, wa_id, sender_name, reservation_draft: nd } } }];"
+      },
+      "id": "5b98f98c-28f8-4af2-b176-bf65a20d0e10",
+      "name": "H F1 CheckOut",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/rooms/availability?checkIn=' + $('H F1 CheckOut').first().json.checkIn + '&checkOut=' + $('H F1 CheckOut').first().json.checkOut + '&adults=' + $('H F1 CheckOut').first().json.adults + '&children=' + $('H F1 CheckOut').first().json.children + '&pet=' + $('H F1 CheckOut').first().json.pet }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "8fedb6b3-d760-46c0-b8ae-a2c8d0f428cb",
+      "name": "API Habitaciones Disponibles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -64,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('H F1 CheckOut').first().json;\nconst raw = $input.all().map((item) => item.json);\nconst rooms = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;\nconst wa_id = source.wa_id;\nconst sender_name = source.sender_name;\nconst draft = Object.assign({}, source.session.reservation_draft, { availableRooms: rooms });\nif (!rooms.length) return [{ json: { wa_id, sender_name, response_text: '😔 No encontré habitaciones disponibles para esas fechas. Escribe *menú* para iniciar otra búsqueda.', session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];\nconst rows = rooms.slice(0, 10).map((room, index) => ({ id: 'room_' + String(room.id), title: ((index + 1) + '. ' + (room.name || room.type || 'Habitación') + ' #' + (room.number || room.id)).slice(0, 24), description: 'Hasta ' + (room.maxAdultsCapacity || '?') + ' adultos · $' + (room.pricePerNight || '?') + '/noche' }));\nconst text = '✅ Encontré estas habitaciones para *' + draft.checkIn + '* al *' + draft.checkOut + '*\\n\\nSelecciona una opción. El bloqueo temporal se hará por 15 minutos.';\nreturn [{ json: { wa_id, sender_name, response_text: text, response_payload: { type: 'interactive', interactive: { type: 'list', body: { text }, action: { button: 'Ver habitaciones', sections: [{ title: 'Disponibles', rows }] } } }, session: { state: 'reserva', step: 'seleccion_habitacion', agent_active: false, wa_id, sender_name, reservation_draft: draft } } }];"
+      },
+      "id": "739862ff-8185-48ad-a7dc-e5d99544e043",
+      "name": "H Mostrar Habitaciones",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\nreturn [{ json: { wa_id, sender_name, response_text: '📎 Por ahora solo puedo procesar mensajes de texto. Escribe *menú* para ver las opciones.', session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} } } }];"
+      },
+      "id": "9fdebf54-b434-4477-a0ba-735eeca5f7bf",
+      "name": "H No Texto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst session = J.session || {};\nconst draft = Object.assign({}, session.reservation_draft || {}, { step: session.step || 'inicio' });\nreturn [{ json: Object.assign({}, J, { session: Object.assign({}, session, { reservation_draft: draft }) }) }];"
+      },
+      "id": "649a708b-736e-4170-88d1-8f86716e5587",
+      "name": "H Normalizar Paso Reserva",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const J = $input.first().json;\nconst D = (J.session && J.session.reservation_draft) || {};\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase();\nconst keep = (draft, step) => ({ state: 'reserva', step, agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: draft });\nconst output = (response_text, session, extra = {}) => ({ json: Object.assign({ wa_id: J.wa_id, sender_name: J.sender_name, response_text, session }, extra) });\nif (J.route === 'reserva:seleccion_habitacion') {\n  const rooms = Array.isArray(D.availableRooms) ? D.availableRooms : [];\n  const number = Number((normalized.match(/\\d+/) || [])[0]);\n  const room = rooms.find((item, index) => String(item.id) === normalized.replace('room_', '') || String(item.id) === normalized || index + 1 === number);\n  if (!room) return [output('⚠️ No reconocí la habitación. Usa el botón de la lista o responde con su número.', keep(D, 'seleccion_habitacion'))];\n  const draft = Object.assign({}, D, { roomId: room.id, room, adults: 1, children: 0, hasPet: false });\n  return [output('🔒 Estoy bloqueando temporalmente la habitación seleccionada...', keep(draft, 'bloqueando'), { api_action: 'lock', roomId: room.id, checkIn: D.checkIn, checkOut: D.checkOut })];\n}\nif (D.step === 'huespedes') {\n  const values = (normalized.match(/\\d+/g) || []).map(Number);\n  const adults = values[0];\n  const children = values.length > 1 ? values[1] : 0;\n  const max = Number(D.room && D.room.maxAdultsCapacity || 0) + Number(D.room && D.room.childrenCapacity || 0);\n  if (!adults || adults < 1 || children < 0) return [output('⚠️ Indica las personas así: *2 adultos y 1 niño*.', keep(D, 'huespedes'))];\n  if (max && adults + children > max) return [output('⚠️ Esa habitación admite máximo *' + max + ' personas* según su capacidad. Regresa a la selección escribiendo *menú* o elige otra habitación.', keep(D, 'seleccion_habitacion'))];\n  const base = Number(D.room && D.room.baseAdultsCapacity || 0);\n  const extraPrice = Number(D.room && D.room.extraGuestPrice || 0);\n  const extraGuests = Math.max(0, adults + children - base);\n  const draft = Object.assign({}, D, { adults, children, extraGuests, extraGuestPrice: extraPrice, extraTotal: extraGuests * extraPrice });\n  return [output('✅ Huéspedes registrados: *' + adults + ' adulto(s)* y *' + children + ' niño(s)*.\\n\\nIndica el nombre completo de la persona que hará la reserva.', keep(draft, 'nombre'))];\n}\nif (D.step === 'nombre') {\n  if (text.length < 3) return [output('⚠️ Indica un nombre completo válido.', keep(D, 'nombre'))];\n  return [output('Gracias. Ahora indica el número de identificación del titular de la reserva.', keep(Object.assign({}, D, { guestName: text }), 'identificacion'))];\n}\nif (D.step === 'identificacion') return [output('¿Viajas con mascota?', keep(Object.assign({}, D, { document: text }), 'mascota'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: '¿Viajas con mascota?' }, action: { buttons: [{ type: 'reply', reply: { id: 'pet_si', title: 'Sí' } }, { type: 'reply', reply: { id: 'pet_no', title: 'No' } }] } } } })];\nif (D.step === 'mascota') {\n  const hasPet = ['si', 'sí', 'pet_si', 'yes'].includes(normalized);\n  const noPet = ['no', 'pet_no'].includes(normalized);\n  if (!hasPet && !noPet) return [output('Responde usando *Sí* o *No* para la mascota.', keep(D, 'mascota'))];\n  if (hasPet && D.room && D.room.allowsPets === false) return [output('⚠️ La habitación seleccionada no permite mascotas. Responde *No* o elige otra habitación.', keep(D, 'mascota'))];\n  return [output('¿Cuáles son los nombres de tus acompañantes? Si no hay, responde *ninguno*.', keep(Object.assign({}, D, { hasPet }), 'acompanantes'))];\n}\nif (D.step === 'acompanantes') {\n  const nights = Math.max(1, Math.round((new Date(D.checkOut) - new Date(D.checkIn)) / 86400000));\n  const nightly = Number(D.room && D.room.pricePerNight || 0);\n  const total = nights * nightly + Number(D.extraTotal || 0);\n  const draft = Object.assign({}, D, { companions: text, nights, total });\n  const summary = '🧾 *Resumen de tu reserva*\\n\\nHabitación: *' + (D.room.name || D.room.type) + ' #' + D.room.number + '*\\nEntrada: *' + D.checkIn + '*\\nSalida: *' + D.checkOut + '*\\nHuéspedes: *' + D.adults + ' adulto(s), ' + D.children + ' niño(s)*\\nMascota: *' + (D.hasPet ? 'Sí' : 'No') + '*\\nTitular: *' + D.guestName + '*\\nAcompañantes: *' + text + '*\\nNoches: *' + nights + '*\\nTotal estimado: *$' + total.toFixed(2) + '*\\n\\nEl bloqueo dura 15 minutos. El pago todavía no está habilitado en este flujo. ¿Deseas continuar?';\n  return [output(summary, keep(draft, 'confirmacion'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: summary }, action: { buttons: [{ type: 'reply', reply: { id: 'reserva_confirmar', title: 'Continuar' } }, { type: 'reply', reply: { id: 'reserva_cancelar', title: 'Cancelar' } }] } } } })];\n}\nif (D.step === 'confirmacion') {\n  if (['si', 'sí', 'reserva_confirmar', 'confirmar', 'continuar'].includes(normalized)) return [output('✅ Datos listos. El pago queda pendiente de habilitar; no se ha creado una reserva confirmada. El bloqueo temporal se liberará al vencer en 15 minutos. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];\n  return [output('Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];\n}\nreturn [output('Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];"
+      },
+      "id": "37bf4f55-17cb-4845-adf8-f7803c25795e",
+      "name": "H Procesar Reserva Paso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "lock",
+                    "leftValue": "={{ $json.api_action }}",
+                    "rightValue": "lock",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Bloquear habitación"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Responder"
+        }
+      },
+      "id": "0a617720-8932-4b05-8073-37a66efbfdf9",
+      "name": "¿Acción Reserva?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -352,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/lock' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ waId: $json.wa_id, roomId: $json.roomId, checkIn: $json.checkIn, checkOut: $json.checkOut }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "3d03d90f-43b7-4496-ad32-dd6ba734e9a5",
+      "name": "API Bloquear Habitación 15 min",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -64,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('H Procesar Reserva Paso').first().json;\nconst api = $input.first().json;\nconst draft = Object.assign({}, source.session.reservation_draft);\nif (!api.lockToken) return [{ json: { wa_id: source.wa_id, sender_name: source.sender_name, response_text: '⚠️ No pude bloquear esa habitación. Puede que ya no esté disponible. Escribe *menú* para intentar otra búsqueda.', session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: source.wa_id, sender_name: source.sender_name, reservation_draft: {} } } }];\ndraft.lockToken = api.lockToken;\ndraft.lockTtlSeconds = api.ttlSeconds || 900;\ndraft.baseTotal = api.totalPrice || 0;\nreturn [{ json: { wa_id: source.wa_id, sender_name: source.sender_name, response_text: '✅ Habitación bloqueada temporalmente por 15 minutos.\\n\\n¿Cuántos adultos y niños se hospedarán? Responde, por ejemplo: *2 adultos y 1 niño*.', session: { state: 'reserva', step: 'huespedes', agent_active: false, wa_id: source.wa_id, sender_name: source.sender_name, reservation_draft: draft } } }];"
+      },
+      "id": "b40b29c0-cc00-4322-a50e-e9eef4069d9b",
+      "name": "H Confirmar Bloqueo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        1136
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook GET Verificación": {
+      "main": [
+        [
+          {
+            "node": "Responder Desafío GET",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook POST Mensajes": {
+      "main": [
+        [
+          {
+            "node": "Parsear Mensaje Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear Mensaje Meta": {
+      "main": [
+        [
+          {
+            "node": "¿Mensaje Válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Mensaje Válido?": {
+      "main": [
+        [
+          {
+            "node": "Redis Obtener Sesión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Obtener Sesión": {
+      "main": [
+        [
+          {
+            "node": "Cargar Sesión y Detectar Ruta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargar Sesión y Detectar Ruta": {
+      "main": [
+        [
+          {
+            "node": "¿Agente Activo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Agente Activo?": {
+      "main": [
+        [
+          {
+            "node": "Pausa (Agente Atendiendo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enrutar por Estado1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrutar por Estado1": {
+      "main": [
+        [
+          {
+            "node": "H Menú Evaluador Opción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Menú Principal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H F1 CheckIn",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H F1 CheckOut",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Escalar a Agente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H No Texto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Normalizar Paso Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Menú Evaluador Opción": {
+      "main": [
+        [
+          {
+            "node": "Switch Opción Seleccionada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Opción Seleccionada": {
+      "main": [
+        [
+          {
+            "node": "H F1 Inicio Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H En Construcción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H En Construcción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H En Construcción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H En Construcción",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Escalar a Agente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Opción Inválida1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H F1 Inicio Reserva": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Salida": {
+      "main": [
+        [
+          {
+            "node": "Redis Guardar Sesión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Guardar Sesión": {
+      "main": [
+        [
+          {
+            "node": "Enviar Mensaje WhatsApp1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Mensaje WhatsApp1": {
+      "main": [
+        [
+          {
+            "node": "Esperar 10 min Inactividad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar 10 min Inactividad": {
+      "main": [
+        [
+          {
+            "node": "Redis Revisar Inactividad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Revisar Inactividad": {
+      "main": [
+        [
+          {
+            "node": "¿Sesión Inactiva 10 min?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Sesión Inactiva 10 min?": {
+      "main": [
+        [
+          {
+            "node": "¿Avisar Inactividad?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Avisar Inactividad?": {
+      "main": [
+        [
+          {
+            "node": "H Aviso Inactividad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Aviso Inactividad": {
+      "main": [
+        [
+          {
+            "node": "Enviar Aviso Inactividad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Aviso Inactividad": {
+      "main": [
+        [
+          {
+            "node": "Esperar 1 min para Limpiar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar 1 min para Limpiar": {
+      "main": [
+        [
+          {
+            "node": "Redis Confirmar Limpieza",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Confirmar Limpieza": {
+      "main": [
+        [
+          {
+            "node": "¿Limpiar Sesión?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Limpiar Sesión?": {
+      "main": [
+        [
+          {
+            "node": "¿Borrar Redis?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Borrar Redis?": {
+      "main": [
+        [
+          {
+            "node": "Redis Borrar Sesión Inactiva",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H En Construcción": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Escalar a Agente": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "¿Recepción Disponible?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Recepción Disponible?": {
+      "main": [
+        [
+          {
+            "node": "Notificar Agente (API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Opción Inválida1": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Menú Principal": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H F1 CheckIn": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H F1 CheckOut": {
+      "main": [
+        [
+          {
+            "node": "API Habitaciones Disponibles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Habitaciones Disponibles": {
+      "main": [
+        [
+          {
+            "node": "H Mostrar Habitaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Mostrar Habitaciones": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H No Texto": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Normalizar Paso Reserva": {
+      "main": [
+        [
+          {
+            "node": "H Procesar Reserva Paso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Procesar Reserva Paso": {
+      "main": [
+        [
+          {
+            "node": "¿Acción Reserva?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Acción Reserva?": {
+      "main": [
+        [
+          {
+            "node": "API Bloquear Habitación 15 min",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Bloquear Habitación 15 min": {
+      "main": [
+        [
+          {
+            "node": "H Confirmar Bloqueo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Confirmar Bloqueo": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4fc66124-7178-45bf-9222-024f7951fe3e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "57bcba21f3efc9cde2fc2461885839884fbf8a990acce242694c3face9380457"
+  },
+  "nodeGroups": [],
+  "id": "1ZO4dKpOM8SEZmY3",
+  "tags": []
+}
