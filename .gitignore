@@ -22,12 +22,13 @@ target/
 # ── Docker ───────────────────────────────────────────────
 docker-compose.override.yml
 
-# ── IDEs ─────────────────────────────────────────────────
+# ── IDEs y Entornos de Escritorio ────────────────────────
 .idea/
 .vscode/
 *.iml
 .DS_Store
 Thumbs.db
+.directory
 
 # ── Logs ─────────────────────────────────────────────────
 *.log
