@@ -1,25 +1,22 @@
-# Índice de Diagramas Técnicos y de Negocio — SatoriPMS
+# Catálogo de Diagramas del Sistema — SatoriPMS
 
-Esta carpeta centraliza los diagramas oficiales de arquitectura, infraestructura, flujos conversacionales, concurrencia y procesos operativos de **Torre Satori PMS**.
-
-Todos los diagramas han sido elaborados en formato **Mermaid estándar**, optimizados con paleta de colores corporativos, tipografía clara, espaciado que evita solapamiento de texto y elementos visuales descriptivos.
+Esta carpeta reúne las representaciones visuales de **SatoriPMS**, diseñadas para explicar con claridad cómo está construido el sistema de **Torre Satori**, cómo fluye la información desde que un viajero escribe por WhatsApp hasta que finaliza su estadía y cómo se protegen las habitaciones contra cualquier intento de sobreventa.
 
 ---
 
-## Catálogo de Diagramas
+## Índice de Diagramas Oficiales
 
-| # | Diagrama | Archivo | Propósito y Contenido |
-|:---:|---|---|---|
-| **01** | **Infraestructura y Servicios** | [`01_Infraestructura_Servicios.md`](01_Infraestructura_Servicios.md) | Topología de contenedores en Docker Compose, asignación de puertos (`:8080`, `:5173`, `:5678`, `:5432`, `:6379`), redes privadas aisladas, volúmenes persistentes y conexiones externas a Meta Cloud API, Google Gemini, Cloudflare y MercadoPago. |
-| **02** | **Flujo Integral de Reserva por WhatsApp** | [`02_Flujo_Reserva_WhatsApp.md`](02_Flujo_Reserva_WhatsApp.md) | Secuencia paso a paso desde el primer mensaje del huésped, extracción estructurada con Google Gemini Flash Lite, consulta de disponibilidad, bloqueo temporal de 15 min, selección de abono (50% / 100%) y emisión del voucher digital. |
-| **03** | **Concurrencia y Doble Candado Anti-Overbooking** | [`03_Concurrencia_Doble_Candado.md`](03_Concurrencia_Doble_Candado.md) | Detalle del mecanismo de dos niveles que erradica la sobreventa: Nivel 1 en memoria con `RedisLockService` (scripts Lua atómicos con TTL) y Nivel 2 en base de datos con la restricción física `EXCLUDE USING gist` en PostgreSQL 16. |
-| **04** | **Gestión Operativa en Recepción (App Web & Sockets)** | [`04_Gestion_Operativa_Recepcion.md`](04_Gestion_Operativa_Recepcion.md) | Flujo operativo del personal del hotel en la aplicación React/Vite: sincronización en tiempo real vía WebSockets STOMP, check-in, cobro de saldos restantes (`/pay-remaining`), check-out y liquidación de consumos de tienda (RN-04). |
-| **05** | **Máquina de Estados y Ciclo de Vida de la Reserva** | [`05_Ciclo_Vida_Reserva.md`](05_Ciclo_Vida_Reserva.md) | Modelo de estados de una reserva (`DRAFT_LOCK` $\rightarrow$ `CONFIRMED` $\rightarrow$ `CHECKED_IN` $\rightarrow$ `CHECKED_OUT`), con el desglose de reglas de cancelación y escalas de reembolso proporcional según la antelación (Regla de Negocio RN-03). |
+| # | Documento | Propósito Principal | Tipo de Diagrama |
+|---|---|---|---|
+| **01** | [Infraestructura y Servicios](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/01_Infraestructura_Servicios.md) | Muestra cómo se conectan los contenedores locales y en la nube (Base de Datos, Memoria Rápida, Orquestador del Chatbot, Servidor Central y Aplicación Web) con WhatsApp y la Inteligencia Artificial. | Diagrama de Arquitectura y Red (`flowchart TB`) |
+| **02** | [Flujo de Reserva por WhatsApp](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/02_Flujo_Reserva_WhatsApp.md) | Detalla paso a paso la experiencia del viajero en WhatsApp (reserva guiada y asistente con inteligencia artificial), el aviso de privacidad, el desglose de recargos y el pago del 50% o 100%. | Diagrama de Secuencia (`sequenceDiagram`) |
+| **03** | [Prevención de Sobreventa (Doble Candado)](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/03_Concurrencia_Doble_Candado.md) | Explica cómo el sistema impide que dos personas reserven la misma habitación al mismo tiempo mediante el bloqueo por intervalos de 15 minutos en memoria rápida y la restricción definitiva en base de datos. | Diagrama de Secuencia y Flujo (`sequenceDiagram` + `flowchart LR`) |
+| **04** | [Gestión Operativa y Administrativa en la Web](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/04_Gestion_Operativa_Recepcion.md) | Representa las labores diarias de recepción (llegadas, cargos de tienda y salidas) y las funciones exclusivas del administrador (crear, editar y eliminar habitaciones sin reservas activas, y programar eventos especiales con descuentos). | Diagrama de Procesos por Rol (`flowchart TB`) |
+| **05** | [Ciclo de Vida de una Reserva y Reembolsos](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/05_Ciclo_Vida_Reserva.md) | Ilustra todos los estados por los que pasa una reserva desde que se cotiza hasta que finaliza o se cancela, detallando el cálculo del reembolso estrictamente sobre el monto abonado. | Diagrama de Estados y Decisión (`stateDiagram-v2` + `flowchart TD`) |
 
 ---
 
-## Convenciones de Visualización
+## Convenciones de Lectura
 
-* **Contenedores y Servicios Internos:** Agrupados en subgrafos con bordes distintivos y etiquetas técnicas (lenguaje, framework y puerto).
-* **Flujos de Información:** Flechas etiquetadas indicando protocolo (REST JSON, WebSocket STOMP, TCP/IP Redis, SQL nativo).
-* **Decisiones y Candados:** Rombos de evaluación condicional con salidas explícitas de éxito (verde) y conflicto/error (rojo).
+- Todos los diagramas están escritos en formato **Mermaid**, lo que permite visualizarlos directamente en GitHub, en editores compatibles con Markdown o exportarlos a imágenes vectoriales de alta resolución.
+- Cuando un diagrama incluye el nombre técnico de una operación o estado del sistema, se acompaña siempre de su concepto en español bajo el formato `Concepto en español : "identificador_tecnico"`, garantizando que sea comprensible tanto para el cliente como para el equipo de desarrollo.

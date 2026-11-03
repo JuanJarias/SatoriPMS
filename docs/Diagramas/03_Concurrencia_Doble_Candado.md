@@ -1,76 +1,103 @@
-# Diagrama 03 — Concurrencia y Mecanismo de Doble Candado Anti-Overbooking
+# 03. Prevención de Sobreventa: Arquitectura de Doble Candado — SatoriPMS
 
-Este diagrama ilustra la arquitectura de **Doble Candado** implementada en Torre Satori PMS para garantizar la prevención absoluta de sobreventa (*overbooking*), protegiendo la consistencia tanto en memoria de baja latencia como a nivel de bloque en disco.
+## 1. Propósito del Diagrama
+
+Uno de los riesgos más críticos para cualquier hotel es la **sobreventa**: que dos clientes distintos intenten reservar la última habitación disponible para las mismas fechas al mismo tiempo.
+
+Este documento explica visualmente cómo **SatoriPMS** elimina ese riesgo mediante un **sistema de Doble Candado**:
+1. **Primer Candado (En memoria rápida Redis por 15 minutos):** Protege la habitación desde el segundo exacto en que el primer viajero la selecciona, evaluando intervalos de fechas de manera atómica.
+2. **Segundo Candado (En la base de datos PostgreSQL de forma permanente):** Impide matemáticamente guardar dos reservas activas con fechas cruzadas para una misma habitación.
 
 ---
 
+## 2. Diagrama de Competencia Simultánea entre Dos Usuarios
+
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#E8EEF5', 'primaryTextColor': '#1B365D', 'primaryBorderColor': '#2C4D75', 'lineColor': '#2C4D75' }}}%%
-flowchart TD
-    subgraph CanalesEntrada["Canales Concurrentes de Venta"]
-        WA["📱 Huésped A<br/>WhatsApp Bot"]
-        WebRec["💻 Recepcionista B<br/>App Web / Reserva Manual"]
+sequenceDiagram
+    autonumber
+    actor H1 as Viajero A (WhatsApp)
+    actor H2 as Viajero B (WhatsApp o Recepción)
+    participant API as Servidor Central (Spring Boot)
+    participant Redis as Primer Candado: Memoria Rápida (Redis 7)
+    participant PG as Segundo Candado: Base de Datos (PostgreSQL 16)
+
+    Note over H1,H2: Ambos viajeros consultan la Habitación 101 del 20 al 23 de diciembre
+    H1->>API: Consulta disponibilidad (GET /api/rooms/availability)
+    H2->>API: Consulta disponibilidad (GET /api/rooms/availability)
+    API-->>H1: Habitación 101 disponible
+    API-->>H2: Habitación 101 disponible
+
+    rect rgb(232, 245, 233)
+        Note over H1,Redis: Viajero A selecciona la Habitación 101 un instante antes (t = 0s)
+        H1->>API: Solicita bloqueo temporal (POST /api/bookings/lock)
+        API->>Redis: Ejecuta script atómico Lua:<br/>1) Limpia tokens vencidos en lock:room:1:intervals<br/>2) Verifica que ningún intervalo activo se cruce con [20 dic, 23 dic)<br/>3) Registra token en lock:room:1:intervals y lock:room:1:metadata:{token} (TTL 900s)
+        Redis-->>API: Bloqueo concedido (Resultado = 1)
+        API-->>H1: Habitación asegurada por 15 minutos (entrega lockToken)
     end
 
-    subgraph CapaAPI["Backend API — Spring Boot 3.3"]
-        BookingCtrl["BookingController<br/>POST /api/bookings/lock"]
-        LockService["RedisLockService<br/>(Adquisición de Candado Atómico)"]
+    rect rgb(255, 235, 238)
+        Note over H2,Redis: Viajero B intenta seleccionar la misma Habitación 101 (t = 1s)
+        H2->>API: Solicita bloqueo temporal (POST /api/bookings/lock)
+        API->>Redis: Ejecuta script atómico Lua sobre lock:room:1:intervals
+        Redis-->>API: Detecta solapamiento con el intervalo activo del Viajero A (Resultado = 0)
+        API-->>H2: Respuesta HTTP 409 (Conflicto):<br/>"La habitación ya tiene un bloqueo temporal activo"
     end
 
-    subgraph Nivel1["NIVEL 1: Candado en Memoria (Baja Latencia)"]
-        RedisMem[("🔴 Redis 7 Alpine<br/>EVAL script Lua atómico<br/>SET room:ID:lock token NX EX 900")]
-        DecisionLock{"¿Candado<br/>adquirido?<br/>(Retorna 1)"}
+    alt Escenario A: Viajero A completa sus datos y confirma el pago (50% o 100%)
+        H1->>API: Confirma reserva con su lockToken (POST /api/bookings/confirm)
+        API->>Redis: Verifica que lock:room:1:metadata:{token} siga vigente
+        API->>PG: Inserta reserva con status = 'confirmed'<br/>Valida restricción GiST no_overlapping_bookings
+        PG-->>API: Reserva guardada con éxito
+        API->>Redis: Libera bloqueo temporal (borra metadata y zrem de intervals)
+        API-->>H1: Entrega código único de reserva confirmada
+    else Escenario B: Viajero A cancela, escribe "menú" o su sesión queda inactiva
+        H1->>API: Cancela o reinicia sesión (POST /api/bookings/unlock)
+        API->>Redis: Elimina de inmediato lock:room:1:metadata:{token} y el registro en intervals
+        API-->>H1: Confirma liberación inmediata de la habitación
+        Note over H2,Redis: La Habitación 101 vuelve a estar libre al instante para el Viajero B
     end
-
-    subgraph Nivel2["NIVEL 2: Candado Físico Relacional (Garantía ACID)"]
-        DBEngine[("🐘 PostgreSQL 16 Motor<br/>Extensión btree_gist<br/>EXCLUDE USING gist")]
-        ConstraintRule["Restricción Excluyente:<br/>room_id WITH = AND<br/>daterange(check_in, check_out, '[)') WITH &&<br/>WHERE status IN ('CONFIRMED', 'CHECKED_IN')"]
-        DecisionDB{"¿Conflicto<br/>en disco?"}
-    end
-
-    subgraph Respuestas["Respuestas al Cliente"]
-        Success["✅ HTTP 200 / 201<br/>Bloqueo temporal 15 min /<br/>Reserva Confirmada"]
-        Conflict["🚫 HTTP 409 Conflict<br/>Habitación no disponible /<br/>En proceso de pago por otro huésped"]
-    end
-
-    %% Flujo concurrente
-    WA -->|"1. Intento bloqueo t = 0 ms"| BookingCtrl
-    WebRec -->|"1. Intento bloqueo t = 1 ms"| BookingCtrl
-    BookingCtrl --> LockService
-    LockService --> RedisMem
-    RedisMem --> DecisionLock
-
-    %% Decisiones Nivel 1
-    DecisionLock -->|"SÍ (Primer solicitante)"| Success
-    DecisionLock -->|"NO (Habitación ya bloqueada)"| Conflict
-
-    %% Transición a Nivel 2
-    Success -->|"2. Pago completado<br/>POST /api/bookings/batch"| DBEngine
-    DBEngine --- ConstraintRule
-    ConstraintRule --> DecisionDB
-
-    %% Decisiones Nivel 2
-    DecisionDB -->|"NO (Sin solapamiento)"| CommitDB["💾 Transacción COMMIT<br/>Status: CONFIRMED<br/>Liberación de llave en Redis"]
-    DecisionDB -->|"SÍ (Violación de exclusión)"| RollbackDB["💥 Error 23P01 exclusion_violation<br/>Transacción ROLLBACK<br/>Cero datos corruptos"]
-
-    classDef channels fill:#EFF6FF,stroke:#2563EB,stroke-width:1.5px,color:#1E3A8A;
-    classDef api fill:#FEF2F2,stroke:#DC2626,stroke-width:1.5px,color:#7F1D1D;
-    classDef n1 fill:#FFFBEB,stroke:#D97706,stroke-width:1.5px,color:#78350F;
-    classDef n2 fill:#F0FDF4,stroke:#16A34A,stroke-width:1.5px,color:#14532D;
-    classDef respOk fill:#ECFDF5,stroke:#059669,stroke-width:1.5px,color:#064E3B;
-    classDef respErr fill:#FFF1F2,stroke:#E11D48,stroke-width:1.5px,color:#881337;
-
-    class WA,WebRec channels;
-    class BookingCtrl,LockService api;
-    class RedisMem,DecisionLock n1;
-    class DBEngine,ConstraintRule,DecisionDB,CommitDB,RollbackDB n2;
-    class Success respOk;
-    class Conflict respErr;
 ```
 
 ---
 
-### Explicación de los Dos Niveles de Blindaje
+## 3. Diagrama de las Dos Capas de Protección por Intervalos de Fechas
 
-1. **Nivel 1 (Redis 7 — Preventivo):** Opera en memoria volátil en $< 5\text{ ms}$. Si dos clientes solicitan la misma habitación para las mismas fechas, el comando atómico `SET ... NX EX 900` entrega el candado al primero y rechaza al segundo de inmediato con un código de conflicto `409 Conflict`, evitando saturar la base de datos con peticiones redundantes.
-2. **Nivel 2 (PostgreSQL 16 — Estructural):** La restricción `EXCLUDE USING gist` opera en el motor relacional. Incluso si la capa de Redis se cayera, se reiniciara o la red sufriera particiones extremas, el motor físico de base de datos aborta con excepción `23P01 exclusion_violation` cualquier intento de insertar dos reservas activas con fechas solapadas para la misma habitación.
+```mermaid
+flowchart LR
+    classDef step fill:#FAF7F2,stroke:#5D4037,stroke-width:2px,color:#3E2723
+    classDef lock1 fill:#FFF8E7,stroke:#F59E0B,stroke-width:2px,color:#3E2723
+    classDef lock2 fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+    classDef reject fill:#FFEBEE,stroke:#C62828,stroke-width:2px,color:#B71C1C
+
+    Solicitud["Solicitud de Reserva<br/>Habitación + Fechas<br/>(checkIn a checkOut)"]:::step
+
+    subgraph Candado1["PRIMER CANDADO: Memoria Rápida (Redis 7)"]
+        direction TB
+        LuaCheck{"¿Existe intervalo cruzado en<br/>lock:room:{id}:intervals?"}:::lock1
+        HashTTL["Guarda rango [checkIn, checkOut)<br/>en lock:room:{id}:metadata:{token}<br/>Vigencia máxima: 900s (15 min)"]:::lock1
+    end
+
+    subgraph Candado2["SEGUNDO CANDADO: Base de Datos (PostgreSQL 16)"]
+        direction TB
+        GistCheck{"Restricción GiST:<br/>no_overlapping_bookings<br/>status IN ('pending_payment','confirmed')"}:::lock2
+        Persist["Reserva Confirmada en Firme<br/>y Liberación del Candado 1"]:::lock2
+    end
+
+    Rechazo1["Rechazo Inmediato (HTTP 409)<br/>Otro cliente está reservando<br/>esas fechas en este momento"]:::reject
+    Rechazo2["Rechazo Transaccional<br/>Ya existe una reserva firme<br/>en ese rango de días"]:::reject
+
+    Solicitud --> LuaCheck
+    LuaCheck -->|"Sí hay cruce"| Rechazo1
+    LuaCheck -->|"No hay cruce"| HashTTL
+    HashTTL -->|"Huésped confirma pago"| GistCheck
+    GistCheck -->|"Sí hay cruce"| Rechazo2
+    GistCheck -->|"No hay cruce"| Persist
+```
+
+---
+
+## 4. Ventajas de Este Diseño para Torre Satori
+
+1. **Bloqueo inteligente por fechas y no por habitación completa:** Si el Viajero A está reservando la Habitación 101 para Navidad (24 al 26 de diciembre), el Primer Candado solo bloquea esas fechas específicas. Si al mismo tiempo el Viajero B desea la misma Habitación 101 para Año Nuevo (30 de diciembre al 2 de enero), el sistema le permite reservar sin ningún obstáculo.
+2. **Cero habitaciones retenidas cuando el usuario se arrepiente:** Además de la expiración automática de 15 minutos, cuando un usuario presiona *"Cancelar"* o regresa al *"Menú"* en WhatsApp, el sistema libera el Primer Candado de inmediato (`Liberación inmediata : "POST /api/bookings/unlock"`).
+3. **Respaldo definitivo en base de datos:** Aunque una reserva ingrese por WhatsApp y otra desde el computador de recepción en el mismo milisegundo, el Segundo Candado en PostgreSQL garantiza que jamás puedan guardarse dos reservas activas superpuestas.

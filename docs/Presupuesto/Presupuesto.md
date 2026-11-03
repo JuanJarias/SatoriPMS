@@ -1,410 +1,197 @@
-# Presupuesto Integral y Modelo de Sostenibilidad Financiera — SatoriPMS
-**Sistema de Gestión de Propiedades Hoteleras con Chatbot WhatsApp para el Hotel Torre Satori (Sevilla, Valle del Cauca)**  
-**Proyecto Integrador II — Universidad Icesi (Semestre 2026-2)**  
+# Presupuesto y Modelo Financiero — Torre Satori PMS
+
+Documento ejecutivo de presupuesto, estructura de costos, análisis de retorno de inversión y proyección a tres años para la implementación y operación del sistema de gestión hotelera **Torre Satori PMS**, alineado con el libro financiero oficial [`Presupuesto_SatoriPMS.xlsx`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Presupuesto_SatoriPMS.xlsx).
 
 ---
 
-### Información del Proyecto
-- **Equipo de Trabajo (Scrum Team):**
-  - **Juan José Arias Gallego:** Product Owner / Analista Funcional y de Negocio
-  - **Esteban Guarín Valencia:** Scrum Master / Ingeniero de Backend, Base de Datos y DevOps
-  - **Juan Felipe Garzón Trejos:** Development Team / Ingeniero Frontend y Flujos n8n
-- **Stakeholder Principal:** Propietario del Hotel Boutique Torre Satori
-- **Duración del Desarrollo:** 10 semanas (5 Sprints de 2 semanas: 14 de septiembre – 20 de noviembre de 2026)
-- **Moneda de Referencia:** Pesos Colombianos (COP) y Dólares Estadounidenses (USD)  
-  *(Tasa Representativa del Mercado de referencia: 1 USD = $4.150 COP)*
+## 1. Identificación del Proyecto y Parámetros Base
+
+| Concepto | Detalle |
+| :--- | :--- |
+| **Proyecto** | Torre Satori PMS — Sistema de gestión hotelera con motor de reservas directas, prevención de sobreventas y asistente conversacional en WhatsApp |
+| **Cliente / Organización** | Hotel Torre Satori (Sevilla, Valle del Cauca, Colombia) |
+| **Capacidad de referencia** | **9 habitaciones** operativas (estándar, superiores y suites) |
+| **Alcance de construcción** | **150 puntos de esfuerzo** distribuidos en **5 etapas quincenales** (10 semanas, 600 horas de ingeniería) más **38 horas** de puesta en marcha, configuración inicial y capacitación presencial en Sevilla |
+| **Equipo de ingeniería** | 3 profesionales con dedicación de 20 horas semanales por integrante durante 10 semanas |
+| **Tarifa horaria de ingeniería** | `$35.000 COP / hora` (`$140.000 COP` por punto de esfuerzo de 4 horas) |
+| **Distribución de calidad por entrega** | 55% construcción funcional, 20% pruebas automatizadas y de concurrencia, 10% revisión y ajustes, 10% documentación y 5% despliegue |
+| **Tasa de cambio de referencia (TRM)** | `$4.150 COP / USD` |
 
 ---
 
-## 1. Resumen Ejecutivo
+## 2. Resumen Ejecutivo de Indicadores Presupuestales
 
-El presente documento expone el **Presupuesto Integral** del proyecto **SatoriPMS**, estructurado bajo las directrices gerenciales de gestión presupuestal del Proyecto Integrador II y articulado directamente con la **Estructura de Desglose de Trabajo (EDT)** de 11 fases y el **Caso de Negocio** de Torre Satori.
-
-El propósito fundamental de este presupuesto no es simplemente sumar gastos, sino proporcionar una herramienta estratégica que demuestre:
-1. **Viabilidad técnica y económica:** Cuánto cuesta diseñar, desarrollar y desplegar la solución hasta que sea 100 % operativa en el hotel.
-2. **Sostenibilidad a largo plazo:** Cuánto cuesta mantener el sistema funcionando de forma autónoma, segura y continua en la nube mes a mes.
-3. **Retorno de inversión (ROI) tangible:** Cómo una inversión en software propio genera un ahorro radical frente a PMS comerciales (Cloudbeds, Opera) y previene pérdidas operativas por dobles reservas y atención manual desatendida.
-
-### Síntesis de Cifras Clave
-
-| Componente Presupuestal | Valor en COP | Valor en USD (aprox.) | % del Costo Total |
-|---|---|---|---|
-| **Costo de Desarrollo e Implementación (CAPEX - Personal e Ingeniería)** | $21.000.000 | $5.060,24 | 74,4 % |
-| **Costo de Puesta en Operación (CAPEX - Configuración, Migración y Capacitación)** | $1.325.000 | $319,28 | 4,7 % |
-| **Reserva para Contingencias e Incertidumbre (Justificada)** | $2.232.500 | $537,95 | 7,9 % |
-| **Costo de Operación Anual (OPEX - 12 meses de Nube, Dominio, SIM y APIs)** | $1.523.000 | $366,99 | 5,4 % |
-| **Soporte y Mantenimiento Evolutivo/Correctivo Anual (12 meses)** | $2.160.000 | $520,48 | 7,6 % |
-| **COSTO TOTAL INTEGRAL (TCO - Año 1)** | **$28.240.500** | **$6.804,94** | **100,0 %** |
-
-> [!NOTE]  
-> **Costo Operativo Mensual Recurrente (OPEX Puro de Infraestructura):** **$126.917 COP/mes (~$30,58 USD/mes)**. Este valor extremadamente bajo garantiza que un hotel familiar pequeño de 6 a 12 habitaciones pueda mantener el sistema en producción sin poner en riesgo su flujo de caja.
+| # | Indicador Presupuestal Clave | Valor en COP | Equivalente en USD | % del Total Año 1 | Alcance y Criterio Financiero |
+| :-: | :--- | ---: | ---: | ---: | :--- |
+| **1** | **Inversión de Implementación (CAPEX)** | **$24.685.000** | **$5.948,19** | **87,65%** | Construcción de 150 puntos (`$21.000.000`) + Puesta en marcha y capacitación en Sevilla (`$1.530.000`) + Reserva para imprevistos (`$2.155.000`) |
+| **2** | **Costo Mensual de Operación (OPEX Mensual)** | **$289.842 / mes** | **$69,84 / mes** | — | Infraestructura en la nube y dominio (`$54.642 / mes`) + Mensajería WhatsApp, inteligencia artificial y línea móvil (`$55.200 / mes`) + Soporte y mantenimiento técnico (`$180.000 / mes`) |
+| **3** | **Costo Anual de Operación (OPEX 12 meses)** | **$3.478.100 / año** | **$838,10 / año** | **12,35%** | Sostenimiento continuo en producción durante los primeros 12 meses tras la entrega |
+| **4** | **Costo Total del Primer Año (TCO Año 1)** | **$28.163.100** | **$6.786,29** | **100,00%** | Inversión inicial completa más 12 meses de operación y soporte técnico garantizado |
 
 ---
 
-## 2. Supuestos Presupuestales
+## 3. Desglose Detallado de Costos de Implementación (CAPEX)
 
-Para que la estimación económica sea transparente y auditable, se declaran los siguientes supuestos técnicos y operativos:
+### 3.1 Construcción de la Solución (Etapas 1 a 5 — 600 horas)
 
-### 2.1. Supuestos de Negocio y Dimensión Operativa
-1. **Capacidad del Hotel:** Torre Satori cuenta inicialmente con 6 habitaciones activas (Estándar, Deluxe con vista, Suite familiar), con proyección de ampliación a 10 habitaciones en 2027.
-2. **Volumen de Reservas:** Se estima un promedio de 35 reservas mensuales en temporada regular y hasta 60 reservas mensuales en temporada alta (promedio anual: 40 reservas/mes).
-3. **Flujo de Mensajería WhatsApp:** Se proyectan 300 a 450 conversaciones mensuales de clientes preguntando por disponibilidad, tarifas, servicios y reservas asistidas.
-4. **Hardware en el Hotel:** El hotel ya dispone en recepción de un computador de escritorio funcional y conexión a internet por fibra óptica. No se requiere comprar hardware físico local adicional.
+| Código | Actividad de Ingeniería | Cantidad | Unidad | Costo Unitario (COP) | Costo Total (COP) |
+| :-: | :--- | ---: | :---: | ---: | ---: |
+| **01** | Construcción y programación de servicios centrales, paneles web y flujos en WhatsApp (55%) | 330 | horas | $35.000 | $11.550.000 |
+| **02** | Pruebas unitarias, de integración y de concurrencia contra sobreventa (20%) | 120 | horas | $35.000 | $4.200.000 |
+| **03** | Correcciones tras revisión técnica y validación con el cliente (10%) | 60 | horas | $35.000 | $2.100.000 |
+| **04** | Documentación funcional, manuales operativos y diagramas (10%) | 60 | horas | $35.000 | $2.100.000 |
+| **05** | Despliegue en entorno de validación y contenedores de prueba (5%) | 30 | horas | $35.000 | $1.050.000 |
+| **06** | Equipos de cómputo y herramientas de desarrollo del equipo | 3 | entornos | $0 | $0 |
+| **07** | Consumo de mensajería de WhatsApp en entorno de prueba (cuota gratuita) | 1.000 | mensajes | $0 | $0 |
+| **08** | Consultas de prueba al modelo de inteligencia artificial en desarrollo | 500 | consultas | $0 | $0 |
+| **09** | Entorno de pruebas de pasarela de pagos | 1 | entorno | $0 | $0 |
+| — | **Subtotal Construcción de la Solución (150 puntos)** | **600** | **horas** | — | **$21.000.000** |
 
-### 2.2. Supuestos del Equipo de Desarrollo (Scrum)
-1. **Composición:** Equipo de 3 ingenieros de sistemas en formación (8vo semestre), asumiendo roles de PO/Analista, Scrum Master/Backend-DevOps y Frontend-Chatbot.
-2. **Dedicación:** 10 semanas cronológicas (5 Sprints de 2 semanas). Cada miembro aporta 20 horas semanales de dedicación técnica efectiva, para un total de:
-   $$\text{Horas totales del equipo} = 3 \text{ personas} \times 20 \text{ h/semana} \times 10 \text{ semanas} = 600 \text{ horas hombre}$$
-3. **Tarifa Profesional de Referencia:** Se fija una tarifa de **$35.000 COP / hora**, correspondiente a un perfil de Ingeniero de Software Junior / Consultor de Desarrollo Tecnológico en el mercado laboral colombiano (equivalente a una asignación mensual de ~$3.000.000 COP por profesional a tiempo completo con factor prestacional).
+### 3.2 Puesta en Operación, Configuración y Capacitación en Sevilla
 
-### 2.3. Supuestos de Infraestructura Tecnológica
-1. **Arquitectura Dockerizada:** El sistema opera en contenedores aislados (PostgreSQL 16, Redis 7, n8n y Spring Boot 3.3).
-2. **Alojamiento Cloud:** Se seleccionó un VPS (Servidor Privado Virtual) de 4 GB de RAM, 2 vCPUs y 80 GB SSD (DigitalOcean Droplet o Hetzner Cloud), suficiente para soportar la concurrencia del hotel.
-3. **Frontend Web:** Alojado en el tier gratuito de **Vercel** o **Cloudflare Pages** con CDN global y certificados SSL automáticos sin costo.
-4. **WhatsApp Business Cloud API (Meta):** Meta otorga de manera gratuita **1.000 conversaciones de servicio al mes** (iniciadas por el usuario). Al proyectarse ~400 conversaciones mensuales para Torre Satori, el costo directo facturado por Meta es de **$0 USD en condiciones normales**. Se presupuesta una bolsa de seguridad para mensajes salientes de marketing/confirmación.
-5. **Inteligencia Artificial (Gemini API):** Uso de **Google Gemini 2.0 Flash** para la interpretación de reservas en lenguaje natural (HU-09). Gracias a su tarifa de $0,10 USD por millón de tokens, 100 consultas mensuales de IA representan un costo inferior a $0,20 USD/mes.
-6. **Pasarela de Pagos (MercadoPago / Wompi):** No cobra costo fijo mensual. La comisión por transacción (2,99 % + $900 COP + IVA) es deducida directamente de las reservas pagadas por los huéspedes y es un costo operacional propio de la venta, no del software.
+| Código | Actividad de Puesta en Marcha | Cantidad | Unidad | Costo Unitario (COP) | Costo Total (COP) |
+| :-: | :--- | ---: | :---: | ---: | ---: |
+| **10** | Configuración de servidor en la nube de producción, contenedores y túnel seguro | 10 | horas | $35.000 | $350.000 |
+| **11** | Gestión y verificación de cuenta comercial oficial en Meta para el número del hotel | 4 | horas | $35.000 | $140.000 |
+| **12** | Configuración inicial de las **9 habitaciones**, tarifas, recargos, eventos especiales e inventario | 8 | horas | $35.000 | $280.000 |
+| **13** | Capacitación presencial al Administrador y Recepcionistas en el hotel en Sevilla | 16 | horas | $35.000 | $560.000 |
+| **14** | Transporte intermunicipal Cali – Sevilla – Cali y alimentación para jornada presencial | 1 | global | $200.000 | $200.000 |
+| — | **Subtotal Puesta en Operación y Capacitación en Sevilla** | **38** | **horas + viáticos** | — | **$1.530.000** |
 
----
+### 3.3 Reserva de Contingencia Calculada por Riesgos
 
-## 3. EDT de Costos (Relación con la EDT del Proyecto)
+El proyecto contempla una reserva técnica de **`$2.155.000 COP`** (equivalente al **9,56%** de la inversión directa), calculada mediante el método de Valor Monetario Esperado sobre seis riesgos identificados:
 
-El presupuesto está estrechamente acoplado con la **Estructura de Desglose de Trabajo (EDT)** del proyecto SatoriPMS. Cada peso presupuestado responde a un entregable concreto:
-
-```mermaid
-flowchart TD
-    EDT["EDT SatoriPMS (11 Fases)"]
-    
-    subgraph CAPEX_DEV["CAPEX: Ingeniería y Desarrollo (600 h)"]
-        F1["1. Gestión del Proyecto (60 h)"]
-        F2["2. Análisis y Diseño (80 h)"]
-        F3["3. Épica 1: Reservas Chatbot (90 h)"]
-        F4["4. Épica 2: Gestión Operativa Web (80 h)"]
-        F5["5. Épica 3: Facturación y Finanzas (60 h)"]
-        F6["6. Épica 4: Tienda y Ventas (50 h)"]
-        F7["7. Épica 5: Reseñas y Fidelización (40 h)"]
-        F8["8. Épica 6: Roles y Auditoría (40 h)"]
-        F9["9. Pruebas y QA (60 h)"]
-        F11["11. Documentación y Cierre (40 h)"]
-    end
-
-    subgraph CAPEX_DEP["CAPEX: Despliegue y Puesta en Marcha"]
-        F10["10. Despliegue e Implementación: Infraestructura, Meta, Migración, Capacitación"]
-    end
-
-    subgraph OPEX_RUN["OPEX: Operación y Sostenibilidad Anual"]
-        OP1["Cloud Hosting VPS (Docker)"]
-        OP2["Dominio y Certificados SSL"]
-        OP3["Línea Móvil WhatsApp Dedicada"]
-        OP4["Bolsa de Consumo APIs Meta y Gemini"]
-        OP5["Soporte y Mantenimiento Técnico"]
-    end
-
-    EDT --> CAPEX_DEV
-    EDT --> CAPEX_DEP
-    EDT --> OPEX_RUN
-```
-
-### Asignación de Horas y Costo por Fase de la EDT
-
-| Código EDT | Fase del Proyecto | Horas Hombre | Tarifa / Hora | Costo Total (COP) | Entregables Clave |
-|---|---|---|---|---|---|
-| **1.0** | **Gestión del Proyecto** | 60 h | $35.000 | $2.100.000 | Caso de negocio, Project Charter, EDT, plan de riesgos, control de Sprints. |
-| **2.0** | **Análisis y Diseño** | 80 h | $35.000 | $2.800.000 | Arquitectura hexagonal, modelo ER Postgres con exclusión GiST, mockups Figma, flujos conversacionales. |
-| **3.0** | **Desarrollo — Épica 1 (Chatbot WhatsApp)** | 90 h | $35.000 | $3.150.000 | Flujos n8n (V1–V8), consulta de disponibilidad, bloqueo 15 min en Redis, recomendación con Gemini IA, cancelaciones. |
-| **4.0** | **Desarrollo — Épica 2 (Gestión Operativa Web)** | 80 h | $35.000 | $2.800.000 | Calendario en tiempo real con WebSocket STOMP, check-in, check-out con consumos, gestión de reservas manuales. |
-| **5.0** | **Desarrollo — Épica 3 (Facturación y Finanzas)** | 60 h | $35.000 | $2.100.000 | Consolidación de ingresos, registro de egresos (HU-13), cálculo de sueldo de recepción (HU-07), exportación a Excel. |
-| **6.0** | **Desarrollo — Épica 4 (Tienda y Ventas)** | 50 h | $35.000 | $1.750.000 | Catálogo de productos, control de stock, asociación a habitación (CU-05, CU-07), rotación de productos. |
-| **7.0** | **Desarrollo — Épica 5 (Reseñas y Fidelización)** | 40 h | $35.000 | $1.400.000 | Captura de reseñas post check-out por bot, panel web de reseñas, clasificación de huésped recurrente (HU-12). |
-| **8.0** | **Desarrollo — Épica 6 (Administración de Roles)** | 40 h | $35.000 | $1.400.000 | Autenticación JWT, control de acceso por rol (Admin/Recepcionista), logs de auditoría (HU-15), Ley 1581. |
-| **9.0** | **Pruebas y Aseguramiento de Calidad (QA)** | 60 h | $35.000 | $2.100.000 | Pruebas de no solapamiento concurrente, pruebas de estrés de bot, validación cruzada n8n-Backend-PostgreSQL. |
-| **10.0** | **Despliegue e Implementación** | 38 h | $35.000 | $1.325.000 | Setup servidor cloud, verificación Meta, migración de datos, capacitación a personal de Torre Satori. *(Detalle en 4.4)* |
-| **11.0** | **Documentación y Cierre** | 40 h | $35.000 | $1.400.000 | Manual técnico, manual de usuario recepcionista/admin, actas de cierre, sustentación formal. |
-| **TOTAL** | **Ciclo Completo de Ingeniería** | **638 h** | — | **$22.325.000** | **Solución funcional puesta en producción** |
+| Código | Riesgo Identificado | Causa Potencial | Impacto Estimado (COP) | Probabilidad | Reserva Asignada (COP) | Medida de Mitigación |
+| :-: | :--- | :--- | ---: | :-: | ---: | :--- |
+| **R-01** | Subida de la tasa de cambio (TRM) | Fluctuación del dólar por encima de `$4.500 COP` en cobros de servidor y servicios en la nube | $700.000 | 30% | $210.000 | Cobertura cambiaria anual sobre servicios cotizados en dólares |
+| **R-02** | Demoras en verificación de cuenta en Meta | Trámite extendido de validación comercial del número oficial de WhatsApp del hotel | $900.000 | 25% | $225.000 | Inicio temprano del trámite con la documentación legal del hotel |
+| **R-03** | Picos de tráfico de mensajes e inteligencia artificial | Aumento de consultas en temporadas altas de Sevilla (Fiestas del Café, Semana Santa) | $600.000 | 30% | $180.000 | Optimización de instrucciones al modelo de inteligencia artificial y filtros previos |
+| **R-04** | Ajustes en reglas de negocio del hotel | Cambios tardíos en parámetros de liquidación de turnos, recargos o descuentos por eventos especiales | $2.000.000 | 35% | $700.000 | Manejo de tarifas, recargos y descuentos mediante parámetros editables por el Administrador |
+| **R-05** | Casos límite de concurrencia simultánea | Solicitudes simultáneas sobre las mismas fechas y habitaciones en horas pico | $1.800.000 | 25% | $450.000 | Pruebas automatizadas de estrés, bloqueos atómicos y liberación inmediata de habitaciones |
+| **R-06** | Ajustes de usabilidad tras capacitación | Mejoras visuales solicitadas por el personal de recepción durante la puesta en marcha | $1.300.000 | 30% | $390.000 | Validación continua de pantallas y flujos con el cliente en cada etapa |
+| — | **Subtotal Reserva de Contingencia** | **Respaldo sujeto a autorización formal del cliente** | — | — | **$2.155.000** | **9,56% sobre la implementación directa** |
 
 ---
 
-## 4. Presupuesto Detallado (Estructura: Recurso $\to$ Cantidad $\to$ Tarifa $\to$ Costo $\to$ Justificación)
+## 4. Costos Recurrentes de Operación y Mantenimiento (OPEX — 12 Meses)
 
-Siguiendo el estándar de la presentación del curso, el desglose se organiza en las 5 categorías esenciales:
+### 4.1 Infraestructura en la Nube y Dominio
 
-### 4.1. Categoría A: Recursos Humanos (Equipo Scrum)
+| Código | Servicio / Recurso Operativo | Cantidad | Unidad | Costo Mensual (COP) | Costo Anual (COP) |
+| :-: | :--- | ---: | :---: | ---: | ---: |
+| **15** | Servidor privado virtual en la nube (Linux, 4 GB RAM, 2 procesadores virtuales, 80 GB disco sólido) | 12 | meses | $49.800 | $597.600 |
+| **16** | Dominio web oficial del hotel y gestión de nombres de dominio | 1 | año | $4.842 | $58.100 |
+| **17** | Alojamiento de la aplicación web en red de distribución global (Cloudflare Pages) | 12 | meses | $0 | $0 |
+| **18** | Almacenamiento en la nube para comprobantes y respaldos hasta 10 GB (Cloudflare R2) | 12 | meses | $0 | $0 |
+| — | **Subtotal Infraestructura en la Nube y Dominio** | — | — | **$54.642** | **$655.700** |
 
-| Recurso / Perfil | Cantidad | Unidad | Tarifa Unitaria (COP) | Costo Total (COP) | Fuente / Justificación |
-|---|---|---|---|---|---|
-| **Product Owner & Analista Funcional** | 200 | Horas | $35.000 | $7.000.000 | Levantamiento de requerimientos con Torre Satori, priorización del backlog, validación de reglas de negocio (RN-01 a RN-06). |
-| **Scrum Master & DevOps/Backend Engineer** | 200 | Horas | $35.000 | $7.000.000 | Arquitectura Spring Boot 3.3, Dockerización, seguridad JWT, base de datos PostgreSQL/Redis y gestión de riesgos del equipo. |
-| **Fullstack Web & Conversational Engineer** | 200 | Horas | $35.000 | $7.000.000 | Desarrollo de la SPA React con TanStack Query, WebSockets y diseño/programación de los 8 flujos conversacionales en n8n. |
-| **Subtotal Recursos Humanos** | **600** | **Horas** | — | **$21.000.000** | **Mano de obra directa de desarrollo del software** |
+### 4.2 Mensajería de WhatsApp, Inteligencia Artificial y Conectividad
 
----
+| Código | Servicio / Recurso Operativo | Cantidad | Unidad | Costo Mensual (COP) | Costo Anual (COP) |
+| :-: | :--- | ---: | :---: | ---: | ---: |
+| **19** | Servicio oficial de mensajería Meta WhatsApp Cloud API (primeras 1.000 conversaciones de servicio gratuitas al mes + bolsa de plantillas) | 12 | meses | $24.900 | $298.800 |
+| **20** | Servicio de inteligencia artificial Google Gemini Flash Lite para atención en lenguaje natural | 12 | meses | $8.300 | $99.600 |
+| **21** | Línea móvil dedicada exclusivamente para el número oficial de WhatsApp del hotel | 12 | meses | $22.000 | $264.000 |
+| **22** | Pasarela de pagos en línea (sin cargo fijo mensual; comisión transaccional descontada por operación) | 12 | meses | $0 | $0 |
+| — | **Subtotal Mensajería, Inteligencia Artificial y Línea Móvil** | — | — | **$55.200** | **$662.400** |
 
-### 4.2. Categoría B: Tecnología e Infraestructura
+### 4.3 Soporte y Mantenimiento Técnico Post-Entrega
 
-| Recurso / Componente | Cantidad | Unidad | Tarifa Unitaria | Costo Mensual | Costo Anual (COP) | Fuente / Justificación |
-|---|---|---|---|---|---|---|
-| **Servidor Cloud VPS (DigitalOcean / Hetzner)** | 12 | Meses | $12 USD / mes | $49.800 COP | $597.600 | VPS 4 GB RAM, 2 vCPU, 80 GB SSD para ejecutar Docker Compose (API + Postgres + Redis + n8n). Tarifa estándar DigitalOcean Droplet Basic. |
-| **Hosting Frontend SPA (Vercel / Cloudflare Pages)** | 12 | Meses | $0 USD / mes | $0 COP | $0 | Tier gratuito ilimitado para proyectos web estándar con CDN y SSL edge. |
-| **Almacenamiento Cloud R2 / S3 (Recibos y Fotos)** | 12 | Meses | $0 USD / mes | $0 COP | $0 | Cloudflare R2: primeros 10 GB de almacenamiento mensual y lecturas ilimitadas a costo $0. |
-| **Dominio Web Propio (`satoripms.com` o `torresatori.com`)** | 1 | Año | $14 USD / año | — | $58.100 | Registro anual en Namecheap/Cloudflare Registrar para el portal web administrativo y Webhooks oficiales. |
-| **Certificados de Seguridad SSL/TLS** | 1 | Anual | $0 USD | — | $0 | Certificados Let's Encrypt administrados automáticamente con renovación cada 90 días. |
-| **Subtotal Tecnología e Infraestructura** | — | — | — | **$49.800/mes** | **$655.700** | **Costos de alojamiento e infraestructura básica** |
+| Código | Servicio / Recurso Operativo | Cantidad | Unidad | Costo Mensual (COP) | Costo Anual (COP) |
+| :-: | :--- | ---: | :---: | ---: | ---: |
+| **23** | Bolsa de mantenimiento preventivo, actualizaciones de seguridad y soporte a recepción (4,5 horas/mes a `$36.000 COP/h`) | 54 | horas/año | $162.000 | $1.944.000 |
+| **24** | Verificación mensual de copias de seguridad y prueba de restauración de base de datos (0,5 horas/mes a `$36.000 COP/h`) | 6 | horas/año | $18.000 | $216.000 |
+| — | **Subtotal Soporte y Mantenimiento Técnico (5 horas/mes)** | **60** | **horas/año** | **$180.000** | **$2.160.000** |
 
----
-
-### 4.3. Categoría C: Software, Licenciamiento y APIs
-
-| Recurso / Licencia | Cantidad | Unidad | Tarifa Unitaria | Costo Mensual | Costo Anual (COP) | Fuente / Justificación |
-|---|---|---|---|---|---|---|
-| **Licencia de n8n (Autoalojado)** | 12 | Meses | $0 COP | $0 COP | $0 | Licencia Fair-Code de n8n para uso interno de la organización. Cero costos de suscripción mensual. |
-| **PostgreSQL 16 & Redis 7** | 12 | Meses | $0 COP | $0 COP | $0 | Motores de base de datos y caché de código abierto (Open Source). |
-| **Meta WhatsApp Business Cloud API** | 12 | Meses | Bolsa $6 USD/mes | $24.900 COP | $298.800 | Las primeras 1.000 conversaciones de servicio al mes son gratuitas. Se presupuesta bolsa de $6 USD para mensajes salientes de marketing o picos. |
-| **Google Gemini 2.0 Flash API (Tokens)** | 12 | Meses | Bolsa $2 USD/mes | $8.300 COP | $99.600 | Modelo de lenguaje para interpretación en lenguaje natural (HU-09). $0,10 USD/1M tokens; 100 consultas/mes consumen ~$0,10 USD. |
-| **Línea Móvil Exclusiva SIM para el Bot** | 12 | Meses | $22.000 COP / mes | $22.000 COP | $264.000 | Plan prepago/control para mantener la titularidad del número oficial de WhatsApp del hotel. |
-| **Pasarela de Pagos (MercadoPago Sandbox/Live)** | — | Setup | $0 COP | $0 COP | $0 | Sin costo fijo mensual. La pasarela descuenta comisión variable por venta efectiva (2,99% + $900 COP). |
-| **Herramientas de Desarrollo y CI/CD** | 12 | Meses | $0 COP | $0 COP | $0 | GitHub Free (repositorio privado, GitHub Actions, proyectos Kanban). |
-| **Subtotal Software y APIs** | — | — | — | **$55.200/mes** | **$662.400** | **Servicios de comunicación e inteligencia artificial** |
+> **Total OPEX Mensual:** **`$289.842 COP / mes`** (`$109.842 COP / mes` en servicios tecnológicos puros + `$180.000 COP / mes` en bolsa de soporte técnico).
+> **Total OPEX Anual (12 meses):** **`$3.478.100 COP / año`**.
 
 ---
 
-### 4.4. Categoría D: Puesta en Operación e Implementación (Fase 10 EDT)
+## 5. Planificación por Etapas Quincenales y Estructura de Trabajo
 
-| Actividad / Recurso | Cantidad | Unidad | Tarifa Unitaria (COP) | Costo Total (COP) | Fuente / Justificación |
-|---|---|---|---|---|---|
-| **Aprovisionamiento y hardening de servidor de producción** | 10 | Horas | $35.000 | $350.000 | Configuración de Docker, reglas de firewall UFW, proxy inverso Nginx/Traefik y copias de seguridad automáticas a S3. |
-| **Verificación de Empresa en Meta Business Manager** | 8 | Horas | $35.000 | $280.000 | Gestión de documentación legal de Torre Satori (RUT, Cámara de Comercio), registro del número telefónico y aprobación del webhook. |
-| **Carga de Datos Iniciales y Parametrización** | 10 | Horas | $35.000 | $350.000 | Creación de habitaciones, inventario inicial de tienda, configuración de tarifas base y recargos por persona extra (RN-01). |
-| **Capacitación al Administrador y Recepcionistas** | 10 | Horas | $35.000 | $350.000 | 2 talleres teórico-prácticos (uno para recepción sobre calendario y check-in/out, uno para administración sobre finanzas). |
-| **Logística de Despliegue Presencial en Sevilla, Valle** | 1 | Global | $200.000 | $200.000 | Viáticos de transporte Cali – Sevilla – Cali y alimentación para la sesión presencial de puesta en marcha. |
-| **Subtotal Puesta en Operación** | — | — | — | **$1.530.000** | **Gastos únicos para encender la solución en el hotel** |
+### 5.1 Distribución en 5 Etapas Quincenales (Sprints)
 
----
+| Etapa | Fechas Programadas | Alcance Funcional Principal | Puntos | Horas | Presupuesto (COP) |
+| :--- | :---: | :--- | :-: | :-: | ---: |
+| **Etapa 1** | 14 sep – 25 sep 2026 | Estructura central del sistema, contenedores, base de datos, memoria rápida, seguridad y doble candado contra sobreventa | 30 | 120 | $4.200.000 |
+| **Etapa 2** | 28 sep – 09 oct 2026 | Asistente en WhatsApp V8, reserva guiada, aviso de privacidad, abono del 50% o 100%, cancelaciones y reembolso sobre lo pagado | 30 | 120 | $4.200.000 |
+| **Etapa 3** | 12 oct – 23 oct 2026 | Asistente con inteligencia artificial, panel web, administración de las **9 habitaciones**, eventos especiales, registro de llegada, salida y reserva manual | 30 | 120 | $4.200.000 |
+| **Etapa 4** | 26 oct – 06 nov 2026 | Tienda e inventario con historial inmutable, finanzas, gastos operativos, liquidación de turnos e informe contable en Excel | 30 | 120 | $4.200.000 |
+| **Etapa 5** | 09 nov – 20 nov 2026 | Reseñas de huéspedes, programa de fidelización, control de permisos por rol, auditoría de operaciones y pruebas de concurrencia | 30 | 120 | $4.200.000 |
+| **Total** | **10 semanas** | **Construcción completa del alcance (32 requerimientos funcionales)** | **150** | **600** | **$21.000.000** |
 
-### 4.5. Categoría E: Operación y Mantenimiento Sostenible (Post-Entrega)
+### 5.2 Cruce con la Estructura de Desglose de Trabajo (EDT)
 
-¿Qué pasa después de que el equipo Scrum entrega el proyecto? Un software necesita sostenimiento. Esta categoría garantiza que el sistema no muera tras la entrega académica:
-
-| Concepto de Mantenimiento | Frecuencia | Esfuerzo Estimado | Costo Mensual (COP) | Costo Anual (COP) | Propósito y Alcance |
-|---|---|---|---|---|---|
-| **Monitoreo de Infraestructura y Logs** | Mensual | 2 horas/mes | $70.000 | $840.000 | Verificación del espacio en disco del VPS, rotación de logs de Docker, comprobación de copias de seguridad y estado de Redis. |
-| **Soporte Correctivo y Actualizaciones Menores** | Mensual | 3 horas/mes | $105.000 | $1.260.000 | Corrección de fallos inesperados, actualización de dependencias de seguridad (Spring Boot, paquetes npm) y parches de n8n. |
-| **Renovación de Credenciales y Tokens Meta** | Semestral | 1 hora/semestre | $5.000 | $60.000 | Mantenimiento preventivo de tokens de acceso permanente en Meta Developers y rotación de secretos JWT. |
-| **Subtotal Mantenimiento Post-Entrega** | — | **5 h / mes** | **$180.000/mes** | **$2.160.000** | **Póliza de mantenimiento técnico mínimo garantizado** |
-
----
-
-## 5. Clasificación Financiera: CAPEX vs. OPEX
-
-Para cumplir con el Paso 4 de la guía del docente, es fundamental separar la inversión de capital inicial (CAPEX) de los costos operativos recurrentes (OPEX). Esto permite a la gerencia de Torre Satori entender la diferencia entre **construir el activo** y **mantenerlo vivo en el tiempo**.
-
-```
-┌────────────────────────────────────────────────────────┐
-│                   PRESUPUESTO TOTAL                    │
-├───────────────────────────┬────────────────────────────┤
-│           CAPEX           │            OPEX            │
-│    (Inversión Inicial)    │    (Operación Recurrente)  │
-│        $24.555.000        │     $3.683.000 / año       │
-│         (86,95 %)         │         (13,05 %)          │
-├───────────────────────────┼────────────────────────────┤
-│ • Desarrollo de software  │ • Servidor VPS en la nube  │
-│ • Arquitectura y diseño   │ • Consumo APIs (Meta / IA) │
-│ • Pruebas y QA            │ • Línea móvil SIM del bot  │
-│ • Configuración inicial   │ • Dominio web anual        │
-│ • Capacitación y puesta   │ • Soporte técnico mensual  │
-│   en marcha               │                            │
-│ • Reserva de contingencia │                            │
-└───────────────────────────┴────────────────────────────┘
-```
-
-### Tabla Comparativa CAPEX vs. OPEX
-
-| Tipo de Gasto | Concepto | Período de Ejecución | Monto (COP) | Monto (USD) | Naturaleza Financiera |
-|---|---|---|---|---|---|
-| **CAPEX** | Ingeniería y Desarrollo de Software (600 h) | Semanas 1 a 10 (Sprints 1–5) | $21.000.000 | $5.060,24 | Activo intangible de software propio para el hotel. |
-| **CAPEX** | Despliegue, Migración y Capacitación Inicial | Semana 10 (Puesta en marcha) | $1.325.000 | $319,28 | Costo de puesta en punto y transferencia de conocimiento. |
-| **CAPEX** | Reserva para Contingencias del Proyecto | Durante el ciclo de desarrollo | $2.232.500 | $537,95 | Cojín financiero para absorber desviaciones de alcance o técnicas. |
-| **TOTAL CAPEX** | **Inversión Inicial Total** | **Fase de Proyecto** | **$24.557.500** | **$5.917,47** | **Inversión requerida para llegar a producción** |
-|---|---|---|---|---|---|
-| **OPEX** | Alojamiento VPS en la Nube (DigitalOcean/Hetzner) | Mensual recurrente | $49.800 / mes | $12,00 / mes | Costo fijo indispensable para que el sistema esté encendido 24/7. |
-| **OPEX** | Consumo de APIs Externas (WhatsApp y Gemini) | Mensual variable | $33.200 / mes | $8,00 / mes | Costo asociado al volumen de clientes atendidos. |
-| **OPEX** | Línea Telefónica Móvil para el Chatbot | Mensual recurrente | $22.000 / mes | $5,30 / mes | Mantenimiento del número ante el operador celular. |
-| **OPEX** | Dominio Web (`satoripms.com`) | Anual | $4.842 / mes | $1,17 / mes | Pago de renovación del nombre en internet ($58.100/año). |
-| **OPEX** | Soporte y Mantenimiento Técnico de Software | Mensual (5 horas de soporte) | $180.000 / mes | $43,37 / mes | Póliza de soporte preventivo y correctivo para el hotel. |
-| **TOTAL OPEX** | **Gasto Operativo Mensual** | **Mes regular de operación** | **$289.842 / mes** | **$69,84 / mes** | **Costo de operación con soporte técnico incluido** |
-| **TOTAL OPEX (Infraestructura Pura)** | **Solo Nube, Dominio, SIM y APIs** | **Sin soporte técnico externo** | **$109.842 / mes** | **$26,47 / mes** | **Costo operativo mínimo si el hotel asume el soporte** |
+| Fase EDT | Nombre de la Fase | Requerimientos Asociados | Puntos | Horas | Costo Directo (COP) |
+| :-: | :--- | :--- | :-: | :-: | ---: |
+| **1.0** | Gestión y Coordinación del Proyecto | Seguimiento quincenal, planificación y control de riesgos | — | — | Incluido transversalmente |
+| **2.0** | Arquitectura, Base de Datos y Doble Candado | `REQ-01`, `REQ-02`, `REQ-04`, `REQ-05`, `REQ-06` | 23 | 92 | $3.220.000 |
+| **3.0** | Módulo 1: Reservas y Asistente en WhatsApp | `REQ-08` a `REQ-14` | 37 | 148 | $5.180.000 |
+| **4.0** | Módulo 2: Recepción Web, 9 Habitaciones y Eventos Especiales | `REQ-07`, `REQ-15` a `REQ-18` | 26 | 104 | $3.640.000 |
+| **5.0** | Módulo 3: Facturación, Finanzas y Turnos | `REQ-22` a `REQ-25` | 18 | 72 | $2.520.000 |
+| **6.0** | Módulo 4: Tienda Interna e Inventario | `REQ-19` a `REQ-21` | 14 | 56 | $1.960.000 |
+| **7.0** | Módulo 5: Reseñas y Fidelización de Clientes | `REQ-26` a `REQ-29` | 12 | 48 | $1.680.000 |
+| **8.0** | Módulo 6: Seguridad por Roles y Auditoría | `REQ-03`, `REQ-30` | 8 | 32 | $1.120.000 |
+| **9.0** | Pruebas de Concurrencia y Aseguramiento de Calidad | `REQ-31` | 6 | 24 | $840.000 |
+| **10.0** | Despliegue en Producción y Capacitación en Sevilla | `REQ-32` + Puesta en marcha y viáticos | 6 | 62 | $2.370.000 |
+| **11.0** | Documentación Funcional, Manuales y Cierre | Transversal en los criterios de entrega | — | — | Incluido en fases 2.0 a 10.0 |
+| — | **Total Implementación Directa (Sin Contingencia)** | **Fases 1.0 a 11.0** | **150** | **638** | **$22.530.000** |
 
 ---
 
-## 6. Costo de Implementación (Llegar a la Solución Funcional)
+## 6. Retorno de Inversión (ROI), Punto de Equilibrio y Proyección a 3 Años
 
-El costo de implementación representa el esfuerzo consolidado para llevar la idea desde el diseño conceptual hasta un software funcional desplegado y validado por Torre Satori:
+### 6.1 Impacto Económico para el Hotel Torre Satori
 
-$$\text{Costo de Implementación} = \text{Recursos Humanos (Fases 1–9 y 11)} + \text{Puesta en Operación (Fase 10)}$$
-$$\text{Costo de Implementación} = \$21.000.000 + \$1.325.000 = \mathbf{\$22.325.000 \text{ COP}}$$
+Tomando como base las **9 habitaciones** del hotel, una tarifa promedio ponderada de **`$180.000 COP / noche`** y un volumen conservador de **40 reservas mensuales**:
 
-### Desglose por Entregables de la Implementación
-1. **Núcleo de Base de Datos y Motor Transaccional:** $2.800.000 COP  
-   - Modelo relacional en PostgreSQL 16 con extensión `btree_gist` y restricción `sin_solape EXCLUDE USING gist`.
-   - Redis para almacenamiento de sesiones efímeras de n8n y bloqueo de 15 minutos (RN-02).
-2. **Chatbot Conversacional de WhatsApp (Épica 1):** $3.150.000 COP  
-   - 8 flujos implementados en n8n: bienvenida, reserva paso a paso, recomendación con Gemini Flash (HU-09), cancelación con cálculo de reembolso (RN-03), cobro con link de pago y escalamiento a humano (HU-06).
-3. **Aplicación Web para Recepción y Administración (Épica 2, 4 y 6):** $5.950.000 COP  
-   - Calendario en tiempo real con WebSockets (HU-03).
-   - Módulos de Check-in (CU-03) y Check-out con consumos de tienda (CU-04).
-   - Control de inventario y ventas de tienda (CU-05, CU-07).
-   - Sistema de autenticación JWT y auditoría (HU-05, HU-15).
-4. **Módulo Financiero y Reportes (Épica 3 y 5):** $3.500.000 COP  
-   - Cálculo automático de ingresos y egresos (HU-13).
-   - Generación de informe mensual exportable a Excel (HU-01).
-   - Módulo de reseñas post-estadía y fidelización de huéspedes recurrentes (HU-04, HU-12).
-5. **Control de Calidad, Despliegue y Pruebas (Fases 9 y 10):** $3.425.000 COP  
-   - 60 horas de pruebas exhaustivas y 38 horas de parametrización en servidor cloud y capacitación presencial en Sevilla.
-6. **Gestión y Cierre Formal del Proyecto (Fases 1 y 11):** $3.500.000 COP  
-   - Documentación técnica, manuales de usuario y actas de aceptación.
+1. **Costo tecnológico por reserva procesada:**
+   - El gasto tecnológico puro (`$1.318.100 COP / año` entre servidor, dominio, WhatsApp, inteligencia artificial y línea móvil) dividido entre 480 reservas anuales equivale a **`$2.746 COP por reserva`**, frente a los **`$32.400 COP por noche`** que cobran las agencias externas en comisiones del 18%.
+2. **Punto de equilibrio operativo (Break-even):**
+   - Con procesar únicamente **3 reservas directas al mes** por WhatsApp (`$97.200 COP` en comisiones evitadas), el hotel cubre prácticamente la totalidad de los costos mensuales de servidor, mensajería e inteligencia artificial (`$109.842 COP / mes`).
+3. **Ahorro anual frente a plataformas comerciales de alquiler mensual:**
+   - Frente a sistemas hoteleros comerciales cuyo costo ronda los `$330 USD / mes` (`$1.369.500 COP / mes`), el costo operativo total de Torre Satori PMS (`$289.842 COP / mes` incluyendo soporte) genera un ahorro directo de **`$12.955.900 COP al año`**.
+4. **Ingresos recuperados por atención automática 24/7:**
+   - La captura de al menos **4 reservas mensuales** en horario nocturno o fuera de turno de recepción representa **`$8.640.000 COP anuales`** en ingresos adicionales para el hotel.
+5. **Recuperación de la inversión (Payback):**
+   - Sumando el ahorro en suscripciones y los ingresos recuperados (`$21.595.900 COP / año` de beneficio neto anual, equivalente a `$1.799.658 COP / mes`), la inversión inicial de `$24.685.000 COP` se recupera en **13,7 meses** de operación.
 
----
+### 6.2 Proyección del Costo Total de Propiedad (TCO) a 3 Años
 
-## 7. Costo de Operación y Sostenibilidad
+Considerando un ajuste anual estimado del 5% en servicios de nube y del 6% (inflación proyectada) en la bolsa de soporte técnico:
 
-Uno de los principales errores en proyectos de software hotelero es omitir qué ocurre después del despliegue. A continuación se analiza la sostenibilidad financiera para los primeros **3 años de vida útil**:
-
-### Proyección de OPEX a 3 Años (Horizonte Temporal)
-
-*Se proyecta una inflación técnica moderada del 5 % anual en tarifas de hosting y APIs.*
-
-| Rubro Operativo | Año 1 (COP) | Año 2 (+5 %) (COP) | Año 3 (+5 %) (COP) | Justificación de la Proyección |
-|---|---|---|---|---|
-| **Servidor Cloud VPS** | $597.600 | $627.480 | $658.854 | Servidor estable para carga del hotel. |
-| **Dominio Web** | $58.100 | $61.005 | $64.055 | Renovación anual de nombre de dominio. |
-| **WhatsApp Business API (Meta)** | $298.800 | $313.740 | $329.427 | Se proyecta crecimiento moderado en volumen de consultas. |
-| **Google Gemini API** | $99.600 | $104.580 | $109.809 | Aumento en uso de recomendación inteligente. |
-| **Línea Celular del Bot** | $264.000 | $277.200 | $291.060 | Tarifa mensual de mantenimiento de SIM card. |
-| **Subtotal OPEX Tecnológico Puro** | **$1.318.100** | **$1.384.005** | **$1.453.205** | **Costo directo para mantener el sistema operando** |
-| **Soporte y Mantenimiento Técnico** | $2.160.000 | $2.268.000 | $2.381.400 | Acompañamiento técnico especializado (5 h/mes). |
-| **TOTAL OPEX INTEGRAL ANUAL** | **$3.478.100** | **$3.652.005** | **$3.834.605** | **Costo total de operación anual para el hotel** |
-
-> [!TIP]  
-> **Impacto en el costo por reserva:**  
-> Considerando un promedio conservador de 40 reservas al mes (480 reservas al año), el costo de la infraestructura tecnológica pura por cada reserva concretada es de apenas:
-> $$\text{Costo por reserva} = \frac{\$1.318.100 \text{ COP}}{480 \text{ reservas}} = \mathbf{\$2.746 \text{ COP / reserva (\approx \$0,66 USD)}}$$
-> Este valor es insignificante comparado con la comisión de Booking.com o Airbnb (15 % a 20 % del valor total de la estadía, equivalente a ~$25.000 - $40.000 COP por noche).
+| Componente Presupuestal | Año 1 (2026-2027) | Año 2 (2027-2028) | Año 3 (2028-2029) | Total 3 Años (COP) |
+| :--- | ---: | ---: | ---: | ---: |
+| **Inversión Inicial de Implementación (CAPEX)** | $24.685.000 | $0 | $0 | **$24.685.000** |
+| **OPEX: Infraestructura en la Nube y Dominio** | $655.700 | $688.485 | $722.909 | **$2.067.094** |
+| **OPEX: Mensajería WhatsApp, IA y Línea Móvil** | $662.400 | $695.520 | $730.296 | **$2.088.216** |
+| **OPEX: Bolsa de Soporte y Mantenimiento (5 h/mes)** | $2.160.000 | $2.289.600 | $2.426.976 | **$6.876.576** |
+| **Total Gasto Operativo Anual (OPEX)** | **$3.478.100** | **$3.673.605** | **$3.880.181** | **$11.031.886** |
+| **Flujo de Caja Anual Total (CAPEX + OPEX)** | **$28.163.100** | **$3.673.605** | **$3.880.181** | **$35.716.886** |
+| **Costo Total de Propiedad Acumulado** | **$28.163.100** | **$31.836.705** | **$35.716.886** | — |
 
 ---
 
-## 8. Gestión de Contingencias e Incertidumbre (Justificada)
+## 7. Comparativa de Escenarios de Alcance y Respuestas Estratégicas
 
-En cumplimiento riguroso del **Paso 6** exigido por la cátedra, **no se asignó un porcentaje arbitrario ni un "10 % ciego" de imprevistos**. 
+### 7.1 Comparación de Alternativas de Alcance
 
-La reserva para contingencias se calculó mediante una **Matriz de Riesgos Financieros**, valorando la probabilidad de ocurrencia y el impacto económico potencial de las incertidumbres reales del proyecto:
+| Métrica Presupuestal | Escenario Optimizado (Esencial) | Escenario Base (Recomendado) | Escenario Expandido (Multi-sede) |
+| :--- | ---: | ---: | ---: |
+| **Alcance funcional** | 135 puntos (540 horas) | **150 puntos (600 horas)** | 195 puntos (780 horas) |
+| **Inversión de implementación (CAPEX)** | $21.685.000 COP | **$24.685.000 COP** | $33.450.000 COP |
+| **Operación mensual (OPEX Mensual)** | $196.842 COP / mes | **$289.842 COP / mes** | $645.000 COP / mes |
+| **Operación anual (OPEX 12 meses)** | $2.362.100 COP / año | **$3.478.100 COP / año** | $7.740.000 COP / año |
+| **Costo Total Primer Año (TCO Año 1)** | $24.047.100 COP (-14,6%) | **$28.163.100 COP (Base)** | $41.190.000 COP (+46,2%) |
+| **Tiempo de recuperación (Payback)** | 12,1 meses | **13,7 meses** | 18,9 meses |
 
-| Riesgo / Factor de Incertidumbre | Probabilidad | Impacto Estimado | Costo Potencial Asociado (COP) | Reserva Asignada (COP) | Razón Técnica y Justificación |
-|---|---|---|---|---|---|
-| **R-01: Fluctuación Cambiaria (Dólar / TRM)** | Media (40 %) | Medio | $300.000 | **$120.000** | Los servicios de VPS, dominio y consumo de Gemini se facturan en USD. Si la TRM supera los $4.500 COP, el costo anual sube. Se respalda un colchón de cobertura cambiaria. |
-| **R-02: Demoras en la Verificación de Meta Business** | Alta (60 %) | Medio | $700.000 (20 h extra) | **$420.000** | Meta puede solicitar subsanaciones legales de la personería jurídica o RUT de Torre Satori, requiriendo reuniones y soporte adicional de ingeniería para destrabar el Webhook oficial. |
-| **R-03: Subestimación de Tokens de IA (Consultas Complejas)** | Media (30 %) | Bajo | $250.000 | **$75.000** | Huéspedes que realizan conversaciones muy largas o reiterativas con la IA para pedir recomendaciones de turismo en Sevilla, incrementando el consumo de tokens en Gemini. |
-| **R-04: Retrasos por Ambigüedad en Reglas de Negocio (Módulo 14)** | Alta (70 %) | Alto | $1.400.000 (40 h extra) | **$980.000** | Si el cliente cambia la definición de la capacidad de niños vs. adultos (RN-01) o la política de cálculo del sueldo del recepcionista (HU-07) a mitad del desarrollo, habrá que refactorizar endpoints y validaciones. |
-| **R-05: Necesidad de Pruebas de Carga Adicionales (Concurrencia)** | Media (40 %) | Medio | $525.000 (15 h extra) | **$210.000** | Horas adicionales para validar que la restricción GiST de PostgreSQL soporte picos de reserva sin generar inconsistencias ni bloqueos en Redis huérfanos. |
-| **R-06: Ajustes de Usabilidad del Flujo Conversacional** | Alta (50 %) | Medio | $700.000 (20 h extra) | **$350.000** | Durante las pruebas con usuarios reales de Sevilla, personas mayores pueden tener dificultades con palabras de reinicio o menús, requiriendo simplificar las opciones del bot. |
-| **TOTAL FONDO DE CONTINGENCIA** | — | — | — | **$2.155.000 COP** | **Equivale al 9,6 % del costo de desarrollo (Rigurosamente respaldado)** |
+### 7.2 Preguntas Estratégicas de Viabilidad
 
----
-
-## 9. Costo Total Integral del Proyecto (TCO - Año 1)
-
-El costo integral consolida la inversión inicial de capital, los costos operativos del primer año de funcionamiento y la reserva de contingencias:
-
-$$\text{Costo Total Integral (Año 1)} = \text{CAPEX Inicial} + \text{OPEX Año 1} + \text{Fondo de Contingencia}$$
-
-$$\text{Costo Total Integral} = \$22.325.000 + \$3.478.100 + \$2.155.000 = \mathbf{\$27.958.100 \text{ COP} \quad (\approx \$6.736,89 \text{ USD})}$$
-
-### Distribución Porcentual del Presupuesto Integral
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│             DISTRIBUCIÓN DEL PRESUPUESTO INTEGRAL           │
-├───────────────────────────────────┬──────────────┬──────────┤
-│ Componente                        │ Valor (COP)  │ Porcentaje│
-├───────────────────────────────────┼──────────────┼──────────┤
-│ Mano de Obra Scrum (Fases 1-9,11) │ $21.000.000  │  75,11 % │
-│ Puesta en Marcha y Capacitación   │  $1.325.000  │   4,74 % │
-│ Reserva de Contingencia Justificada│  $2.155.000  │   7,71 % │
-│ OPEX Infraestructura y APIs (Año 1)│  $1.318.100  │   4,71 % │
-│ OPEX Mantenimiento y Soporte (Año 1)│ $2.160.000  │   7,73 % │
-├───────────────────────────────────┼──────────────┼──────────┤
-│ TOTAL                             │ $27.958.100  │ 100,00 % │
-└───────────────────────────────────┴──────────────┴──────────┘
-```
-
----
-
-## 10. Análisis de Viabilidad Económica y Retorno de Inversión (ROI)
-
-Para que el presupuesto sea una verdadera herramienta de decisión gerencial, se compara el costo de SatoriPMS frente a las alternativas reales disponibles en el mercado para Torre Satori:
-
-### 10.1. Comparación con PMS Comerciales (Cloudbeds / Opera Cloud)
-
-| Criterio de Comparación | Alternativa Comercial (Cloudbeds / Mews) | Solución SatoriPMS (Software Propio) | Impacto para Torre Satori |
-|---|---|---|---|
-| **Costo de Suscripción Mensual** | $180 a $260 USD / mes (~$750.000 a $1.080.000 COP) | $0 USD (Software propio) | **Ahorro de ~$9.000.000 a $13.000.000 COP al año** en licencias recurrentes. |
-| **Costo de Setup e Implementación** | $800 a $1.200 USD (~$3.300.000 a $5.000.000 COP) | Incluido en el proyecto de grado | Menor barrera de entrada económica. |
-| **Canal Nativo WhatsApp Chatbot** | ❌ No incluye (requiere pagar herramientas terceras como Yanolja o Asksuite por $150 USD/mes extra). | ✅ Chatbot nativo incluido integrado con Spring Boot y PostgreSQL. | Adaptado a la realidad del turismo en Colombia (el 90 % de reservas llegan por WhatsApp). |
-| **Personalización de Reglas de Negocio** | ❌ Rígida (no permite ajustar la regla de cancelación 72h/24h específica ni sueldos de recepcionista de Sevilla). | ✅ 100 % adaptado a las políticas del hotel (RN-01 a RN-06). | Cero fricción operativa para el personal del hotel. |
-| **Costo Anual de Mantenimiento (Año 2 en adelante)** | ~$11.000.000 COP / año (suscripción obligatoria o te cortan el acceso). | **$1.384.005 COP / año** (solo costos directos de nube). | **Ahorro acumulado superior al 85 % anual.** |
-
-### 10.2. Análisis de Ahorro Operativo (Atención 24/7)
-Actualmente, para que Torre Satori atienda mensajes de WhatsApp en horas de la noche y madrugada (cuando turistas buscan hospedaje para el fin de semana), el hotel enfrentaba dos escenarios:
-1. **Perder la reserva:** El huésped escribe a las 11:30 p.m., nadie responde en recepción, y reserva en otro hotel del municipio. Pérdida estimada: 4 reservas al mes $\times$ $150.000 COP = **$600.000 COP/mes perdidos ($7.200.000 COP al año)**.
-2. **Contratar un recepcionista nocturno:** Costaría al menos 1 Salario Mínimo Legal Vigente con recargos nocturnos y prestaciones sociales (~$2.200.000 COP/mes = **$26.400.000 COP al año**).
-
-> [!IMPORTANT]  
-> **Conclusión Financiera:**  
-> SatoriPMS atiende y bloquea habitaciones automáticamente las 24 horas del día por un costo operativo de **$109.842 COP/mes**. Al recuperar tan solo 4 reservas mensuales que antes se perdían por falta de atención inmediata, el sistema genera **$7.200.000 COP en nuevos ingresos anuales**, pagando por completo su operación y generando rentabilidad neta positiva desde el primer trimestre de uso.
-
----
-
-## 11. Gobernanza Presupuestal y Control de Costos en Scrum
-
-De acuerdo con lo expuesto en las diapositivas de clase (Páginas 158 y 159), el presupuesto en Scrum es dinámico y requiere monitoreo continuo para evitar desviaciones en el "Triángulo de Hierro" (Alcance – Tiempo – Costo).
-
-### 11.1. Gestión del Valor Ganado (Earned Value Management - EVM)
-Durante cada Sprint Review (cada 2 semanas), el Scrum Master y el Product Owner evaluarán el desempeño del proyecto utilizando las métricas EVM:
-
-* **Métricas Base:**
-  - **PV (Planned Value / Valor Planificado):** Presupuesto programado para las historias de usuario de los Sprints completados a la fecha.
-  - **AC (Actual Cost / Costo Real):** Horas reales trabajadas por el equipo multiplicadas por la tarifa horaria ($35.000) más gastos devengados.
-  - **EV (Earned Value / Valor Ganado):** Valor del trabajo realmente terminado y aceptado por el Product Owner según la definición de terminado (*Definition of Done*).
-* **Indicadores de Control:**
-  - **Variación de Costo:** $\text{CV} = \text{EV} - \text{AC}$  
-    - $\text{CV} \ge 0 \to$ Dentro del presupuesto.  
-    - $\text{CV} < 0 \to$ Sobrecosto en el Sprint.
-  - **Variación de Cronograma:** $\text{SV} = \text{EV} - \text{PV}$  
-    - $\text{SV} \ge 0 \to$ Al día o adelantado.  
-    - $\text{SV} < 0 \to$ Retraso en entregables.
-  - **Índice de Desempeño de Costo:** $\text{CPI} = \frac{\text{EV}}{\text{AC}}$  
-    - $\text{CPI} > 1 \to$ Eficiencia de gasto (el presupuesto rinde más).  
-    - $\text{CPI} < 1 \to$ Ineficiencia de gasto (se están gastando más horas de las estimadas).
-
-### 11.2. Procedimiento de Control de Cambios Presupuestales
-Si durante el desarrollo surge un cambio de alcance o un requerimiento nuevo (por ejemplo, agregar facturación electrónica DIAN en la Épica 3 o un canal adicional), se seguirá estrictamente el siguiente flujo de gobernanza:
-
-```mermaid
-flowchart TD
-    A["1. Solicitud de Cambio de Alcance o Costo"] --> B["2. Análisis de Impacto Técnico y Financiero (PO + SM)"]
-    B --> C{"¿Afecta el Triángulo de Hierro?"}
-    C -- "No (Ajuste menor)" --> D["Ajuste interno en Product Backlog del siguiente Sprint"]
-    C -- "Sí (Incremento de horas/costo)" --> E["3. Presentación al Comité (Stakeholder Torre Satori + Tutor)"]
-    E --> F{"Decisión del Comité"}
-    F -- "Aprobado" --> G["4. Uso de Reserva de Contingencia o Aumento Presupuestal"]
-    F -- "Rechazado" --> H["Negociación de Alcance: Se retira una HU de menor prioridad"]
-    G --> I["5. Actualización formal de la Línea Base del Presupuesto"]
-    H --> I
-```
-
----
-
-## 12. Conclusión y Recomendación Final
-
-1. **El proyecto es altamente viable:** La inversión requerida para el desarrollo de SatoriPMS ($22.325.000 COP) se traduce en un software a la medida, sin ataduras a contratos comerciales restrictivos, cuya propiedad intelectual y código fuente quedan en poder del hotel.
-2. **Sostenibilidad asegurada:** El costo de operación mensual de infraestructura ($109.842 COP/mes) es completamente asumible para un hotel pequeño, representando menos del valor de una sola noche de estadía en habitación Deluxe ($180.000 COP).
-3. **Control riguroso de riesgos:** La reserva de contingencia de $2.155.000 COP está técnicamente sustentada en riesgos reales (TRM, verificación de Meta, ambigüedad en capacidad RN-01), lo que protege el proyecto contra sorpresas financieras.
-4. **Decisión estratégica:** Se recomienda a la gerencia de Torre Satori aprobar el presente presupuesto integral y proceder con la ejecución del Sprint 2 conforme al cronograma establecido.
+1. **¿El alcance actual del sistema es coherente con el costo estimado?**
+   Sí. La inversión inicial de **`$24.685.000 COP`** y el costo mensual de sostenimiento de **`$289.842 COP / mes`** cubren íntegramente las necesidades operativas del Hotel Torre Satori: atención y reservas automáticas las 24 horas por WhatsApp, cobro de anticipos del 50% o 100%, reembolsos calculados de forma transparente sobre el monto realmente pagado, panel web de recepción con administración de las **9 habitaciones** y programación de **eventos especiales y descuentos**, y un sistema de doble candado que impide por completo la sobreventa.
+2. **¿Qué componente representa el mayor costo y por qué?**
+   La construcción e ingeniería del software (**`$21.000.000 COP`**, equivalente al **74,57%** del costo total del primer año). Se justifica porque corresponde a **600 horas de trabajo especializado** para construir, probar y documentar los servicios centrales, el asistente conversacional, la base de datos y los paneles administrativos. En contraste, la infraestructura en la nube y la inteligencia artificial cuestan apenas **`$109.842 COP / mes`**, garantizando que el hotel sea dueño de su plataforma con un costo fijo mensual mínimo.
+3. **¿Qué se ajustaría si fuera necesario reducir el presupuesto sin perder el valor principal?**
+   En un escenario de ajuste moderado (Escenario Optimizado), se pospondrían para una segunda etapa las funciones administrativas que el hotel puede llevar inicialmente de forma manual (cálculo automático de turnos de recepción, programa de fidelización y moderación web de reseñas), junto con un esquema semipresencial de capacitación y una bolsa de soporte de 2,5 horas al mes. Esto ahorra de inmediato **`$3.000.000 COP`** en la implementación y **`$4.116.000 COP`** en el primer año, manteniendo intactos el asistente de reservas en WhatsApp, el doble candado contra sobreventa, la recepción y el control de tienda y caja.

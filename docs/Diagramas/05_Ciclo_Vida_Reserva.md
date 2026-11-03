@@ -1,99 +1,87 @@
-# Diagrama 05 — Máquina de Estados y Ciclo de Vida de la Reserva
+# 05. Ciclo de Vida de una Reserva y Política de Reembolso — SatoriPMS
 
-Este diagrama documenta la **máquina de estados finita** de una reserva en SatoriPMS, detallando las transiciones de pago, la vigencia de los bloqueos temporales en Redis y las políticas de cancelación y reembolso proporcional (**Regla de Negocio RN-03**).
+## 1. Propósito del Diagrama
+
+Este documento describe todos los estados por los que transita una reserva dentro de **SatoriPMS** desde que el viajero selecciona una habitación hasta que concluye su estadía o solicita una cancelación, mostrando de forma explícita cómo se calcula el reembolso **exclusivamente sobre el dinero que el huésped haya abonado hasta ese momento** (`Monto abonado : "paid_amount"`).
 
 ---
 
+## 2. Diagrama de Estados de la Reserva y del Pago
+
+Los estados representados corresponden exactamente a los valores que gestiona el servidor y la base de datos del hotel:
+- **Estados de la reserva (`Estado de la reserva : "status"`):** `'pending_payment'`, `'confirmed'`, `'finished'`, `'cancelled'`.
+- **Estados financieros (`Estado del pago : "payment_status"`):** `'pending'`, `'partial'`, `'paid'`, `'refunded'`.
+
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#E8EEF5', 'primaryTextColor': '#1B365D', 'primaryBorderColor': '#2C4D75', 'lineColor': '#2C4D75' }}}%%
 stateDiagram-v2
-    [*] --> DRAFT_LOCK : Huésped selecciona habitación en WhatsApp / Web
+    [*] --> BloqueoTemporal : Selección de habitación en WhatsApp o Web\n(Bloqueo en Redis por 15 minutos)
 
-    state DRAFT_LOCK {
-        [*] --> CandadoEnMemoria
-        CandadoEnMemoria : Llave Redis con TTL = 900s (15 min)
-        CandadoEnMemoria : Habitación invisible para otros clientes
-    }
+    state "Bloqueo Temporal en Memoria (15 min)" as BloqueoTemporal
+    state "Pendiente de Pago\nstatus = 'pending_payment'\npayment_status = 'pending'" as PendientePago
+    state "Confirmada con Anticipo del 50%\nstatus = 'confirmed'\npayment_status = 'partial'\npaid_amount = 50%" as ConfirmadaParcial
+    state "Confirmada y Pagada al 100%\nstatus = 'confirmed'\npayment_status = 'paid'\npaid_amount = 100%" as ConfirmadaTotal
+    state "Estadía Finalizada\nstatus = 'finished'\npayment_status = 'paid'" as Finalizada
+    state "Reserva Cancelada\nstatus = 'cancelled'\npayment_status = 'refunded' o 'paid'" as Cancelada
 
-    DRAFT_LOCK --> LIBERADA_TIMEOUT : Expiran 15 minutos sin completar pago
-    LIBERADA_TIMEOUT --> [*] : Habitación reaparece disponible
+    BloqueoTemporal --> [*] : Cancela en resumen, escribe "menú"\no inactividad (POST /api/bookings/unlock)
+    BloqueoTemporal --> PendientePago : Registro sin pago inmediato
+    BloqueoTemporal --> ConfirmadaParcial : Elige Opción 2 (Abono del 50%)\nPOST /api/bookings/confirm
+    BloqueoTemporal --> ConfirmadaTotal : Elige Opción 1 (Pago del 100%)\nPOST /api/bookings/confirm
 
-    DRAFT_LOCK --> CONFIRMED_PARTIAL : Huésped abona 50% anticipo (payment_status='partial')
-    DRAFT_LOCK --> CONFIRMED_PAID : Huésped abona 100% total (payment_status='paid')
+    PendientePago --> ConfirmadaParcial : Registra abono del 50%
+    PendientePago --> ConfirmadaTotal : Registra pago del 100%
+    PendientePago --> Cancelada : Cancelación antes de abonar\n(Reembolso = $0)
 
-    state CONFIRMED_PARTIAL {
-        ConfirmadaConSaldo : Reserva garantizada en PostgreSQL (EXCLUDE GIST)
-        ConfirmadaConSaldo : Saldo pendiente = 50% restante
-    }
+    ConfirmadaParcial --> ConfirmadaTotal : Liquida el 50% restante en WhatsApp o Recepción\nPOST /api/bookings/group/{code}/pay-remaining
 
-    state CONFIRMED_PAID {
-        ConfirmadaTotal : Reserva garantizada en PostgreSQL (EXCLUDE GIST)
-        ConfirmadaTotal : Saldo pendiente = $0.00 COP
-    }
+    ConfirmadaParcial --> Cancelada : Solicita cancelación\n(Reembolso calculado sobre el 50% abonado)
+    ConfirmadaTotal --> Cancelada : Solicita cancelación\n(Reembolso calculado sobre el 100% abonado)
 
-    CONFIRMED_PARTIAL --> CONFIRMED_PAID : Pago de saldo restante (/pay-remaining) en recepción
+    ConfirmadaTotal --> Finalizada : Salida del huésped (Check-out)\ncon consumos de tienda en $0
 
-    CONFIRMED_PARTIAL --> EVALUACION_CANCELACION : Solicitud de Cancelación (CU-02)
-    CONFIRMED_PAID --> EVALUACION_CANCELACION : Solicitud de Cancelación (CU-02)
-
-    state EVALUACION_CANCELACION {
-        [*] --> ValidarAnticipacion
-        ValidarAnticipacion : Cálculo de días calendario hasta Check-in (RN-03)
-    }
-
-    EVALUACION_CANCELACION --> CANCELLED_REEMBOLSO_100 : > 15 días antes del Check-in
-    EVALUACION_CANCELACION --> CANCELLED_REEMBOLSO_50 : Entre 7 y 14 días antes del Check-in
-    EVALUACION_CANCELACION --> CANCELLED_SIN_REEMBOLSO : < 7 días antes del Check-in
-
-    state CANCELLED_REEMBOLSO_100 {
-        R100 : Reembolso del 100% sobre paid_amount
-        R100 : Habitación liberada para reventa
-    }
-
-    state CANCELLED_REEMBOLSO_50 {
-        R50 : Reembolso del 50% sobre paid_amount (retención 50%)
-        R50 : Habitación liberada para reventa
-    }
-
-    state CANCELLED_SIN_REEMBOLSO {
-        R0 : Reembolso del 0% (Penalidad total por cancelación tardía)
-        R0 : Habitación liberada para reventa
-    }
-
-    CANCELLED_REEMBOLSO_100 --> [*]
-    CANCELLED_REEMBOLSO_50 --> [*]
-    CANCELLED_SIN_REEMBOLSO --> [*]
-
-    CONFIRMED_PAID --> CHECKED_IN : Huésped llega al hotel (CU-03)
-    CONFIRMED_PARTIAL --> CHECKED_IN : Huésped liquida saldo restante y hace Check-in
-
-    state CHECKED_IN {
-        EstadiaActiva : Huésped alojado físicamente
-        EstadiaActiva : Habitación en estado 'OCCUPIED'
-        EstadiaActiva : Registro de consumos de tienda (RN-04)
-    }
-
-    CHECKED_IN --> CHECKED_OUT : Huésped entrega habitación y liquida tienda (CU-04)
-
-    state CHECKED_OUT {
-        SalidaExitosa : Factura final generada
-        SalidaExitosa : Habitación pasa a estado 'CLEANING' (Aseo)
-        SalidaExitosa : Envío automático de solicitud de reseña
-    }
-
-    CHECKED_OUT --> [*]
+    Finalizada --> [*]
+    Cancelada --> [*]
 ```
 
 ---
 
-### Tabla de Reglas de Transición y Devoluciones (RN-03)
+## 3. Árbol de Decisión de Reembolso sobre el Monto Efectivamente Pagado
 
-| Estado Origen | Evento Desencadenante | Estado Destino | Regla de Negocio Aplicada |
-|---|---|---|---|
-| `DRAFT_LOCK` | Transcurren 15 min sin abono | `LIBERADA_TIMEOUT` | La llave expira en Redis (`DEL room:{id}:lock`); inventario vuelve a la matriz pública. |
-| `DRAFT_LOCK` | Pago del 50% confirmado | `CONFIRMED_PARTIAL` | Se asienta en PostgreSQL con `paid_amount = total * 0.5` y `payment_status = 'partial'`. |
-| `DRAFT_LOCK` | Pago del 100% confirmado | `CONFIRMED_PAID` | Se asienta en PostgreSQL con `paid_amount = total` y `payment_status = 'paid'`. |
-| `CONFIRMED_*` | Cancelación > 15 días antes | `CANCELLED` | **Reembolso 100%:** Se devuelve el 100% del monto efectivamente pagado (`paid_amount`). |
-| `CONFIRMED_*` | Cancelación 7–14 días antes | `CANCELLED` | **Reembolso 50%:** Se devuelve el 50% de `paid_amount`; el hotel retiene el otro 50%. |
-| `CONFIRMED_*` | Cancelación < 7 días antes | `CANCELLED` | **Penalidad Total:** 0% de reembolso; el hotel retiene el 100% de lo pagado. |
-| `CHECKED_IN` | Check-out completado | `CHECKED_OUT` | Exige validar que todos los consumos de tienda (`RN-04`) estén pagados en `$0 COP`. |
+Cuando un huésped solicita cancelar su reserva confirmada (`POST /api/bookings/group/{code}/cancellation`), el sistema toma dos datos reales de la reserva:
+1. Las horas que faltan desde el momento de la cancelación hasta las **15:00 horas (3:00 p. m.) del día de entrada**.
+2. El **monto efectivamente pagado por el cliente hasta ese instante (`Monto abonado : "paid_amount"`)**.
+
+```mermaid
+flowchart TD
+    classDef start fill:#FAF7F2,stroke:#3E2723,stroke-width:2px,color:#3E2723
+    classDef cond fill:#FFF8E7,stroke:#F59E0B,stroke-width:2px,color:#3E2723
+    classDef r100 fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+    classDef r50 fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1
+    classDef r0 fill:#FFEBEE,stroke:#C62828,stroke-width:2px,color:#B71C1C
+
+    Inicio["Solicitud de Cancelación de Reserva<br/>Base de cálculo: Monto Abonado (paid_amount)<br/>Hora de referencia: 15:00 del día de llegada"]:::start
+
+    Horas{"¿Cuántas horas faltan<br/>para el Check-in (15:00)?"}:::cond
+
+    Tramo1["Más de 72 horas antes:<br/>Reembolso del 100% de lo abonado<br/>• Reserva pasa a status = 'cancelled'<br/>• payment_status = 'refunded'<br/>• Habitaciones liberadas de inmediato"]:::r100
+
+    Tramo2["Entre 24 y 72 horas antes:<br/>Reembolso del 50% de lo abonado<br/>• Reserva pasa a status = 'cancelled'<br/>• payment_status = 'refunded'<br/>• Habitaciones liberadas de inmediato"]:::r50
+
+    Tramo3["Menos de 24 horas o no presentación:<br/>Sin reembolso (0% de lo abonado)<br/>• Reserva pasa a status = 'cancelled'<br/>• Habitaciones liberadas de inmediato"]:::r0
+
+    Ej100["Ejemplo sobre estadía de $200.000:<br/>• Si pagó el 100% ($200.000) -> Devuelve $200.000<br/>• Si abonó el 50% ($100.000) -> Devuelve $100.000"]:::r100
+    Ej50["Ejemplo sobre estadía de $200.000:<br/>• Si pagó el 100% ($200.000) -> Devuelve $100.000<br/>• Si abonó el 50% ($100.000) -> Devuelve $50.000"]:::r50
+    Ej0["Ejemplo sobre estadía de $200.000:<br/>• Si pagó el 100% ($200.000) -> Devuelve $0<br/>• Si abonó el 50% ($100.000) -> Devuelve $0"]:::r0
+
+    Inicio --> Horas
+    Horas -->|"> 72 horas"| Tramo1 --> Ej100
+    Horas -->|"Entre 24h y 72h"| Tramo2 --> Ej50
+    Horas -->|"< 24 horas"| Tramo3 --> Ej0
+```
+
+---
+
+## 4. Garantías Financieras y Operativas del Ciclo de Vida
+
+1. **Coherencia entre consulta y cancelación:** Tanto cuando el huésped consulta su reserva antes de decidir (`GET /api/bookings/group/{code}`) como cuando confirma la cancelación definitiva (`POST /api/bookings/group/{code}/cancellation`), el servidor aplica exactamente la misma fórmula sobre el monto abonado (`paid_amount`).
+2. **Liberación inmediata de disponibilidad:** En cuanto el estado cambia a `'cancelled'`, la restricción de la base de datos deja de bloquear ese rango de fechas y la habitación vuelve a aparecer disponible en WhatsApp y en la aplicación web sin requerir intervención manual.

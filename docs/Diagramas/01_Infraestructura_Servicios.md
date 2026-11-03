@@ -1,102 +1,94 @@
-# Diagrama 01 — Arquitectura de Infraestructura y Servicios
+# 01. Arquitectura de Infraestructura y Servicios — SatoriPMS
 
-Este diagrama detalla la topología de contenedores de **Docker Compose**, asignación de puertos, redes aisladas, volúmenes de persistencia y la interacción con los servicios en la nube (Meta WhatsApp Cloud API, Google Gemini AI Studio, Cloudflare y MercadoPago).
+## 1. Propósito del Diagrama
+
+Este diagrama representa cómo están organizados y conectados los servicios tecnológicos de **SatoriPMS**. Permite observar qué elementos interactúan con los huéspedes y el personal del hotel en el exterior, y cómo los cuatro contenedores principales del sistema colaboran dentro de una red interna protegida para garantizar rapidez, seguridad y respaldo permanente de los datos de **Torre Satori**.
 
 ---
 
+## 2. Diagrama General de Infraestructura
+
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#E8EEF5', 'primaryTextColor': '#1B365D', 'primaryBorderColor': '#2C4D75', 'lineColor': '#2C4D75', 'secondaryColor': '#F0FDF4', 'tertiaryColor': '#FFFBEB' }}}%%
-flowchart TD
-    subgraph Internet["🌐 Capa Externa e Internet"]
-        UserWA["📱 Huéspedes<br/>(WhatsApp Móvil)"]
-        UserWeb["💻 Recepción / Admin<br/>(Navegador Web)"]
-        MetaAPI["☁️ Meta Cloud API<br/>(WhatsApp Business)"]
-        GeminiAPI["🤖 Google Gemini API<br/>(Flash Lite LLM)"]
-        MPPasarela["💳 MercadoPago<br/>(Pasarela Sandbox)"]
+flowchart TB
+    classDef external fill:#FAF7F2,stroke:#5D4037,stroke-width:2px,color:#3E2723
+    classDef frontend fill:#FFF8E7,stroke:#D4A373,stroke-width:2px,color:#3E2723
+    classDef core fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+    classDef data fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1
+    classDef storage fill:#F3E5F5,stroke:#6A1B9A,stroke-width:1.5px,color:#4A148C
+
+    subgraph Usuarios["Canales de Atención y Usuarios"]
+        direction LR
+        Huesped["Huésped / Viajero<br/>(Aplicación WhatsApp)"]:::external
+        Personal["Recepcionista y Administrador<br/>(Navegador Web en Recepción)"]:::frontend
     end
 
-    subgraph Host["🖥️ Servidor Host (Linux / Docker Environment)"]
-        subgraph Proxy["Perímetro y Seguridad"]
-            CFTunnel["🛡️ Cloudflare Tunnel / SSL<br/>(Terminación HTTPS :443)"]
+    subgraph Externos["Plataformas Externas Conectadas"]
+        direction LR
+        MetaAPI["Plataforma Oficial de WhatsApp<br/>(Meta Cloud API)"]:::external
+        GeminiAPI["Motor de Inteligencia Artificial<br/>(Google Gemini Flash Lite)"]:::external
+        GoogleMaps["Ficha Pública del Hotel<br/>(Google Maps Reviews)"]:::external
+    end
+
+    subgraph FrontendApp["Interfaz Visual del Hotel"]
+        WebApp["Aplicación Web SatoriPMS<br/>(React 18 + TypeScript + Vite)<br/>Puerto local: 5173"]:::frontend
+    end
+
+    subgraph DockerHost["Infraestructura en Contenedores Docker (docker-compose.yml)"]
+        direction TB
+
+        subgraph Orquestacion["Capa de Atención y Lógica Central"]
+            direction LR
+            N8N["Orquestador del Chatbot (satori-n8n)<br/>Flujo V8 (83 nodos)<br/>Puerto: 5678"]:::core
+            API["Servidor Central (satori-api)<br/>Java 21 + Spring Boot 3.3<br/>Puerto: 8080"]:::core
         end
 
-        subgraph DockerNet["Red Privada Docker (satori-network)"]
-            subgraph FrontService["Frontend SPA"]
-                WebReact["⚛️ App Web Satori<br/>React 18 + Vite<br/>Puerto Host: :5173"]
-            end
-
-            subgraph CoreService["Backend Core"]
-                API["☕ Spring Boot 3.3 API<br/>Java 21 · Arquitectura Hexagonal<br/>Puerto Host: :8080"]
-            end
-
-            subgraph AutomationService["Orquestación Conversacional"]
-                N8N["⚡ n8n Workflow Engine<br/>Flujo V8_ChatbotReservas<br/>Puerto Host: :5678"]
-            end
-
-            subgraph DataService["Capa de Datos y Almacenamiento"]
-                Postgres[("🐘 PostgreSQL 16<br/>Extensión btree_gist<br/>Puerto Host: :5432")]
-                Redis[("🔴 Redis 7 Alpine<br/>Scripts Lua + TTL<br/>Puerto Host: :6379")]
-            end
+        subgraph Persistencia["Capa de Datos y Control de Concurrencia"]
+            direction LR
+            Redis["Memoria Rápida (satori-redis)<br/>Redis 7 · Sesiones y Bloqueos 15 min<br/>Puerto: 6379"]:::data
+            Postgres["Base de Datos Principal (satori-postgres)<br/>PostgreSQL 16 + Migraciones Flyway<br/>Puerto local: 5433 -> 5432"]:::data
         end
 
-        subgraph StorageVolumes["💾 Volúmenes de Persistencia en Disco"]
-            VolPG[("postgres_data<br/>(Datos relacionales)")]
-            VolRedis[("redis_data<br/>(Caché y dump.rdb)")]
-            VolN8N[("n8n_data<br/>(Workflows y credenciales)")]
+        subgraph Volumenes["Almacenamiento Permanente en Disco"]
+            direction LR
+            VolN8N[("Volumen n8n<br/>n8n_data")]:::storage
+            VolRedis[("Volumen Redis<br/>redis_data")]:::storage
+            VolPG[("Volumen PostgreSQL<br/>postgres_data")]:::storage
         end
     end
 
-    %% Relaciones externas
-    UserWA <-->|"Mensajería cifrada"| MetaAPI
-    MetaAPI <-->|"Webhook HTTP / POST"| CFTunnel
-    CFTunnel -->|"Proxy inverso local"| N8N
-    UserWeb <-->|"HTTPS :443"| CFTunnel
-    CFTunnel -->|"Servicio estático"| WebReact
+    %% Relaciones de usuarios y servicios externos
+    Huesped <-->|"Mensajes y menús interactivos"| MetaAPI
+    Huesped -.->|"Publicación de reseña pública"| GoogleMaps
+    MetaAPI <-->|"Recepción y envío de mensajes<br/>(/webhook/whatsapp-webhook)"| N8N
+    N8N <-->|"Extracción de fechas y datos<br/>en lenguaje natural"| GeminiAPI
 
-    %% Relaciones frontend - backend
-    WebReact <-->|"REST API (JSON) + JWT"| API
-    WebReact <-->|"WebSockets STOMP<br/>(Sincronización en vivo)"| API
+    %% Relaciones de la aplicación web
+    Personal <-->|"Operación diaria y administración"| WebApp
+    WebApp <-->|"Operaciones del hotel (REST)<br/>y alertas en vivo (/ws)"| API
 
-    %% Relaciones n8n
-    N8N <-->|"Prompts / JSON Extraction"| GeminiAPI
-    N8N -->|"Consultas y reservas REST"| API
-    N8N <-->|"Sesiones y locks temporales"| Redis
+    %% Relaciones internas entre contenedores
+    N8N <-->|"Lectura y guardado de sesión<br/>(session:{waId})"| Redis
+    N8N <-->|"Disponibilidad, bloqueos, reservas,<br/>pagos, cancelaciones y reseñas"| API
+    API <-->|"Bloqueo atómico por intervalos (15 min)<br/>y liberación inmediata"| Redis
+    API <-->|"Transacciones y restricción<br/>contra sobreventa"| Postgres
 
-    %% Relaciones backend
-    API <-->|"Bloqueos atómicos (Lua scripts)"| Redis
-    API <-->|"Persistencia transaccional ACID"| Postgres
-    API <-->|"Webhooks de pago / Notificaciones"| MPPasarela
-
-    %% Volúmenes
-    Postgres --- VolPG
-    Redis --- VolRedis
+    %% Persistencia en volúmenes
     N8N --- VolN8N
-
-    classDef external fill:#EFF6FF,stroke:#2563EB,stroke-width:1.5px,color:#1E3A8A;
-    classDef proxy fill:#F5F3FF,stroke:#7C3AED,stroke-width:1.5px,color:#4C1D95;
-    classDef front fill:#ECFDF5,stroke:#059669,stroke-width:1.5px,color:#064E3B;
-    classDef core fill:#FEF2F2,stroke:#DC2626,stroke-width:1.5px,color:#7F1D1D;
-    classDef auto fill:#FFFBEB,stroke:#D97706,stroke-width:1.5px,color:#78350F;
-    classDef data fill:#F0FDF4,stroke:#16A34A,stroke-width:1.5px,color:#14532D;
-    classDef storage fill:#F1F5F9,stroke:#64748B,stroke-width:1px,stroke-dasharray: 4 4,color:#334155;
-
-    class UserWA,UserWeb,MetaAPI,GeminiAPI,MPPasarela external;
-    class CFTunnel proxy;
-    class WebReact front;
-    class API core;
-    class N8N auto;
-    class Postgres,Redis data;
-    class VolPG,VolRedis,VolN8N storage;
+    Redis --- VolRedis
+    Postgres --- VolPG
 ```
 
 ---
 
-### Componentes y Matriz de Puertos
+## 3. Explicación de Componentes y Flujo de Comunicación
 
-| Servicio | Imagen Docker | Puerto Contenedor | Puerto Host | Red Docker | Propósito Técnico |
-|---|---|:---:|:---:|---|---|
-| **Spring Boot API** | `eclipse-temurin:21-jre-alpine` | `8080` | `8080` | `satori-network` | Servidor de aplicaciones backend, endpoints REST, seguridad Spring Security y sockets. |
-| **App Web (React)** | `node:20-alpine` (Vite dev) | `5173` | `5173` | `satori-network` | Panel administrativo de recepción para check-in, check-out y visualización de ocupación. |
-| **n8n Workflow** | `n8nio/n8n:latest` | `5678` | `5678` | `satori-network` | Orquestador de flujos conversacionales, integración con Meta API y Gemini. |
-| **PostgreSQL** | `postgres:16-alpine` | `5432` | `5432` | `satori-network` | Base de datos relacional principal con extensión `btree_gist` para exclusión física. |
-| **Redis** | `redis:7-alpine` | `6379` | `6379` | `satori-network` | Almacenamiento en memoria para candados distribuidos (TTL 15 min) y estados de sesión. |
+1. **Canal de Huéspedes (WhatsApp e Inteligencia Artificial):**
+   - El viajero se comunica desde su teléfono con el número oficial de **Torre Satori**.
+   - La plataforma de WhatsApp entrega el mensaje al **Orquestador del Chatbot** (`Contenedor de n8n : "satori-n8n"`), el cual recupera en milisegundos el paso actual de la conversación desde la **Memoria Rápida** (`Contenedor de Redis : "satori-redis"`).
+   - Cuando el huésped escribe una solicitud en lenguaje libre, el orquestador se apoya en el motor **Google Gemini Flash Lite** para interpretar las fechas, la cantidad de personas y las preferencias.
+2. **Canal de Recepción y Administración (Aplicación Web):**
+   - El recepcionista y el administrador operan desde el navegador web conectándose directamente con el **Servidor Central** (`Contenedor del servidor : "satori-api"`).
+   - A través de este canal se gestionan las 9 habitaciones de referencia (creación, edición y eliminación segura), los eventos especiales con descuentos, las llegadas y salidas de huéspedes, la tienda interna y los reportes contables.
+3. **Aislamiento y Respaldo de Datos:**
+   - Ni la base de datos (`Contenedor de PostgreSQL : "satori-postgres"`) ni la memoria rápida reciben conexiones directas desde internet; solo el servidor central y el orquestador interno pueden consultarlas.
+   - Los tres volúmenes de almacenamiento (`"postgres_data"`, `"redis_data"` y `"n8n_data"`) garantizan que toda la información permanezca intacta aunque el servidor se reinicie.
