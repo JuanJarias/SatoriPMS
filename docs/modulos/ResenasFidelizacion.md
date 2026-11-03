@@ -1,31 +1,43 @@
-# Módulo — Reseñas y Fidelización
+# Reseñas y Fidelización de Huéspedes — SatoriPMS
 
-## 1. Requerimientos y Casos de Uso
+## 1. Propósito del Módulo
 
-**HU-02, Consultar reseñas.** Los huéspedes y futuros clientes ven los comentarios de huéspedes anteriores desde el chatbot (opción 3 del menú) y desde la web pública, con la calificación promedio en estrellas y las opiniones reales persistidas en PostgreSQL.
+El módulo de **Reseñas y Fidelización** tiene un doble objetivo comercial para **Torre Satori**:
+1. Medir de forma continua la satisfacción de los viajeros que se hospedan en el hotel y potenciar el posicionamiento público del establecimiento en **Google Maps**.
+2. Identificar automáticamente a los huéspedes frecuentes para brindarles un trato preferencial y ofrecerles beneficios o descuentos en sus próximas visitas a Sevilla.
 
-**HU-04, Dejar reseña.** Formulario conversacional vía WhatsApp (opción 4 del menú) o por la web tras el check-out. Captura una calificación numérica de 1 a 5 estrellas y un comentario libre. No se permite duplicar la reseña de una misma estadía.
+---
 
-**Redirección a Google Reviews.** Tras guardar la reseña local con `source = 'chatbot'`, el chatbot entrega el enlace directo al perfil de Google Business del hotel (`https://search.google.com/local/writereview?placeid=${GOOGLE_PLACE_ID}`) e invita al huésped a publicarla en Google Maps. Google no permite crear reseñas de forma programática sin la autenticación del usuario final, por lo que esta redirección es la vía oficial.
+## 2. Captura y Consulta de Reseñas por WhatsApp
 
-**HU-10, Panel de reseñas.** Vista para el administrador y la recepcionista que muestra las opiniones recibidas, su calificación y su fuente (`chatbot`, `google` o `web`).
+### A. Consulta Pública de Opiniones (Opción 3 del Menú)
+Cuando un viajero potencial desea conocer la experiencia de otros clientes antes de reservar:
+- El asistente de WhatsApp consulta las valoraciones más recientes almacenadas en el sistema.
+- Calcula y muestra la **calificación promedio del hotel sobre 5.0 estrellas** junto con los últimos comentarios verificados, indicando el nombre del huésped, la puntuación otorgada y el origen de la reseña.
 
-**HU-12, Huéspedes recurrentes.** Identificación automática de los clientes que superan el umbral de estadías definido por el administrador, para aplicar beneficios de fidelización.
+### B. Registro de Nueva Reseña e Impulso en Google Maps (Opción 4 del Menú)
+Tanto al finalizar la estadía como en cualquier momento desde el menú principal de WhatsApp:
+1. **Calificación por estrellas:** El asistente invita al huésped a puntuar su experiencia del **1 al 5** (donde 1 es muy insatisfecho y 5 es excelente).
+2. **Comentario abierto:** A continuación, le solicita escribir con sus propias palabras qué le pareció la atención, la comodidad de la habitación o las instalaciones de Torre Satori.
+3. **Almacenamiento en el sistema:** La reseña queda registrada en la base de datos (`Tabla de reseñas : "review"`) con el nombre del autor (`Nombre del autor : "author_name"`), teléfono (`Teléfono de WhatsApp : "wa_id"`), calificación (`Estrellas : "rating"`), texto (`Comentario : "comment"`) y fecha.
+4. **Enlace directo a Google Maps:** Inmediatamente después de guardar el comentario interno, el asistente agradece al huésped y le entrega un enlace directo a la ficha oficial de **Torre Satori en Google** (configurada mediante `Identificador de lugar en Google : "GOOGLE_PLACE_ID"`) para que, con un solo toque, pueda publicar también su reseña en Google Maps y ayudar a que más viajeros descubran el hotel.
 
-## 2. Flujo de Reseña
+---
 
-Después del check-out, el sistema envía al huésped por WhatsApp una invitación a calificar su estadía. El huésped también puede iniciar el flujo en cualquier momento desde la opción 4 del menú. El bot pide la calificación, luego el comentario, guarda la reseña en PostgreSQL con `POST /api/reviews` y entrega el enlace para que el huésped la publique también en Google. Si el número de WhatsApp pertenece a un huésped registrado, la reseña queda asociada a su `guest_id` y, cuando se conoce, a la reserva de origen.
+## 3. Panel Administrativo de Moderación de Reseñas
 
-## 3. Reglas de Integridad y Persistencia
+En la aplicación web, el **Administrador** dispone de una vista dedicada para supervisar la reputación del hotel:
+- Visualiza la evolución de la calificación promedio, la distribución de estrellas (de 1 a 5) y el listado cronológico de todos los comentarios recibidos.
+- Identifica de forma temprana cualquier comentario con calificación baja (1 a 3 estrellas) para contactar al huésped, conocer qué ocurrió durante su turno de atención y aplicar mejoras operativas en el hotel.
 
-**Persistencia real.** La entidad JPA `Review` y el repositorio `ReviewRepository` se conectan a la tabla `review` de PostgreSQL. Las reseñas se listan ordenadas por fecha de creación descendente.
+---
 
-**Unicidad por reserva.** Si la reseña proviene de una reserva conocida (`bookingId`), se valida que no exista ya otra reseña asociada a ella (`existsByBookingId`), evitando duplicados.
+## 4. Reconocimiento y Fidelización de Huéspedes Recurrentes
 
-**Calificación válida.** El valor de `rating` debe estar entre 1 y 5.
+Dado que muchos visitantes viajan periódicamente a Sevilla por motivos familiares, laborales o turísticos, el sistema aprovecha el directorio unificado de clientes (`Directorio de huéspedes : "guest"`):
 
-**Fuentes admitidas.** La columna `source` acepta `chatbot`, `google` y `web`. Las reseñas importadas de Google no requieren huésped, habitación ni reserva asociados.
-
-## 4. Fidelización
-
-El sistema identifica a un huésped recurrente contando las estadías finalizadas asociadas a su registro. Cuando el conteo alcanza el umbral que define el administrador, el huésped queda marcado como recurrente y aparece en el panel de fidelización, filtrable por frecuencia de visitas. Los beneficios para huéspedes recurrentes, así como los descuentos para familiares y amigos del hotel, se aplican según las reglas definidas por el administrador.
+1. **Reconocimiento automático por número de WhatsApp:** Cada vez que un cliente se comunica por WhatsApp o se registra en recepción, el sistema identifica su perfil a través de su número telefónico (`Teléfono de WhatsApp : "whatsapp_phone"`) y su documento de identidad (`Documento de identidad : "document_number"`), asociando todas sus estadías históricas bajo una misma ficha.
+2. **Clasificación de clientes frecuentes:** El sistema contabiliza cuántas estadías finalizadas (`Estado de la reserva : "finished"`) acumula cada huésped y cuál ha sido su inversión histórica en el hotel.
+3. **Beneficios y campañas de fidelización:**
+   - En el panel de recepción y administración se destaca con un distintivo de **Huésped Frecuente** a todo cliente que registra múltiples visitas previas, mostrando sus notas de preferencia (por ejemplo, si suele viajar con mascota o prefiere habitaciones de un piso específico).
+   - El administrador puede consultar el listado de clientes recurrentes para otorgarles descuentos especiales, tarifas preferenciales en temporada baja o invitaciones directas durante eventos especiales del hotel.

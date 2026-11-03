@@ -1,70 +1,57 @@
-# Documentación Oficial — Torre Satori PMS
+# Documentación del Proyecto — SatoriPMS
 
-Bienvenido al repositorio documental de **SatoriPMS**, el Property Management System diseñado para automatizar y centralizar la operación del hotel boutique Torre Satori en Sevilla (Valle del Cauca).
+Bienvenido al centro de documentación de **SatoriPMS**, el sistema de gestión hotelera y reservas automatizadas para **Torre Satori** (Sevilla, Valle del Cauca).
 
-Este directorio organiza todo el conocimiento técnico, arquitectónico, presupuestal y de gestión del proyecto en carpetas especializadas.
-
----
-
-## Estructura de la Documentación
-
-```
-docs/
-├── modulos/               # Documentación modular de los 14 componentes del sistema
-├── Diagramas/             # Diagramas oficiales de arquitectura, infraestructura y flujos
-├── Presupuesto/           # Presupuesto oficial en Excel, memorias de costeo y plan de crisis
-├── Reuniones/             # Minutas y actas de reuniones con el cliente / stakeholder
-├── Actividades/           # Guías académicas y requerimientos del curso (PI2)
-├── cambios_commit.md      # Registro cronológico detallado de cambios por commit
-└── README.md              # Este índice
-```
+Esta carpeta reúne la especificación completa del proyecto: cómo funciona el negocio, qué compone cada módulo del sistema, cómo interactúan sus servicios mediante diagramas visuales, cuál es su modelo financiero y cuál es el estado actual de construcción.
 
 ---
 
-## 1. Módulos de Arquitectura y Negocio ([`modulos/`](modulos/))
+## Propósito y Cómo Utilizar esta Documentación
 
-Documentación exhaustiva de las reglas de negocio, endpoints y diseños de cada componente bajo nomenclatura estandarizada:
+La documentación está organizada para cumplir dos funciones claramente diferenciadas:
 
-| Módulo | Archivo | Descripción |
-|---|---|---|
-| **01. Generalidades y Núcleo** | [`GeneralidadesNucleo.md`](modulos/GeneralidadesNucleo.md) | Contexto, problema de negocio, alcance del MVP, épicas y reglas RN-01 a RN-04. |
-| **02. Chatbot WhatsApp** | [`Chatbot.md`](modulos/Chatbot.md) | Especificación de los flujos conversacionales en n8n y comandos interactivos. |
-| **03. Aplicación Web** | [`AplicacionWeb.md`](modulos/AplicacionWeb.md) | Vistas, componentes y diseño del panel de recepción y administración. |
-| **04. Backend API** | [`BackendAPI.md`](modulos/BackendAPI.md) | Endpoints REST en Spring Boot 3.3, contratos DTO y arquitectura hexagonal. |
-| **05. Base de Datos** | [`Database.md`](modulos/Database.md) | Modelo entidad-relación, migraciones Flyway V1-V5 y restricciones de integridad. |
-| **06. Seguridad y Permisos** | [`Seguridad.md`](modulos/Seguridad.md) | Autenticación JWT, control de acceso por roles y Ley 1581 de protección de datos. |
-| **07. Infraestructura** | [`Infraestructura.md`](modulos/Infraestructura.md) | Contenedores Docker, variables de entorno, puertos y políticas de red. |
-| **08. Tienda e Inventario** | [`TiendaInventario.md`](modulos/TiendaInventario.md) | Catálogo de productos, cobro de consumos a la habitación y rotación de stock. |
-| **09. Facturación y Finanzas** | [`FacturacionFinanzas.md`](modulos/FacturacionFinanzas.md) | Reportes contables, libro de egresos y cálculo de liquidación de recepcionistas. |
-| **10. Reseñas y Fidelización** | [`ResenasFidelizacion.md`](modulos/ResenasFidelizacion.md) | Captura de opiniones, persistencia de calificaciones y enlace a Google Reviews. |
-| **11. Gestión del Proyecto** | [`GestionProyecto.md`](modulos/GestionProyecto.md) | Marco Scrum, cronograma oficial reorganizado, roles y matriz de riesgos. |
-| **12. Diseño UX/UI** | [`DiseñoUXUI.md`](modulos/DiseñoUXUI.md) | Guía de estilos, paleta de colores, tipografías y diseño adaptativo. |
-| **13. Estado Actual** | [`EstadoActual.md`](modulos/EstadoActual.md) | **Memoria viva:** Qué está construido, qué está probado y qué está pendiente. |
+1. **Especificación Funcional y de Diseño del Proyecto (`modulos/`, `Diagramas/`, `Presupuesto/`, `Reuniones/`):**
+   Explica con claridad qué debe hacer el sistema, cómo funcionan sus flujos operativos y cuáles son las reglas acordadas para el hotel. Cualquier persona, cliente o integrante del equipo que lea estos documentos comprenderá qué compone el proyecto y cómo debe operar en su totalidad.
+2. **Seguimiento de Avance y Control de Cambios (`EstadoActual.md` y `CambiosPendientes.md`):**
+   Concentra exclusivamente el estado real de implementación, las decisiones técnicas adoptadas, el historial de modificaciones y los cambios pendientes de envío al repositorio remoto.
 
 ---
 
-## 2. Diagramas Técnicos y de Flujos ([`Diagramas/`](Diagramas/))
+## Estructura de la Carpeta `docs/`
 
-Catálogo de diagramas visuales en Mermaid con iconos y convenciones de color:
+### 1. Módulos del Sistema (`docs/modulos/`)
+Cada documento describe el funcionamiento previsto, las reglas de negocio y el diseño de un área específica de la plataforma:
 
-* [`01_Infraestructura_Servicios.md`](Diagramas/01_Infraestructura_Servicios.md): Topología Docker, puertos y servicios externos.
-* [`02_Flujo_Reserva_WhatsApp.md`](Diagramas/02_Flujo_Reserva_WhatsApp.md): Ciclo conversacional completo con IA, disponibilidad y abonos.
-* [`03_Concurrencia_Doble_Candado.md`](Diagramas/03_Concurrencia_Doble_Candado.md): Arquitectura de prevención de overbooking en 2 niveles (Redis + PostgreSQL).
-* [`04_Gestion_Operativa_Recepcion.md`](Diagramas/04_Gestion_Operativa_Recepcion.md): Operación de recepción web, WebSockets, check-in y check-out.
-* [`05_Ciclo_Vida_Reserva.md`](Diagramas/05_Ciclo_Vida_Reserva.md): Máquina de estados finita y reglas de cancelación RN-03.
+- [Generalidades y Núcleo del Negocio](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/GeneralidadesNucleo.md): Contexto de Torre Satori, problemáticas que resuelve el sistema, catálogo de capacidades y reglas fundamentales del hotel (tarifas, prevención de sobreventa, reembolsos, inventario, eventos especiales y administración de habitaciones).
+- [Chatbot y Atención por WhatsApp](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/Chatbot.md): Flujos conversacionales del asistente virtual, reserva guiada paso a paso, asistente con inteligencia artificial en lenguaje natural, pagos del 50% o 100%, consulta y cancelación de reservas, reseñas y transferencia a un recepcionista humano.
+- [Aplicación Web (Recepción y Administración)](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/AplicacionWeb.md): Panel interactivo del hotel, calendario de ocupación, registro de llegada y salida de huéspedes, reservas manuales, bandeja de conversaciones de WhatsApp, gestión completa de habitaciones (crear, editar y eliminar) y programación de eventos especiales y descuentos.
+- [Servicios del Servidor Central (Backend API)](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/BackendAPI.md): Descripción de las operaciones que ofrece el servidor central para reservas, habitaciones, bloqueos temporales, pagos, cancelaciones, tienda, finanzas y reseñas, explicadas tanto en lenguaje de negocio como con sus rutas de comunicación.
+- [Estructura de Datos (Base de Datos)](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/Database.md): Organización de la información almacenada en el sistema (habitaciones, eventos tarifarios, huéspedes, reservas, productos, consumos, movimientos financieros, reseñas y usuarios del personal).
+- [Tienda e Inventario](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/TiendaInventario.md): Administración de la vitrina de productos del hotel, cargos a la cuenta de la habitación o ventas de contado, alertas de existencias bajas y reglas de trazabilidad.
+- [Facturación y Finanzas](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/FacturacionFinanzas.md): Liquidación de estadías, recargos por personas adicionales, descuentos por temporadas o eventos especiales, abonos parciales, política de reembolso sobre lo abonado, gastos operativos, cálculo de turnos y exportación contable en Excel.
+- [Reseñas y Fidelización](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/ResenasFidelizacion.md): Captura de calificaciones de los huéspedes, impulso al posicionamiento en Google Maps, reconocimiento de clientes frecuentes y moderación administrativa.
+- [Seguridad y Protección de Datos](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/Seguridad.md): Control de acceso por roles (Administrador y Recepcionista), protección de credenciales, auditoría de acciones críticas y cumplimiento de la Ley 1581 de 2012 de protección de datos personales.
+- [Infraestructura y Despliegue](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/Infraestructura.md): Organización de los servicios locales y en la nube, requisitos de operación, copias de seguridad automáticas y procedimiento de recuperación.
+- [Diseño Visual y Experiencia de Usuario (UX/UI)](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/DiseñoUXUI.md): Identidad visual inspirada en la cultura cafetera de Sevilla, paleta de colores, tipografía y principios de usabilidad del panel web.
+- [Gestión del Proyecto](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/GestionProyecto.md): Alcance general, desglose de etapas de trabajo, conformación del equipo, cronograma de entregas y matriz de gestión de riesgos.
 
----
+### 2. Seguimiento del Proyecto (`docs/modulos/EstadoActual.md` y `docs/CambiosPendientes.md`)
+- [Estado Actual del Proyecto](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/EstadoActual.md): Único documento oficial de seguimiento técnico y administrativo. Contiene el resumen ejecutivo, el estado verificado de cada componente y documento, las discrepancias identificadas, los trabajos pendientes, el historial de cambios y el registro de decisiones.
+- [Cambios Pendientes de Envío](file:///home/guarinve/Documentos/SatoriPMS/docs/CambiosPendientes.md): Registro organizado por commit de todas las modificaciones realizadas localmente desde la última sincronización con el repositorio remoto.
 
-## 3. Presupuesto y Modelo Financiero ([`Presupuesto/`](Presupuesto/))
+### 3. Diagramas del Sistema (`docs/Diagramas/`)
+- [Índice de Diagramas](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/README.md): Guía de las representaciones visuales del proyecto:
+  1. [Infraestructura y Servicios](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/01_Infraestructura_Servicios.md)
+  2. [Flujo de Reserva por WhatsApp](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/02_Flujo_Reserva_WhatsApp.md)
+  3. [Prevención de Sobreventa (Doble Candado)](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/03_Concurrencia_Doble_Candado.md)
+  4. [Gestión Operativa en Recepción](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/04_Gestion_Operativa_Recepcion.md)
+  5. [Ciclo de Vida de una Reserva](file:///home/guarinve/Documentos/SatoriPMS/docs/Diagramas/05_Ciclo_Vida_Reserva.md)
 
-Herramientas financieras y de gestión de costos según los lineamientos del Guion 3:
+### 4. Presupuesto y Viabilidad Financiera (`docs/Presupuesto/`)
+- [Presupuesto General del Proyecto](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Presupuesto.md): Análisis detallado de los costos de construcción, puesta en marcha en Sevilla, operación mensual en producción y retorno de inversión para las 9 habitaciones de referencia del hotel.
+- [Libro Financiero en Excel (`Presupuesto_SatoriPMS.xlsx`)](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Presupuesto_SatoriPMS.xlsx): Modelo financiero dinámico con cinco hojas vinculadas mediante fórmulas (Resumen Ejecutivo, Matriz de Costos, Catálogo de Requerimientos, Escenarios Financieros y Supuestos Validados).
+- [Análisis de Escenarios de Crisis Presupuestal](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Actividad4_Crisis_Presupuestal.md): Evaluación de planes de contingencia ante un recorte financiero, un cambio regulatorio de privacidad y la salida imprevista de un integrante técnico.
 
-* [`Presupuesto_SatoriPMS.xlsx`](Presupuesto/Presupuesto_SatoriPMS.xlsx): Libro Excel auditado con 5 hojas funcionales y 684 fórmulas dinámicas (0 errores `#REF!`).
-* [`Presupuesto.md`](Presupuesto/Presupuesto.md): Informe técnico de costeo, desglose CAPEX vs OPEX, análisis de retorno (Payback de 13,7 meses) y matriz de supuestos.
-* [`Actividad4_Crisis_Presupuestal.md`](Presupuesto/Actividad4_Crisis_Presupuestal.md): Plan de contingencia ante crisis de sobrecosto del 30%, alineado al tablero oficial de GitHub Projects #2.
-
----
-
-## 4. Reuniones y Actas de Acuerdos ([`Reuniones/`](Reuniones/))
-
-* [`ReunionCliente.md`](Reuniones/ReunionCliente.md): Minuta de la sesión de validación con el cliente y stakeholder (6 de octubre de 2026), con enlaces a transcripción y grabación.
+### 5. Actas y Actividades de Referencia (`docs/Reuniones/` y `docs/Actividades/`)
+- [Acta de Reunión con el Cliente](file:///home/guarinve/Documentos/SatoriPMS/docs/Reuniones/ReunionCliente.md): Minuta ejecutiva y transcripción íntegra de la sesión de levantamiento de requerimientos con el propietario del hotel, Frank Arias Salgado.
+- [Enunciado de Escenarios de Crisis Presupuestal (PDF)](file:///home/guarinve/Documentos/SatoriPMS/docs/Actividades/ACTIVIDAD%204%20(Escenarios%20de%20Crisis%20Presupuestal).pdf): Documento académico de referencia para la simulación financiera.

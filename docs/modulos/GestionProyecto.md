@@ -1,65 +1,61 @@
-# Módulo 11 — Gestión del Proyecto
+# Gestión del Proyecto — SatoriPMS
 
-## 11.1 Metodología y Herramientas
+## 1. Propósito y Alcance General
 
-El proyecto se gestiona bajo el marco ágil Scrum en cinco sprints. El seguimiento en tiempo real y la gestión del backlog se realiza oficialmente en **GitHub Projects**:
-* **Tablero Oficial:** [GitHub Projects — SatoriPMS (Project #2)](https://github.com/users/JuanJarias/projects/2)
-* **Repositorio y Rama de Trabajo:** [`JuanJarias/SatoriPMS` (rama `feat/database-redis-setup`)](https://github.com/JuanJarias/SatoriPMS/tree/feat/database-redis-setup)
+El proyecto **SatoriPMS** consiste en el diseño, desarrollo, aseguramiento de calidad y puesta en marcha de un sistema integral de gestión hotelera y reservas automatizadas por WhatsApp para el hotel **Torre Satori** (Sevilla, Valle del Cauca).
 
-El tablero cuenta con 3 vistas principales:
-1. **Backlog y planificación** (Table layout agrupado por Sprint).
-2. **Tablero de Progreso** (Board layout por estados: *Backlog*, *In Progress*, *Review*, *Done*).
-3. **Cronograma Sprints** (Roadmap layout por fechas de inicio y duración).
+### A. Qué Incluye el Alcance del Proyecto
+1. **Motor de Reservas y Prevención de Sobreventa:** Control de disponibilidad en tiempo real para las **9 habitaciones de referencia** del hotel, con bloqueo temporal de 15 minutos durante el proceso de compra y restricción definitiva contra cruce de fechas en base de datos.
+2. **Chatbot de WhatsApp con Inteligencia Artificial (24/7):** Flujo guiado paso a paso, asistente en lenguaje natural impulsado por inteligencia artificial, cobro de anticipo del 50% o pago del 100%, liquidación de saldos pendientes, cancelación con cálculo de reembolso sobre lo abonado, consulta y captura de reseñas con enlace a Google Maps y transferencia a un recepcionista humano.
+3. **Aplicación Web para Recepción y Administración:** Calendario visual de ocupación, registro de llegadas (Check-in) y salidas (Check-out), creación de reservas manuales, bandeja de conversaciones escaladas, **administración completa de habitaciones (crear, editar y eliminar sin reservas pendientes)** y **configuración de eventos especiales y descuentos por fechas**.
+4. **Módulo de Tienda Interna e Inventario:** Catálogo de productos de vitrina, registro de ventas de contado o con cargo a la habitación, control de existencias y desactivación segura de productos sin afectar la contabilidad histórica.
+5. **Módulo de Facturación, Finanzas y Turnos:** Consolidación de ingresos y gastos operativos, cálculo configurable de turnos de recepción y exportación de informes contables en formato Excel.
+6. **Seguridad, Roles y Puesta en Marcha:** Control de acceso diferenciado para Administrador y Recepcionista, cumplimiento de la Ley 1581 de 2012 de protección de datos personales y capacitación presencial en el hotel.
 
-Al cierre de cada sprint se realiza una sesión de Sprint Review con el Product Owner y el stakeholder para validar los entregables contra la Definición de Hecho (DoD) y repriorizar el backlog.
+### B. Qué Queda Fuera del Alcance Inicial
+- Operación simultánea para múltiples hoteles distintos (la plataforma está hecha a la medida de Torre Satori).
+- Integración automática bidireccional con portales externos como Booking o Airbnb (el objetivo estratégico del proyecto es fortalecer el canal de venta directa sin comisiones).
+- Emisión de facturación electrónica ante la DIAN (el sistema genera soportes de cuenta internos y el consolidado contable en Excel).
 
-## 11.2 Estructura de Desglose de Trabajo (EDT)
+---
 
-La EDT combina dos criterios de descomposición: las fases del ciclo de vida y, dentro de la fase de desarrollo, las seis épicas de los requerimientos.
+## 2. Equipo de Trabajo y Responsabilidades
 
-| # | Fase | Propósito |
+El desarrollo del proyecto está a cargo de un equipo de ingeniería de tres integrantes bajo metodología ágil Scrum:
+
+| Integrante | Rol Principal | Responsabilidades en el Proyecto |
 |---|---|---|
-| 1 | Gestión del Proyecto | Dirigir, planificar y controlar el proyecto de principio a fin |
-| 2 | Análisis y Diseño | Traducir los requerimientos en una solución técnica: arquitectura, modelo de datos, flujos conversacionales y mockups |
-| 3 | Desarrollo, Épica 1 | Reservas con Chatbot |
-| 4 | Desarrollo, Épica 2 | Gestión Operativa (App Web) |
-| 5 | Desarrollo, Épica 3 | Facturación y Finanzas |
-| 6 | Desarrollo, Épica 4 | Tienda y Ventas |
-| 7 | Desarrollo, Épica 5 | Reseñas y Fidelización |
-| 8 | Desarrollo, Épica 6 | Administración de Roles |
-| 9 | Pruebas y Aseguramiento de Calidad | Verificar el cumplimiento de los requerimientos funcionales y no funcionales |
-| 10 | Despliegue e Implementación | Poner el sistema en producción y capacitar al personal |
-| 11 | Documentación y Cierre | Dejar el conocimiento documentado y formalizar la entrega |
+| **Juan José Arias Gallego** | Propietario del Producto (Product Owner) y Desarrollador | Enlace directo con la administración de Torre Satori, definición y validación de reglas de negocio, priorización de entregas y apoyo en base de datos y pruebas. |
+| **Esteban Guarín Valencia** | Líder Ágil (Scrum Master) y Arquitecto de Servidor | Diseño y construcción del servidor central (Java / Spring Boot), modelo de base de datos (PostgreSQL), sistema de bloqueos temporales (Redis) y aseguramiento de calidad. |
+| **Juan Felipe Garzón Trejos** | Especialista en Interfaz Web y Automatización | Construcción de la aplicación web de recepción y administración (React / TypeScript), orquestación de flujos conversacionales en n8n e integración con inteligencia artificial. |
 
-## 11.3 Cronograma Scrum Oficial (Reorganizado en GitHub Projects)
+- **Patrocinador y Cliente Principal:** **Frank Arias Salgado** — Propietario y Administrador de Torre Satori (Sevilla, Valle del Cauca).
 
-| Sprint | Fechas Oficiales | Duración | Estado GitHub | Foco Técnico e Issues Clave Asociadas |
-|---|---|---|---|---|
-| **Sprint 1** | 23/09/2026 al 02/10/2026 | 10 días | **Done** | **Diseño y Arquitectura de la Solución (7 issues):** DU-01 (Arquitectura), HU-00.1 (Conexión WhatsApp-n8n), DU-02 (Mockups UX/UI), DU-03 (Modelo BD relacional), DU-04 (Estrategia de concurrencia), DU-05 (Flujos chatbot), DU-06 (Seguridad y datos). |
-| **Sprint 2** | 03/10/2026 al 16/10/2026 | 14 días | **Done** | **Core de Reservas Chatbot WhatsApp (6 issues):** CU-01 (Reservar habitación), CU-01.1 (Disponibilidad por fechas), CU-01.2 (Bloqueo temporal 15 min RN-02), CU-01.4 (Precio total y confirmar), CU-02 (Cancelar en chatbot), HU-08 (Confirmación automática WhatsApp). |
-| **Sprint 3** | 17/10/2026 al 30/10/2026 | 14 días | **In Progress** | **Gestión Operativa Web y Asistente IA (11 issues):** CU-03 (Check-in), CU-04 (Check-out consumos), HU-03 (Calendario en tiempo real), HU-03.1 (Reconexión socket y sincronización), CU-08 (Reserva manual), CU-02 (Cancelar reserva web), HU-05 (Rol Recepcionista), HU-11 (Credenciales), HU-06 (Escalamiento a humano), HU-09 (Recomendación IA Gemini), CU-01.3 (Validar capacidad y cargo extra RN-01). |
-| **Sprint 4** | 31/10/2026 al 13/11/2026 | 14 días | **Backlog** | **Finanzas, Tienda, Reseñas, Pasarela y Auditoría (13 issues):** CU-01.5 (Pasarela de pago pruebas Colombia), HU-01 (Informe mensual Excel), CU-06 (Ingresos y egresos), HU-07 (Sueldo recepcionista), HU-13 (Egresos operativos), CU-05 (Vender producto tienda), CU-07 (Catálogo inventario), HU-14 (Rotación de stock), HU-02 (Consultar reseñas bot), HU-04 (Dejar reseña post check-out), HU-10 (Panel web reseñas), HU-12 (Huéspedes recurrentes), HU-15 (Log de auditoría). |
-| **Sprint 5** | 14/11/2026 al 27/11/2026 | 14 días | **Backlog** | **Aseguramiento de Calidad y Pruebas Transversales (7 issues):** QA-01 (Pruebas unitarias RN-01 a RN-04), QA-02 (Integración chatbot-API-BD-pagos), QA-03 (Pruebas funcionales CU-01 a CU-08), QA-04 (Rendimiento <3s), QA-05 (Concurrencia dos reservas simultáneas), QA-06 (Responsive móvil/escritorio), QA-07 (Usabilidad con usuarios reales). |
+---
 
-## 11.4 Equipo y Roles
+## 3. Estructura de Desglose de Trabajo y Cronograma por Etapas
 
-| Persona | Rol Scrum | Responsabilidad técnica |
-|---|---|---|
-| Esteban Guarín Valencia | Scrum Master | Arquitectura del backend, base de datos, infraestructura y gestión de riesgos del equipo |
-| Juan José Arias Gallego | Product Owner | Levantamiento y priorización de requerimientos, validación de reglas de negocio y relación con el stakeholder |
-| Juan Felipe Garzón Trejos | Development Team | Aplicación web, flujos conversacionales en n8n e integración con el backend |
+El plan de ingeniería comprende **10 semanas de ejecución** divididas en **5 iteraciones (Sprints) de dos semanas cada una**, con una dedicación total de **600 horas de ingeniería** (150 puntos de esfuerzo) más **38 horas de puesta en marcha y capacitación presencial en Sevilla**:
 
-El stakeholder principal es el propietario del hotel Torre Satori. La definición de reglas de negocio pendientes se acuerda con el Product Owner y el stakeholder, y queda registrada en el módulo de Decisiones Pendientes.
-
-## 11.5 Matriz de Riesgos y Mitigaciones
-
-| Riesgo | Probabilidad | Impacto | Mitigación |
+| Etapa / Sprint | Fechas Programadas | Esfuerzo | Entregables Principales para el Hotel |
 |---|---|---|---|
-| Baja adopción del personal por resistencia al cambio frente al proceso manual | Media | Alto | Capacitación práctica previa al despliegue e interfaz intuitiva enfocada en usabilidad |
-| Dobles reservas simultáneas por concurrencia entre la web y el bot | Baja | Alto | Bloqueo temporal de 15 minutos, validación de inventario en tiempo real en todos los canales y restricción de exclusión en PostgreSQL |
-| Fallas en la API de WhatsApp por caídas del servicio externo | Baja | Alto | Escalamiento directo e inmediato a un recepcionista humano |
-| Protección de datos sensibles de los huéspedes | Baja | Alto | Cumplimiento de la Ley 1581 de 2012, roles y permisos diferenciados y auditoría de acciones |
-| Interpretación incorrecta de respuestas en lenguaje libre | Media | Medio | Uso de Gemini Flash Lite para normalizar respuestas, validación posterior en el backend y posibilidad de corregir en cualquier punto |
-| Bloqueo de habitación que no se libera, o que se libera por error | Baja | Alto | Verificación cuidadosa del fin del flujo antes de liberar y bloqueo permanente una vez confirmada la reserva |
-| Dependencia de un único proveedor de pasarela de pagos | Baja | Medio | Contrato de integración documentado para facilitar un cambio de proveedor |
-| Cambios en las reglas de negocio durante el desarrollo | Alta | Alto | Registro de decisiones pendientes con el stakeholder y revisión en cada sprint |
+| **Sprint 1: Base Tecnológica y Prevención de Sobreventa** | 14 sep – 25 sep 2026 | 30 puntos (120 h) | Infraestructura en contenedores Docker, base de datos del hotel, catálogo inicial de las 9 habitaciones de referencia, doble candado contra sobreventa (bloqueo temporal de 15 minutos y restricción de fechas) y esquema de seguridad por roles. |
+| **Sprint 2: Chatbot de WhatsApp, Abonos y Cancelaciones** | 28 sep – 09 oct 2026 | 30 puntos (120 h) | Flujo conversacional de reserva guiada paso a paso, confirmación con pago del 100% o anticipo del 50%, consulta de reserva por código, pago de saldo pendiente, cancelación con política de reembolso sobre lo abonado y transferencia a agente humano. |
+| **Sprint 3: Inteligencia Artificial y Operación de Recepción en Web** | 12 oct – 23 oct 2026 | 32 puntos (128 h) | Asistente de reservas con inteligencia artificial en lenguaje natural, calendario interactivo de ocupación en la web, registro de llegadas (Check-in), salidas (Check-out), reservas manuales, administración completa de habitaciones (crear, editar, eliminar) y programación de eventos especiales con descuentos. |
+| **Sprint 4: Tienda Interna, Finanzas, Turnos y Reportes en Excel** | 26 oct – 06 nov 2026 | 30 puntos (120 h) | Administración de catálogo e inventario de la tienda interna, cargos de consumos a la habitación, registro de ingresos y gastos operativos, calculadora de turnos de recepción y exportación del balance mensual en Excel. |
+| **Sprint 5: Reseñas, Fidelización, Auditoría y Puesta en Marcha** | 09 nov – 20 nov 2026 | 28 puntos (112 h) | Consulta y registro de reseñas con redirección a Google Maps, panel de moderación de opiniones, identificación de clientes frecuentes, historial de auditoría, pruebas integrales de concurrencia y capacitación presencial en Sevilla. |
+
+---
+
+## 4. Gestión de Riesgos del Proyecto
+
+El equipo mantiene una matriz preventiva para anticipar y mitigar los riesgos técnicos, operativos y financieros:
+
+| Código | Riesgo Identificado | Nivel | Estrategia de Prevención y Mitigación |
+|---|---|---|---|
+| **R-01** | Variación en la tasa de cambio del dólar que encarezca el servidor en la nube o el consumo de mensajería. | Bajo | Uso de infraestructura liviana auto-alojada (~18 USD/mes en total) respaldada por una reserva financiera de contingencia. |
+| **R-02** | Demoras en los trámites de verificación comercial de la cuenta oficial de WhatsApp ante Meta. | Medio | Inicio temprano del proceso administrativo con la documentación del hotel y uso de entorno de pruebas funcional durante el desarrollo. |
+| **R-03** | Aumento inusual de consultas al asistente de inteligencia artificial en temporadas festivas de Sevilla. | Bajo | Pre-filtrado de menús y comandos rápidos antes de invocar al modelo de inteligencia artificial y configuración de límites por conversación. |
+| **R-04** | Ajustes o refinamientos en las políticas de tarifas, eventos especiales, reembolsos o turnos solicitados por el cliente. | Alto | Diseño parametrizable en la aplicación web (edición libre de habitaciones, eventos de descuento y tarifas de turnos sin necesidad de reprogramar el sistema). |
+| **R-05** | Intentos simultáneos de reserva sobre la última habitación disponible en fechas de alta demanda. | Medio | Implementación del sistema de doble candado (bloqueo atómico de 15 minutos en memoria rápida con liberación inmediata al cancelar, sumado a la restricción en base de datos). |
+| **R-06** | Curva de aprendizaje del personal de recepción al adoptar el nuevo panel web. | Medio | Diseño visual limpio e intuitivo acompañado de una jornada presencial de capacitación y entrega de manuales prácticos en el hotel en Sevilla. |

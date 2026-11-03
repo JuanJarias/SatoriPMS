@@ -1,131 +1,75 @@
-# Módulo 1 — Generalidades y Núcleo del Proyecto
+# Generalidades y Núcleo del Negocio — SatoriPMS
 
-## 1.1 Contexto del Sistema
+## 1. Contexto del Negocio
 
-Torre Satori es un hotel familiar pequeño ubicado en Sevilla (Valle del Cauca). Su operación completa (reservas, control de habitaciones, tienda y finanzas) se gestionaba de forma manual: las reservas se coordinaban por WhatsApp o presencialmente, sin registro estructurado de huéspedes, sin control confiable del estado de las habitaciones y sin visibilidad operativa consolidada del negocio.
+**Torre Satori** es un hotel boutique familiar ubicado en **Sevilla, Valle del Cauca**, municipio reconocido por su tradición cafetera, su paisaje cultural y su constante flujo turístico durante fines de semana, puentes festivos y celebraciones regionales (como el Festival Bandola, las Fiestas aniversarias y Semana Santa).
 
-Los problemas que SatoriPMS resuelve son cuatro: tiempo perdido en tareas repetitivas que pueden automatizarse, riesgo de dobles reservas y de habitaciones no liberadas a tiempo, ausencia de trazabilidad histórica de clientes (lo que impide fidelizar o analizar consumo) y falta de visibilidad sobre el estado real del negocio (ocupación, temporadas, rotación de productos).
+Tradicionalmente, la gestión del hotel se ha realizado mediante atención manual por WhatsApp y apuntes en hojas de cálculo o cuadernos físicos. Este esquema presenta cuatro limitaciones principales:
+1. **Pérdida de reservas fuera de horario:** Cuando un viajero escribe en la noche o madrugada solicitando disponibilidad y precios, la demora en la respuesta provoca que reserve en otro alojamiento.
+2. **Riesgo de sobreventa:** Si dos personas consultan por la misma habitación al mismo tiempo —una por WhatsApp y otra en la recepción física—, existe el riesgo de comprometer dos veces el mismo espacio.
+3. **Descontrol de cobros y consumos adicionales:** Los productos consumidos en la vitrina o tienda del hotel (bebidas, mecato, artículos personales) y los abonos parciales requieren un consolidado claro al momento de la salida del huésped.
+4. **Dependencia de intermediarios:** Las plataformas externas de reserva cobran comisiones cercanas al 18% por cada estadía. Fortalecer el canal directo de WhatsApp permite conservar ese margen en beneficio del hotel.
 
-Las alternativas comerciales existentes (Oracle Hospitality OPERA Cloud, Cloudbeds, Mews) están pensadas para hoteles medianos o grandes y no ofrecen un flujo centrado en WhatsApp, que es el canal real de llegada de reservas de este hotel.
+---
 
-**SatoriPMS** es un *Property Management System* que centraliza y automatiza la operación diaria del hotel a través de dos canales: un **chatbot de WhatsApp**, canal principal de los huéspedes, y una **aplicación web** para recepción y administración. Ambos se apoyan en un único backend que concentra las reglas de negocio y es la fuente de verdad de disponibilidad, precios y estados.
+## 2. Propósito del Sistema
 
-## 1.2 Objetivos del Proyecto
+**SatoriPMS** es una solución integral diseñada a la medida de Torre Satori que unifica la atención automatizada por WhatsApp con un panel web administrativo y de recepción. Su propósito es automatizar la venta directa de habitaciones las 24 horas del día, impedir cualquier cruce o duplicidad de reservas y entregar a la administración control total sobre sus habitaciones, tarifas, eventos especiales, tienda interna, ingresos, egresos y reseñas de clientes.
 
-**Objetivo general.** Automatizar y centralizar la operación diaria de Torre Satori (reservas, check-in y check-out, tienda y reseñas) mediante un canal conversacional en WhatsApp y una aplicación web que compartan una única fuente de disponibilidad y de reglas de negocio, reduciendo el trabajo manual repetitivo y el riesgo de errores operativos.
+El catálogo de referencia actual del hotel contempla **9 habitaciones** (utilizando inicialmente datos y tarifas de referencia mientras se formaliza el listado comercial definitivo del hotel), con la flexibilidad de que el administrador pueda crear, editar o retirar habitaciones directamente desde la aplicación web en cualquier momento.
 
-**Objetivos específicos.**
+---
 
-1. Automatizar el ciclo reserva, check-in y check-out, con validación de disponibilidad en tiempo real desde ambos canales.
-2. Prevenir dobles reservas mediante bloqueo temporal y restricciones transaccionales a nivel de base de datos.
-3. Ofrecer atención conversacional disponible las 24 horas sin exigir al huésped instalar una aplicación adicional.
-4. Diferenciar roles operativos (Administrador y Recepcionista) con trazabilidad completa de las acciones ejecutadas.
-5. Construir un histórico propio de datos operativos (ocupación, huéspedes, consumo de tienda) como insumo para decisiones de operación y servicio.
-6. Habilitar reseñas de huéspedes y reconocimiento de huéspedes recurrentes para apoyar la fidelización.
-7. Permitir el escalamiento fluido de la conversación del chatbot hacia un recepcionista humano cuando el caso lo requiera.
+## 3. Capacidades Principales de la Plataforma
 
-## 1.3 Alcance
+El sistema se organiza en áreas funcionales que cubren de principio a fin la operación del hotel:
 
-**Dentro del alcance (v1).**
+| Área Funcional | Propósito Operativo | Usuarios Principales |
+|---|---|---|
+| **Reserva Guiada y Asistente con Inteligencia Artificial por WhatsApp** | Atender al viajero las 24 horas, consultar disponibilidad real por fechas, cantidad de personas y mascotas, bloquear temporalmente la habitación elegida y confirmar la reserva con pago total o anticipo del 50%. | Huéspedes y viajeros |
+| **Autogestión de Reservas por WhatsApp** | Permitir al huésped consultar el detalle de su reserva mediante su código único, pagar el saldo pendiente antes de llegar al hotel o cancelar su estadía aplicando la política de reembolso vigente. | Huéspedes y viajeros |
+| **Escalamiento a Recepción Humana** | Silenciar el asistente automático cuando el viajero solicita atención personalizada o tiene una solicitud especial (como reservar todo el hotel para un grupo familiar) y notificar de inmediato a la recepción. | Huéspedes y Recepcionista |
+| **Panel Operativo de Recepción (Check-in, Check-out y Reservas Manuales)** | Visualizar el calendario de ocupación, registrar el ingreso de los huéspedes verificando su documento y acompañantes, registrar reservas presenciales o telefónicas y liquidar la salida cobrando saldos o consumos pendientes. | Recepcionista y Administrador |
+| **Administración del Catálogo de Habitaciones** | Crear nuevas habitaciones, editar toda su información (precio por noche, capacidad de adultos y niños, recargo por persona adicional, admisión de mascotas, descripción y estado) y eliminar habitaciones que no tengan reservas activas o pendientes. | Administrador |
+| **Eventos Especiales, Temporadas y Descuentos** | Definir rangos de fechas para eventos especiales, temporadas altas o campañas promocionales en las que se apliquen descuentos o tarifas diferenciadas de forma automática. | Administrador |
+| **Tienda Interna e Inventario** | Administrar el catálogo de productos de vitrina, registrar ventas de contado o con cargo a la habitación del huésped y controlar las existencias con alertas de agotamiento. | Recepcionista y Administrador |
+| **Facturación, Finanzas y Turnos** | Registrar ingresos y gastos operativos del hotel, calcular el pago de turnos del personal de recepción según las horas y recargos configurados, y exportar el balance contable mensual en formato Excel. | Administrador |
+| **Reseñas y Fidelización de Huéspedes** | Recopilar calificaciones de los clientes al finalizar su estadía, invitarlos a publicar su opinión en Google Maps y reconocer a los huéspedes frecuentes para otorgarles beneficios o descuentos. | Huéspedes y Administrador |
+| **Seguridad, Roles y Auditoría** | Proteger el acceso al sistema diferenciando los permisos del Recepcionista y del Administrador, resguardar los datos personales conforme a la ley y mantener un historial inalterable de operaciones críticas. | Administrador |
 
-- Chatbot de WhatsApp: consulta de disponibilidad, reserva guiada paso a paso, reserva asistida por IA, bloqueo temporal de habitaciones, abono del 50 % o pago total, consulta de reserva por código, pago del saldo pendiente, cancelación con reembolso según política, escalamiento a agente humano y reseñas (consulta y captura con redirección a Google).
-- Aplicación web: panel de habitaciones y calendario, check-in y check-out, reservas manuales (crear, modificar y cancelar), centro de conversaciones, tienda (catálogo, ventas e inventario), finanzas (ingresos, egresos e informes), reseñas, administración de usuarios y roles, y auditoría.
-- Backend único (monolito modular con arquitectura hexagonal) como fuente de verdad de reglas y datos para ambos canales.
-- Base de datos relacional transaccional (PostgreSQL) y Redis para sesiones conversacionales y bloqueos temporales.
+---
 
-**Fuera del alcance de la primera versión.**
+## 4. Reglas de Negocio Fundamentales
 
-- Arquitectura de microservicios.
-- Operación multi-hotel o multi-tenant (posibilidad futura).
-- Formularios nativos de WhatsApp Flows con selector de calendario (idea a futuro).
+Las siguientes reglas rigen el comportamiento de todos los módulos del sistema:
 
-## 1.4 Stakeholders y Usuarios
+### A. Cálculo de Tarifas, Personas Adicionales y Eventos Especiales
+- Cada habitación tiene una tarifa base por noche (`Precio por noche : "price_per_night"`), una capacidad base incluida en dicha tarifa (`Capacidad base de adultos : "base_adults_capacity"`) y una capacidad máxima permitida (`Capacidad máxima de adultos : "max_adults_capacity"` y `Capacidad de niños : "children_capacity"`).
+- Cuando el número de huéspedes supera la capacidad base sin exceder el tope máximo de la habitación, el sistema suma automáticamente el valor configurado por cada persona adicional (`Precio por persona adicional : "extra_guest_price"`), mostrándolo de forma desglosada en el resumen antes del pago.
+- Si la fecha de la estadía coincide con un **evento especial o campaña promocional** configurada por el administrador, el sistema aplica el descuento o ajuste tarifario correspondiente sobre las noches incluidas en dicho evento.
 
-| Actor | Rol en el sistema |
-|---|---|
-| Hotel familiar Torre Satori (propietario) | Stakeholder principal; define los requerimientos del negocio |
-| Otros hoteles pequeños | Stakeholders secundarios; adopción potencial futura del producto |
-| Administrador | Usuario de la app web con visibilidad global: usuarios, precios y políticas, auditoría y reportes financieros |
-| Recepcionista | Usuario operativo diario de la app web: reservas, check-in y check-out, tienda y conversaciones escaladas |
-| Huésped | Usuario final del canal WhatsApp |
+### B. Prevención Estricta de Sobreventa (Doble Protección)
+- Ninguna habitación puede asignarse a dos reservas distintas cuyas fechas se crucen.
+- **Primera protección (Bloqueo temporal de 15 minutos):** En el instante en que un huésped selecciona una habitación en WhatsApp o en la web, el sistema la bloquea temporalmente por 15 minutos. Durante ese lapso, ningún otro usuario puede tomarla. Si el huésped cancela la operación o reinicia su conversación, el bloqueo se libera de inmediato; si abandona el chat sin responder, el bloqueo se elimina automáticamente al expirar la sesión.
+- **Segunda protección (Restricción en base de datos):** Al confirmar la reserva, la base de datos verifica de manera definitiva que no exista ningún cruce de fechas entre la fecha de llegada (`Fecha de entrada : "check_in"`) y la fecha de salida (`Fecha de salida : "check_out"`). El día de salida de un huésped queda habilitado para recibir a un nuevo viajero a partir de la hora de entrada.
 
-## 1.5 Épicas, Casos de Uso e Historias de Usuario
+### C. Modalidades de Pago (100% o Anticipo del 50%)
+- Para confirmar una reserva, el huésped puede elegir entre:
+  1. **Pago total (100%):** La reserva queda confirmada y completamente saldada (`Estado del pago : "paid"`).
+  2. **Anticipo del 50%:** La reserva queda confirmada y garantizada con el pago de la mitad del valor total (`Estado del pago : "partial"`). El 50% restante queda registrado como saldo pendiente y puede pagarse en cualquier momento desde WhatsApp antes del viaje o directamente en la recepción del hotel.
 
-| Épica | Casos de uso e historias de usuario |
-|---|---|
-| 1. Reservas con Chatbot | CU-01 Reservar habitación; CU-02 Revisar o cancelar reserva; HU-06 Escalar a agente; HU-08 Confirmación automática por WhatsApp tras el pago; HU-09 Reserva asistida por IA |
-| 2. Gestión Operativa (App Web) | CU-03 Check-in; CU-04 Check-out; CU-08 Reserva manual; HU-03 Calendario en tiempo real |
-| 3. Facturación y Finanzas | CU-06 Consultar ingresos y egresos; HU-01 Exportar informe; HU-07 Cálculo de sueldo; HU-13 Registrar egresos |
-| 4. Tienda y Ventas | CU-05 Vender producto; CU-07 Administrar catálogo; HU-14 Rotación de productos |
-| 5. Reseñas y Fidelización | HU-02 Consultar reseñas; HU-04 Dejar reseña; HU-10 Panel de reseñas; HU-12 Huésped recurrente |
-| 6. Administración de Roles | HU-05 Roles y permisos; HU-11 Recuperación de contraseña; HU-15 Auditoría |
+### D. Política de Cancelación y Reembolso sobre lo Abonado
+- Todo cálculo de devolución por cancelación se realiza **exclusivamente sobre el dinero que el huésped haya pagado efectivamente hasta ese momento** (`Monto abonado : "paid_amount"`), nunca sobre el valor total no pagado de la reserva.
+- Tomando como referencia las 15:00 horas (3:00 p. m.) del día de llegada, se aplican tres ventanas de tiempo:
+  - **Más de 72 horas de anticipación:** Reembolso del **100%** del monto abonado.
+  - **Entre 24 y 72 horas de anticipación:** Reembolso del **50%** del monto abonado.
+  - **Menos de 24 horas de anticipación o no presentación en el hotel:** **0%** de reembolso (sin devolución).
+- Al confirmarse la cancelación, las habitaciones quedan libres de inmediato para nuevos viajeros. *(Los plazos de horas e importes de penalidad son parametrizables según la política definitiva que establezca la administración de Torre Satori).*
 
-## 1.6 Requerimientos No Funcionales
+### E. Reglas de Administración de Habitaciones
+- Únicamente el usuario con perfil de **Administrador** está autorizado para crear nuevas habitaciones, modificar los datos de las habitaciones existentes (nombre, número, tipo, precio por noche, recargo por persona adicional, capacidad de adultos y niños, admisión de mascotas y estado operativo) o eliminarlas.
+- **Condición obligatoria para eliminar una habitación:** El sistema impide eliminar cualquier habitación que tenga reservas activas, confirmadas o pendientes de pago en el presente o hacia el futuro. Si una habitación cuenta con historial contable pasado y se retira de operación, se desactiva su disponibilidad comercial (`Habitación activa : "active"`) para preservar la integridad de los reportes financieros históricos.
 
-| RNF | Definición |
-|---|---|
-| Disponibilidad | El sistema está disponible las 24 horas, porque las reservas llegan en cualquier momento por WhatsApp |
-| Seguridad y protección de datos | Cumplimiento de la Ley 1581 de 2012 de Colombia, detallado en el módulo de Seguridad |
-| Usabilidad | La interacción por chatbot se completa sin instalar una aplicación adicional |
-| Rendimiento | La validación de disponibilidad responde en menos de 3 segundos |
-| Concurrencia | Se evita la doble reserva simultánea mediante bloqueo temporal (RN-02) y restricción en base de datos |
-| Compatibilidad | La app web funciona en navegadores de escritorio y en dispositivos móviles |
-| Mantenibilidad | Agregar nuevos tipos de habitación o reglas de precio no exige cambios estructurales mayores |
-
-## 1.7 Reglas de Negocio Consolidadas
-
-**RN-01. Capacidad y cobro extra.** La capacidad se valida con un tope combinado: la suma de adultos y niños no puede superar la capacidad máxima total de las habitaciones seleccionadas, en cuyo caso la reserva se rechaza. Si la suma supera la capacidad base pero no la máxima, se cobra automáticamente un cargo adicional por huésped extra por noche, calculado con el valor `extra_guest_price` de cada habitación.
-
-**RN-02. Bloqueo temporal.** Al elegir una o más habitaciones se bloquean temporalmente por 15 minutos mientras el huésped completa sus datos y el pago. Al confirmarse la reserva, el bloqueo temporal desaparece y la habitación queda reservada durante toda la estadía mediante la restricción de exclusión de PostgreSQL. Si el flujo se interrumpe sin llegar a la confirmación (por inactividad, porque el huésped termina la conversación o porque elige no reservar), el bloqueo se libera. Antes de liberar se verifica que el flujo realmente terminó, para no liberar por error una reserva en curso. La implementación usa Redis con scripts Lua (`RedisLockService`) y un TTL de 900 segundos.
-
-**RN-03. Cancelación y reembolso escalonado.** El reembolso se calcula sobre el monto efectivamente pagado (`paid_amount`) según las horas restantes hasta el check-in, fijado a las 15:00 del día de llegada. Con más de 72 horas de anticipación se reembolsa el 100 %; entre 24 y 72 horas, el 50 %; con menos de 24 horas o en caso de no-show, el 0 %. La cancelación no elimina la reserva: cambia su estado a `cancelled` y libera las habitaciones.
-
-**RN-04. Inmutabilidad de productos con historia.** Un producto con ventas o consumos históricos asociados no puede eliminarse; solo puede desactivarse.
-
-**RN-05. Recibo.** Toda reserva pagada genera un recibo inmutable almacenado en el sistema y asociado a la reserva. Toda reserva confirmada genera además un código de grupo único que identifica la reserva ante el huésped.
-
-**RN-06. Duración de la estadía.** Toda estadía respeta una duración mínima y máxima de noches definida por el hotel.
-
-## 1.8 Ecosistema Tecnológico
-
-| Capa | Tecnología |
-|---|---|
-| Backend | Java 21, Spring Boot (Spring Data JPA, Spring Data Redis, Flyway, springdoc-openapi) |
-| Base de datos | PostgreSQL 16 con extensión `btree_gist` |
-| Caché, sesión conversacional y bloqueos | Redis 7 |
-| Orquestación conversacional | n8n autoalojado |
-| Canal de mensajería | WhatsApp Business Cloud API, integración directa con Meta sin intermediario |
-| Pasarela de pagos | MercadoPago (Sandbox para desarrollo) |
-| IA e interpretación de mensajes | Google Gemini Flash Lite |
-| Frontend | React, Vite, TanStack Query, react-router-dom y Tailwind CSS |
-| Tiempo real | WebSocket con protocolo STOMP |
-| Autenticación | JWT |
-| Documentación de API | OpenAPI y Swagger |
-| Control de versiones de esquema | Flyway |
-| Contenedores | Docker Compose |
-| Seguimiento de trabajo | GitHub Projects con Milestones por épica |
-
-**Convención de idioma.** Todo el código del proyecto (variables, funciones, tablas y endpoints) se escribe en inglés. Todo el contenido que ve el usuario final (mensajes del chatbot y textos de la aplicación web) se escribe en español.
-
-## 1.9 Principios de Diseño
-
-El backend es el único dueño de las reglas de negocio: disponibilidad, precios, capacidad, estados de reserva y reembolsos se calculan y validan siempre allí. n8n solo orquesta la conversación y presenta los resultados; la aplicación web solo presenta y captura datos. La IA interpreta lenguaje libre y redacta conversaciones cuando se le asigna ese rol, pero nunca confirma disponibilidad, precios ni reservas por sí misma: toda mutación pasa por el backend y ocurre por una decisión explícita del huésped. Una reserva tiene la misma estructura en la base de datos sin importar su canal de origen (chatbot o app web).
-
-## 1.10 Mapa de la Documentación
-
-| Módulo | Contenido |
-|---|---|
-| Generalidades y Núcleo | Contexto, objetivos, alcance, reglas de negocio y stack |
-| Chatbot de WhatsApp | Flujos conversacionales, sesión, rol de la IA, escalamiento |
-| Backend y API | Arquitectura, módulos lógicos, integraciones y contrato REST |
-| Base de Datos | Modelo de datos, restricciones y migraciones |
-| Aplicación Web | Vistas, roles y operación de recepción y administración |
-| Tienda e Inventario | Catálogo, ventas y rotación |
-| Facturación y Finanzas | Ingresos, egresos, informes y sueldo |
-| Reseñas y Fidelización | Reseñas locales y en Google, huésped recurrente |
-| Seguridad | Autenticación, auditoría y protección de datos |
-| Infraestructura | Contenedores, variables de entorno y despliegue |
-| Diseño UX/UI | Principios de experiencia en WhatsApp y web |
-| Gestión del Proyecto | EDT, cronograma, equipo y riesgos |
-| Decisiones Pendientes | Definiciones por acordar con el stakeholder |
-| Estado Actual | Único módulo con el avance real del proyecto |
+### F. Reglas de Tienda, Inventario y Salida del Huésped (Check-out)
+- Los productos del catálogo de la tienda interna que tengan ventas históricas registradas no se borran físicamente para no alterar la contabilidad; cuando dejan de venderse, se marcan como inactivos.
+- Al registrar la salida de un huésped en recepción, el sistema verifica automáticamente si existen saldos pendientes de la estadía o consumos de tienda cargados a la habitación sin pagar, exigiendo su liquidación antes de cerrar la cuenta y liberar la habitación.
