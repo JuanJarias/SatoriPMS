@@ -110,28 +110,28 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        -6544,
-        1664
+        -5888,
+        1456
       ],
       "alwaysOutputData": true,
       "credentials": {
         "redis": {
-          "id": "x2mphqTmk12Pj9W3",
+          "id": "nbnU5viNmZNWAOZ9",
           "name": "Redis account"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const p = $('Parsear Mensaje Meta').first().json;\nconst raw = $input.first().json.value;\nlet S = {};\nif (typeof raw === 'string' && raw.trim()) { try { S = JSON.parse(raw); } catch (e) { S = {}; } }\nelse if (raw && typeof raw === 'object') { S = raw; }\nif (!S || typeof S !== 'object' || Array.isArray(S)) S = {};\n\nconst norm = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\nconst t = norm(p.message_text);\nconst state = S.state || 'menu';\nconst step = S.step || 'inicio';\n\nconst RESTART = ['hola','menu','inicio','reiniciar','start','hi','hello','buenas','buenos dias','buenas tardes','buenas noches'];\nconst restartRequested = RESTART.includes(t);\nconst agentActive = !restartRequested && (S.agent_active === true || S.agent_active === 'true');\nconst AGENT = /\\b(agente|recepcionista|humano)\\b/;\nconst textual = ['text','interactive','button'].includes(p.message_type);\n\nlet route = state + ':' + step;\nif (!textual) {\n  route = 'no_texto';\n} else if (restartRequested) {\n  route = 'menu:inicio';\n} else if (AGENT.test(t) && state !== 'escribir_resena') {\n  route = 'escalamiento:inicio';\n} else if (state === 'escalamiento') {\n  route = 'menu:inicio';\n} else if (state === 'revisar_reserva') {\n  route = 'revisar_reserva';\n} else if (state === 'escribir_resena') {\n  route = 'escribir_resena';\n} else if (state === 'ia_reserva') {\n  route = 'ia_reserva';\n}\n\nreturn [{ json: { wa_id: p.wa_id, sender_name: p.sender_name, message_text: p.message_text, message_type: p.message_type, agent_active: agentActive, session: S, route } }];"
+        "jsCode": "const p = $('Parsear Mensaje Meta').first().json;\nconst raw = $input.first().json.value;\nlet S = {};\nif (typeof raw === 'string' && raw.trim()) { try { S = JSON.parse(raw); } catch (e) { S = {}; } }\nelse if (raw && typeof raw === 'object') { S = raw; }\nif (!S || typeof S !== 'object' || Array.isArray(S)) S = {};\n\nconst norm = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\nconst t = norm(p.message_text);\nconst state = S.state || 'menu';\nconst step = S.step || 'inicio';\n\nconst RESTART = ['hola','menu','inicio','reiniciar','start','hi','hello','buenas','buenos dias','buenas tardes','buenas noches'];\nconst restartRequested = RESTART.includes(t);\nconst agentActive = !restartRequested && (S.agent_active === true || S.agent_active === 'true');\nconst AGENT = /\\b(agente|recepcionista|humano)\\b/;\nconst textual = ['text','interactive','button'].includes(p.message_type);\n\nlet route = state + ':' + step;\nif (!textual) {\n  route = 'no_texto';\n} else if (restartRequested) {\n  route = 'menu:inicio';\n} else if (AGENT.test(t) && state !== 'escribir_resena') {\n  route = 'escalamiento:inicio';\n} else if (state === 'escalamiento') {\n  route = 'menu:inicio';\n} else if (state === 'revisar_reserva') {\n  route = 'revisar_reserva';\n} else if (state === 'escribir_resena') {\n  route = 'escribir_resena';\n} else if (state === 'ia_reserva') {\n  route = 'ia_reserva';\n}\n\nconst prevLocks = [];\nif (S.reservation_draft) {\n  if (Array.isArray(S.reservation_draft.lockTokens)) {\n    S.reservation_draft.lockTokens.forEach(lt => {\n      if (lt && lt.roomId && lt.lockToken) prevLocks.push({ roomId: lt.roomId, lockToken: lt.lockToken });\n    });\n  } else if (S.reservation_draft.roomId && S.reservation_draft.lockToken) {\n    prevLocks.push({ roomId: S.reservation_draft.roomId, lockToken: S.reservation_draft.lockToken });\n  }\n}\nif (S.ia_draft && S.ia_draft.selectedRoom && S.ia_draft.lockToken) {\n  prevLocks.push({ roomId: S.ia_draft.selectedRoom.id, lockToken: S.ia_draft.lockToken });\n}\n\nreturn [{ json: { wa_id: p.wa_id, sender_name: p.sender_name, message_text: p.message_text, message_type: p.message_type, agent_active: agentActive, session: S, prev_locks: prevLocks, route } }];"
       },
       "id": "57e00676-a890-4553-a4aa-84692f35432a",
       "name": "Cargar Sesión y Detectar Ruta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -6336,
-        1664
+        -5696,
+        1456
       ]
     },
     {
@@ -164,8 +164,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -6096,
-        1664
+        -5488,
+        1456
       ]
     },
     {
@@ -175,8 +175,8 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -5872,
-        1648
+        -5296,
+        1312
       ]
     },
     {
@@ -385,6 +385,54 @@
                 },
                 "conditions": [
                   {
+                    "id": "r_ia",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "ia_reserva",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ia_reserva"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "rsel",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "reserva:seleccion_habitacion",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reserva:seleccion_habitacion"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
                     "id": "r_reserva_huespedes",
                     "leftValue": "={{ $json.route }}",
                     "rightValue": "reserva:huespedes",
@@ -518,54 +566,6 @@
               },
               "renameOutput": true,
               "outputKey": "reserva:pago"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "r_ia",
-                    "leftValue": "={{ $json.route }}",
-                    "rightValue": "ia_reserva",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "ia_reserva"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "rsel",
-                    "leftValue": "={{ $json.route }}",
-                    "rightValue": "reserva:seleccion_habitacion",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "reserva:seleccion_habitacion"
             }
           ]
         },
@@ -579,21 +579,21 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -5600,
-        1824
+        -4272,
+        1440
       ]
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst text = String(J.message_text || '').trim().toLowerCase();\nconst ids = { \n  menu_reserva: '1', \n  menu_ia: '2', \n  menu_resenas: '3', \n  menu_escribir_resena: '4', \n  menu_agente: '5', \n  menu_cancelar: '6' \n};\nconst normalized = ids[text] || text;\nconst m = normalized.replace(/[\\uFE0F\\u20E3]/g, '').match(/^\\D*([1-6])\\D*$/);\nreturn [{ json: Object.assign({}, J, { opcion: m ? m[1] : 'invalido' }) }];"
+        "jsCode": "const J = $input.first().json;\nconst text = String(J.message_text || '').trim().toLowerCase();\nconst ids = { \n  menu_reserva: '1', \n  menu_ia: '2', \n  menu_resenas: '3', \n  menu_escribir_resena: '4', \n  menu_cancelar: '5', \n  menu_agente: '6' \n};\nconst normalized = ids[text] || text;\nconst m = normalized.replace(/[\\uFE0F\\u20E3]/g, '').match(/^\\D*([1-6])\\D*$/);\nreturn [{ json: Object.assign({}, J, { opcion: m ? m[1] : 'invalido' }) }];"
       },
       "id": "d13c95e7-b4bd-4d6c-a5aa-b161e9535da5",
       "name": "H Menú Evaluador Opción",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5392,
-        864
+        -4064,
+        1008
       ]
     },
     {
@@ -706,30 +706,6 @@
                 },
                 "conditions": [
                   {
-                    "id": "o6",
-                    "leftValue": "={{ $json.opcion }}",
-                    "rightValue": "6",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "6 Cancelar"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
                     "id": "o5",
                     "leftValue": "={{ $json.opcion }}",
                     "rightValue": "5",
@@ -742,7 +718,31 @@
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "5 Agente"
+              "outputKey": "5 Revisar o Cancelar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "o6",
+                    "leftValue": "={{ $json.opcion }}",
+                    "rightValue": "6",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "6 Agente"
             }
           ]
         },
@@ -756,8 +756,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -5232,
-        784
+        -3904,
+        928
       ]
     },
     {
@@ -769,13 +769,13 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        272
+        -3504,
+        832
       ]
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst now = Date.now();\nconst session = Object.assign({}, J.session || { state: 'menu', step: 'inicio', agent_active: false }, { last_activity: now });\nreturn [{ json: { wa_id: J.wa_id, response_text: J.response_text || 'Entendido. Procesando...', response_payload: J.response_payload || null, redis_key: 'session:' + J.wa_id, redis_value: JSON.stringify(session), last_activity: now } }];"
+        "jsCode": "const J = $input.first().json;\nconst now = Date.now();\nconst session = Object.assign({}, J.session || { state: 'menu', step: 'inicio', agent_active: false }, { last_activity: now });\nlet prevLocks = [];\ntry { prevLocks = $('Cargar Sesión y Detectar Ruta').first().json.prev_locks || []; } catch (e) { prevLocks = []; }\nconst newDraft = session.reservation_draft || {};\nconst newIaDraft = session.ia_draft || {};\nconst stillLocked = (Array.isArray(newDraft.lockTokens) && newDraft.lockTokens.length > 0)\n  || Boolean(newDraft.lockToken)\n  || Boolean(newIaDraft.lockToken);\nconst locksToRelease = (!stillLocked && !J.locks_confirmed && prevLocks.length > 0) ? prevLocks : [];\nreturn [{ json: { wa_id: J.wa_id, response_text: J.response_text || 'Entendido. Procesando...', response_payload: J.response_payload || null, redis_key: 'session:' + J.wa_id, redis_value: JSON.stringify(session), last_activity: now, locks_to_release: locksToRelease, release_locks: locksToRelease.length > 0 } }];"
       },
       "id": "4fb623a3-3805-4e76-abab-4afff2efa8c7",
       "name": "Preparar Salida",
@@ -806,7 +806,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "redis": {
-          "id": "x2mphqTmk12Pj9W3",
+          "id": "nbnU5viNmZNWAOZ9",
           "name": "Redis account"
         }
       }
@@ -875,7 +875,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "redis": {
-          "id": "x2mphqTmk12Pj9W3",
+          "id": "nbnU5viNmZNWAOZ9",
           "name": "Redis account"
         }
       }
@@ -1004,14 +1004,14 @@
       "alwaysOutputData": true,
       "credentials": {
         "redis": {
-          "id": "x2mphqTmk12Pj9W3",
+          "id": "nbnU5viNmZNWAOZ9",
           "name": "Redis account"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json.value;\nlet session = {};\ntry { session = typeof raw === 'string' ? JSON.parse(raw) : (raw || {}); } catch (error) {}\nconst stored = Number(session.last_activity || 0);\nconst mine = Number($('Preparar Salida').first().json.last_activity || 0);\n// Solo borramos si no hubo actividad nueva (misma sesión) y ya pasaron 11 min.\nconst sameSession = stored > 0 && stored === mine;\nconst elapsed = Date.now() - stored >= 660000;\nreturn [{ json: { redis_key: $('Preparar Salida').first().json.redis_key, stale: sameSession && elapsed } }];"
+        "jsCode": "const raw = $input.first().json.value;\nlet session = {};\ntry { session = typeof raw === 'string' ? JSON.parse(raw) : (raw || {}); } catch (error) {}\nconst stored = Number(session.last_activity || 0);\nconst mine = Number($('Preparar Salida').first().json.last_activity || 0);\nconst sameSession = stored > 0 && stored === mine;\nconst elapsed = Date.now() - stored >= 660000;\nconst staleLocks = [];\nif (session.reservation_draft) {\n  if (Array.isArray(session.reservation_draft.lockTokens)) {\n    session.reservation_draft.lockTokens.forEach(lt => {\n      if (lt && lt.roomId && lt.lockToken) staleLocks.push({ roomId: lt.roomId, lockToken: lt.lockToken });\n    });\n  } else if (session.reservation_draft.roomId && session.reservation_draft.lockToken) {\n    staleLocks.push({ roomId: session.reservation_draft.roomId, lockToken: session.reservation_draft.lockToken });\n  }\n}\nif (session.ia_draft && session.ia_draft.selectedRoom && session.ia_draft.lockToken) {\n  staleLocks.push({ roomId: session.ia_draft.selectedRoom.id, lockToken: session.ia_draft.lockToken });\n}\nreturn [{ json: { redis_key: $('Preparar Salida').first().json.redis_key, stale: sameSession && elapsed, locks_to_release: staleLocks } }];"
       },
       "id": "91376733-67af-4c21-b1b5-054f85af8132",
       "name": "¿Limpiar Sesión?",
@@ -1072,7 +1072,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "redis": {
-          "id": "x2mphqTmk12Pj9W3",
+          "id": "nbnU5viNmZNWAOZ9",
           "name": "Redis account"
         }
       }
@@ -1086,8 +1086,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        2336
+        -3504,
+        992
       ]
     },
     {
@@ -1099,8 +1099,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        1360
+        -3504,
+        1136
       ]
     },
     {
@@ -1133,8 +1133,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -4352,
-        1376
+        -2944,
+        1136
       ]
     },
     {
@@ -1153,8 +1153,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4096,
-        1360
+        -2688,
+        1120
       ],
       "onError": "continueRegularOutput"
     },
@@ -1167,8 +1167,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        1504
+        -3504,
+        1296
       ]
     },
     {
@@ -1180,8 +1180,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        1808
+        -3504,
+        1456
       ]
     },
     {
@@ -1193,8 +1193,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        1936
+        -3504,
+        1632
       ]
     },
     {
@@ -1206,8 +1206,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        2064
+        -3504,
+        1760
       ]
     },
     {
@@ -1222,8 +1222,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4560,
-        2064
+        -3312,
+        1760
       ],
       "onError": "continueRegularOutput"
     },
@@ -1236,8 +1236,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4384,
-        2064
+        -3136,
+        1760
       ]
     },
     {
@@ -1249,8 +1249,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        2192
+        -3504,
+        1888
       ]
     },
     {
@@ -1262,8 +1262,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5072,
-        3200
+        -4112,
+        2288
       ]
     },
     {
@@ -1296,8 +1296,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -6544,
-        2048
+        -5280,
+        1584
       ]
     },
     {
@@ -1309,8 +1309,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -6336,
-        1888
+        -5104,
+        1424
       ]
     },
     {
@@ -1329,8 +1329,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -6160,
-        1888
+        -4880,
+        1424
       ],
       "onError": "continueRegularOutput"
     },
@@ -1343,8 +1343,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5984,
-        1888
+        -4656,
+        1424
       ]
     },
     {
@@ -1356,8 +1356,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5808,
-        2064
+        -4480,
+        1600
       ]
     },
     {
@@ -1369,21 +1369,21 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4784,
-        3200
+        -3824,
+        2288
       ]
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst D = (J.session && J.session.reservation_draft) || {};\nconst step = (J.session && J.session.step) || (D && D.step);\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n\nconst keep = (draft, nextStep) => ({\n  state: 'reserva',\n  step: nextStep,\n  agent_active: false,\n  wa_id: J.wa_id,\n  sender_name: J.sender_name,\n  reservation_draft: Object.assign({}, draft, { step: nextStep })\n});\n\nconst output = (response_text, session, extra = {}) => ({\n  json: Object.assign({ wa_id: J.wa_id, sender_name: J.sender_name, response_text, session }, extra)\n});\n\nif (step === 'huespedes') {\n  const numberTokens = (normalized.match(/\\d+/g) || []).map(Number);\n  const adultMatches = [...normalized.matchAll(/(\\d+)\\s*(adultos?|personas?|huespedes?)/g)];\n  const childMatches = [...normalized.matchAll(/(\\d+)\\s*(ninos?|niños?|menores?)/g)];\n  let adults = adultMatches.length ? Number(adultMatches[0][1]) : (numberTokens[0] ?? null);\n  let children = childMatches.length ? Number(childMatches[0][1]) : (numberTokens[1] ?? 0);\n  if (adults == null && numberTokens.length) adults = numberTokens[0];\n  if (children === 0 && numberTokens.length > 1 && !childMatches.length) children = numberTokens[1];\n  const max = Number(D.room && D.room.maxAdultsCapacity || 0) + Number(D.room && D.room.childrenCapacity || 0);\n  if (!adults || adults < 1 || children < 0) return [output('⚠️ Indica las personas así: *2 adultos y 1 niño*.', keep(D, 'huespedes'))];\n  if (max && adults + children > max) return [output('⚠️ Esa habitación admite máximo *' + max + ' personas* según su capacidad. Regresa a la selección escribiendo *menú* o elige otra habitación.', keep(D, 'seleccion_habitacion'))];\n  const base = Number(D.room && D.room.baseAdultsCapacity || 0);\n  const extraPrice = Number(D.room && D.room.extraGuestPrice || 0);\n  const extraGuests = Math.max(0, adults + children - base);\n  const draft = Object.assign({}, D, { adults, children, extraGuests, extraGuestPrice: extraPrice, extraTotal: extraGuests * extraPrice });\n\n  return [output(`✅ Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\nIndica el nombre completo de la persona titular de la reserva.`, keep(draft, 'nombre'))];\n}\n\nif (step === 'nombre') {\n  if (text.length < 3) return [output('⚠️ Indica un nombre completo válido.', keep(D, 'nombre'))];\n  return [output('Gracias. Ahora indica el número de identificación (cédula o pasaporte) del titular.', keep(Object.assign({}, D, { guestName: text }), 'identificacion'))];\n}\n\nif (step === 'identificacion') {\n  const document = text.replace(/\\s+/g, '').replace(/[^0-9]/g, '');\n  if (!/^\\d{6,10}$/.test(document)) return [output('⚠️ La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', keep(D, 'identificacion'))];\n  return [output('¿Viajas con mascota?', keep(Object.assign({}, D, { document }), 'mascota'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: '¿Viajas con mascota?' }, action: { buttons: [{ type: 'reply', reply: { id: 'pet_si', title: 'Sí' } }, { type: 'reply', reply: { id: 'pet_no', title: 'No' } }] } } } })];\n}\n\nif (step === 'mascota') {\n  const hasPet = ['si', 'sí', 'pet_si', 'yes'].includes(normalized);\n  const noPet = ['no', 'pet_no'].includes(normalized);\n  if (!hasPet && !noPet) return [output('Responde usando *Sí* o *No* para la mascota.', keep(D, 'mascota'))];\n  if (hasPet && D.room && D.room.allowsPets === false) return [output('⚠️ La habitación seleccionada no permite mascotas. Responde *No* o elige otra habitación.', keep(D, 'mascota'))];\n  return [output('¿Cuáles son los nombres de tus acompañantes? Si viajas solo, responde *ninguno*.', keep(Object.assign({}, D, { hasPet }), 'acompanantes'))];\n}\n\nif (step === 'acompanantes') {\n  const noCompanions = ['ninguno', 'no', 'solo yo', 'nadie', 'sin acompanantes', 'no hay', 'no tengo', 'no viajan mas'].includes(normalized);\n  const companions = noCompanions ? '' : text;\n  const nights = Math.max(1, Math.round((new Date(D.checkOut) - new Date(D.checkIn)) / 86400000));\n  const nightly = Number(D.room && D.room.pricePerNight || 0);\n  const total = nights * nightly + Number(D.extraTotal || 0);\n  const half = (total / 2).toFixed(2);\n  const totalStr = total.toFixed(2);\n  const draft = Object.assign({}, D, { companions, nights, total });\n\n  const summary = `🧾 *Resumen de tu Reserva*\\n\\n` +\n    `• Habitación: *${D.room.name || D.room.type} #${D.room.number}*\\n` +\n    `• Entrada: *${D.checkIn}*\\n` +\n    `• Salida: *${D.checkOut}* (${nights} noche${nights > 1 ? 's' : ''})\\n` +\n    `• Huéspedes: *${D.adults} adulto(s), ${D.children} niño(s)*\\n` +\n    `• Mascota: *${D.hasPet ? 'Sí' : 'No'}*\\n` +\n    `• Titular: *${D.guestName}* (${D.document})\\n` +\n    `• Acompañantes: *${companions || 'Ninguno'}*\\n` +\n    `• Total estadía: *$${totalStr}*\\n\\n` +\n    `💳 *¿Cómo deseas realizar el pago?*\\n` +\n    `1️⃣ *Pagar el 100% ahora ($${totalStr})*\\n` +\n    `2️⃣ *Pagar el 50% de anticipo ($${half})* (saldo al check-in)\\n` +\n    `3️⃣ *Cancelar reserva*\\n\\n` +\n    `_Responde 1, 2 o 3._`;\n\n  return [output(summary, keep(draft, 'pago'), {\n    response_payload: {\n      type: 'interactive',\n      interactive: {\n        type: 'button',\n        body: { text: summary },\n        action: {\n          buttons: [\n            { type: 'reply', reply: { id: 'pago_100', title: 'Pagar 100%' } },\n            { type: 'reply', reply: { id: 'pago_50', title: 'Pagar 50%' } },\n            { type: 'reply', reply: { id: 'pago_cancelar', title: 'Cancelar' } }\n          ]\n        }\n      }\n    }\n  })];\n}\n\nif (step === 'pago') {\n  let opt = J.payment_selection;\n  if (!opt) {\n    if (['1', '100', '100%', 'total', 'pago_100', 'completo'].some(k => normalized.includes(k))) opt = 'full';\n    else if (['2', '50', '50%', 'mitad', 'anticipo', 'pago_50'].some(k => normalized.includes(k))) opt = 'deposit';\n  }\n\n  if (opt === 'full' || opt === 'deposit') {\n    const payload = {\n      waId: J.wa_id,\n      guestName: D.guestName,\n      guestDocument: D.document,\n      companions: D.companions || '',\n      checkIn: D.checkIn,\n      checkOut: D.checkOut,\n      adults: Number(D.adults || 0),\n      children: Number(D.children || 0),\n      hasPet: Boolean(D.hasPet),\n      rooms: Array.isArray(D.lockTokens) ? D.lockTokens.map(e => ({ roomId: e.roomId, lockToken: e.lockToken })) : [{ roomId: D.roomId, lockToken: D.lockToken }],\n      paymentOption: opt\n    };\n\n    const optMsg = opt === 'deposit' ? 'el 50% de anticipo' : 'el 100% total';\n    return [output(`✅ Confirmando tu reserva con pago de ${optMsg}...`, { state: 'reserva', step: 'confirmando', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: Object.assign({}, D, { payload, paymentOption: opt }) }, { api_action: 'confirm', payload })];\n  }\n\n  return [output('❌ Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];\n}\n\nreturn [output('Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];"
+        "jsCode": "const J = $input.first().json;\nconst D = (J.session && J.session.reservation_draft) || {};\nconst step = (J.session && J.session.step) || (D && D.step);\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n\nconst keep = (draft, nextStep) => ({\n  state: 'reserva',\n  step: nextStep,\n  agent_active: false,\n  wa_id: J.wa_id,\n  sender_name: J.sender_name,\n  reservation_draft: Object.assign({}, draft, { step: nextStep })\n});\n\nconst output = (response_text, session, extra = {}) => ({\n  json: Object.assign({ wa_id: J.wa_id, sender_name: J.sender_name, response_text, session }, extra)\n});\n\nif (step === 'huespedes') {\n  const numberTokens = (normalized.match(/\\d+/g) || []).map(Number);\n  const adultMatches = [...normalized.matchAll(/(\\d+)\\s*(adultos?|personas?|huespedes?)/g)];\n  const childMatches = [...normalized.matchAll(/(\\d+)\\s*(ninos?|niños?|menores?)/g)];\n  let adults = adultMatches.length ? Number(adultMatches[0][1]) : (numberTokens[0] ?? null);\n  let children = childMatches.length ? Number(childMatches[0][1]) : (numberTokens[1] ?? 0);\n  if (adults == null && numberTokens.length) adults = numberTokens[0];\n  if (children === 0 && numberTokens.length > 1 && !childMatches.length) children = numberTokens[1];\n  const max = Number(D.room && D.room.maxAdultsCapacity || 0) + Number(D.room && D.room.childrenCapacity || 0);\n  if (!adults || adults < 1 || children < 0) return [output('⚠️ Indica las personas así: *2 adultos y 1 niño*.', keep(D, 'huespedes'))];\n  if (max && adults + children > max) return [output('⚠️ Esa habitación admite máximo *' + max + ' personas* según su capacidad. Regresa a la selección escribiendo *menú* o elige otra habitación.', keep(D, 'seleccion_habitacion'))];\n  const base = Number(D.room && D.room.baseAdultsCapacity || 0);\n  const extraPrice = Number(D.room && D.room.extraGuestPrice || 0);\n  const extraGuests = Math.max(0, adults + children - base);\n  const draft = Object.assign({}, D, { adults, children, extraGuests, extraGuestPrice: extraPrice, extraTotal: extraGuests * extraPrice });\n\n  return [output(`✅ Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\n🔒 *Aviso de Privacidad (Ley 1581 de 2012):* Al continuar y suministrar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva y estadía.\\n\\nIndica el nombre completo de la persona titular de la reserva:`, keep(draft, 'nombre'))];\n}\n\nif (step === 'nombre') {\n  if (text.length < 3) return [output('⚠️ Indica un nombre completo válido.', keep(D, 'nombre'))];\n  return [output('Gracias. Ahora indica el número de identificación (cédula o pasaporte) del titular.', keep(Object.assign({}, D, { guestName: text }), 'identificacion'))];\n}\n\nif (step === 'identificacion') {\n  const document = text.replace(/\\s+/g, '').replace(/[^0-9]/g, '');\n  if (!/^\\d{6,10}$/.test(document)) return [output('⚠️ La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', keep(D, 'identificacion'))];\n  return [output('¿Viajas con mascota?', keep(Object.assign({}, D, { document }), 'mascota'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: '¿Viajas con mascota?' }, action: { buttons: [{ type: 'reply', reply: { id: 'pet_si', title: 'Sí' } }, { type: 'reply', reply: { id: 'pet_no', title: 'No' } }] } } } })];\n}\n\nif (step === 'mascota') {\n  const hasPet = ['si', 'sí', 'pet_si', 'yes'].includes(normalized);\n  const noPet = ['no', 'pet_no'].includes(normalized);\n  if (!hasPet && !noPet) return [output('Responde usando *Sí* o *No* para la mascota.', keep(D, 'mascota'))];\n  if (hasPet && D.room && D.room.allowsPets === false) return [output('⚠️ La habitación seleccionada no permite mascotas. Responde *No* o elige otra habitación.', keep(D, 'mascota'))];\n  return [output('¿Cuáles son los nombres de tus acompañantes? Si viajas solo, responde *ninguno*.', keep(Object.assign({}, D, { hasPet }), 'acompanantes'))];\n}\n\nif (step === 'acompanantes') {\n  const noCompanions = ['ninguno', 'no', 'solo yo', 'nadie', 'sin acompanantes', 'no hay', 'no tengo', 'no viajan mas'].includes(normalized);\n  const companions = noCompanions ? '' : text;\n  const nights = Math.max(1, Math.round((new Date(D.checkOut) - new Date(D.checkIn)) / 86400000));\n  const nightly = Number(D.room && D.room.pricePerNight || 0);\n  const baseStay = nights * nightly;\n  const extraGuests = Number(D.extraGuests || 0);\n  const extraGuestPrice = Number(D.extraGuestPrice || (D.room && D.room.extraGuestPrice) || 0);\n  const extraTotal = Number(D.extraTotal != null ? D.extraTotal : (extraGuests * extraGuestPrice));\n  const total = baseStay + extraTotal;\n  const half = (total / 2).toFixed(2);\n  const totalStr = total.toFixed(2);\n  const draft = Object.assign({}, D, { companions, nights, baseStay, extraTotal, total });\n  const extraDesc = extraGuests > 0 ? `(${extraGuests} adic. x $${extraGuestPrice.toFixed(2)})` : '(Sin recargo)';\n\n  const summary = `🧾 *Resumen de tu Reserva*\\n\\n` +\n    `• Habitación: *${D.room.name || D.room.type} #${D.room.number}*\\n` +\n    `• Entrada: *${D.checkIn}*\\n` +\n    `• Salida: *${D.checkOut}* (${nights} noche${nights > 1 ? 's' : ''})\\n` +\n    `• Huéspedes: *${D.adults} adulto(s), ${D.children} niño(s)*\\n` +\n    `• Mascota: *${D.hasPet ? 'Sí' : 'No'}*\\n` +\n    `• Titular: *${D.guestName}* (${D.document})\\n` +\n    `• Acompañantes: *${companions || 'Ninguno'}*\\n` +\n    `• Tarifa base (${nights} noche${nights > 1 ? 's' : ''}): *$${baseStay.toFixed(2)}*\\n` +\n    `• Recargo persona adicional: *$${extraTotal.toFixed(2)}* _${extraDesc}_\\n` +\n    `• Total estadía: *$${totalStr}*\\n\\n` +\n    `💳 *¿Cómo deseas realizar el pago?*\\n` +\n    `1️⃣ *Pagar el 100% ahora ($${totalStr})*\\n` +\n    `2️⃣ *Pagar el 50% de anticipo ($${half})* (saldo al check-in)\\n` +\n    `3️⃣ *Cancelar reserva*\\n\\n` +\n    `_Responde 1, 2 o 3._`;\n\n  return [output(summary, keep(draft, 'pago'), {\n    response_payload: {\n      type: 'interactive',\n      interactive: {\n        type: 'button',\n        body: { text: summary },\n        action: {\n          buttons: [\n            { type: 'reply', reply: { id: 'pago_100', title: 'Pagar 100%' } },\n            { type: 'reply', reply: { id: 'pago_50', title: 'Pagar 50%' } },\n            { type: 'reply', reply: { id: 'pago_cancelar', title: 'Cancelar' } }\n          ]\n        }\n      }\n    }\n  })];\n}\n\nif (step === 'pago') {\n  let opt = J.payment_selection;\n  if (!opt) {\n    if (['1', '100', '100%', 'total', 'pago_100', 'completo'].some(k => normalized.includes(k))) opt = 'full';\n    else if (['2', '50', '50%', 'mitad', 'anticipo', 'pago_50'].some(k => normalized.includes(k))) opt = 'deposit';\n  }\n\n  if (opt === 'full' || opt === 'deposit') {\n    const payload = {\n      waId: J.wa_id,\n      guestName: D.guestName,\n      guestDocument: D.document,\n      companions: D.companions || '',\n      checkIn: D.checkIn,\n      checkOut: D.checkOut,\n      adults: Number(D.adults || 0),\n      children: Number(D.children || 0),\n      hasPet: Boolean(D.hasPet),\n      rooms: Array.isArray(D.lockTokens) ? D.lockTokens.map(e => ({ roomId: e.roomId, lockToken: e.lockToken })) : [{ roomId: D.roomId, lockToken: D.lockToken }],\n      paymentOption: opt\n    };\n\n    const optMsg = opt === 'deposit' ? 'el 50% de anticipo' : 'el 100% total';\n    return [output(`✅ Confirmando tu reserva con pago de ${optMsg}...`, { state: 'reserva', step: 'confirmando', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: Object.assign({}, D, { payload, paymentOption: opt }) }, { api_action: 'confirm', payload })];\n  }\n\n  return [output('❌ Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];\n}\n\nreturn [output('Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];"
       },
       "id": "31ea5d92-668d-4e49-9d2f-8e508ac832cc",
       "name": "H Procesar Reserva Paso",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4080,
-        3232
+        -3136,
+        2448
       ]
     },
     {
@@ -1450,8 +1450,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -4576,
-        3184
+        -3616,
+        2272
       ]
     },
     {
@@ -1479,8 +1479,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4320,
-        3408
+        -3376,
+        2288
       ],
       "onError": "continueRegularOutput"
     },
@@ -1493,8 +1493,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3728,
-        3424
+        -3136,
+        2128
       ]
     },
     {
@@ -1506,8 +1506,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4080,
-        3408
+        -3136,
+        2288
       ]
     },
     {
@@ -1519,8 +1519,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4320,
-        3232
+        -3376,
+        2448
       ]
     },
     {
@@ -1543,22 +1543,22 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4080,
-        3072
+        -3136,
+        2640
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "const apiResponse = $input.first().json || {};\nconst inputToApi = (() => { try { return $('API Confirmar Reserva').first().json; } catch(e) { return {}; } })();\nconst source = (() => {\n  try { return $('H Procesar Reserva Paso').first().json; } catch(e) {}\n  try { return $('H Normalizar IA').first().json; } catch(e) {}\n  return {};\n})();\n\nconst wa_id = source.wa_id || inputToApi.waId || (inputToApi.payload && inputToApi.payload.waId) || '';\nconst sender_name = source.sender_name || (inputToApi.payload && inputToApi.payload.guestName) || 'Huésped';\n\nlet text = '';\n\nif (apiResponse.reservationGroupId) {\n    const code = String(apiResponse.reservationGroupId).split('-')[0].toUpperCase();\n    const paid = apiResponse.paidAmount != null ? Number(apiResponse.paidAmount).toFixed(2) : '0.00';\n    const pending = apiResponse.pendingBalance != null ? Number(apiResponse.pendingBalance).toFixed(2) : '0.00';\n    const total = apiResponse.totalPrice != null ? Number(apiResponse.totalPrice).toFixed(2) : paid;\n    const isPartial = apiResponse.paymentStatus === 'partial';\n\n    text = `🎉 *¡Tu reserva ha sido confirmada con éxito!*\\n\\n` +\n           `• Código de reserva: *${code}*\\n` +\n           `• Total de la estadía: *$${total}*\\n` +\n           `• Monto pagado: *$${paid}* ${isPartial ? '_(Anticipo del 50%)_' : '_(Pago total 100%)_'}\\n`;\n\n    if (isPartial) {\n        text += `• Saldo pendiente: *$${pending}*\\n` +\n                `💡 _Puedes pagar el saldo restante en cualquier momento desde la opción *Revisar o Cancelar* del menú, o al momento de tu check-in._\\n\\n`;\n    } else {\n        text += `• Estado de pago: *Completamente pagado (100%)*\\n\\n`;\n    }\n\n    text += `Conserva tu código *${code}* para cualquier consulta.\\n` +\n            `¡Te esperamos con los brazos abiertos en *Satori Hotel*! 🌿\\n\\n` +\n            `Escribe *menú* para volver al inicio.`;\n} else {\n    let errorMsg = apiResponse.error || apiResponse.message || apiResponse.detail;\n    if (errorMsg && typeof errorMsg === 'object') errorMsg = errorMsg.message || JSON.stringify(errorMsg);\n    if (!errorMsg) errorMsg = JSON.stringify(apiResponse);\n    text = `⚠️ Lo sentimos, no pudimos completar tu reserva.\\nMotivo: ${errorMsg}.\\n\\nSi el tiempo de 15 minutos expiró, las habitaciones se liberaron automáticamente. Escribe *menú* para intentar de nuevo.`;\n}\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: text,\n        session: { state: 'menu', step: 'esperando_opcion', agent_active: false,\n                   wa_id, sender_name, reservation_draft: {} }\n    }\n}];"
+        "jsCode": "const apiResponse = $input.first().json || {};\nconst inputToApi = (() => { try { return $('API Confirmar Reserva').first().json; } catch(e) { return {}; } })();\nconst source = (() => {\n  try { return $('H Procesar Reserva Paso').first().json; } catch(e) {}\n  try { return $('H Normalizar IA').first().json; } catch(e) {}\n  return {};\n})();\n\nconst wa_id = source.wa_id || inputToApi.waId || (inputToApi.payload && inputToApi.payload.waId) || '';\nconst sender_name = source.sender_name || (inputToApi.payload && inputToApi.payload.guestName) || 'Huésped';\n\nlet text = '';\n\nif (apiResponse.reservationGroupId) {\n    const code = String(apiResponse.reservationGroupId).split('-')[0].toUpperCase();\n    const paid = apiResponse.paidAmount != null ? Number(apiResponse.paidAmount).toFixed(2) : '0.00';\n    const pending = apiResponse.pendingBalance != null ? Number(apiResponse.pendingBalance).toFixed(2) : '0.00';\n    const total = apiResponse.totalPrice != null ? Number(apiResponse.totalPrice).toFixed(2) : paid;\n    const isPartial = apiResponse.paymentStatus === 'partial';\n\n    text = `🎉 *¡Tu reserva ha sido confirmada con éxito!*\\n\\n` +\n           `• Código de reserva: *${code}*\\n` +\n           `• Total de la estadía: *$${total}*\\n` +\n           `• Monto pagado: *$${paid}* ${isPartial ? '_(Anticipo del 50%)_' : '_(Pago total 100%)_'}\\n`;\n\n    if (isPartial) {\n        text += `• Saldo pendiente: *$${pending}*\\n` +\n                `💡 _Puedes pagar el saldo restante en cualquier momento desde la opción *Revisar o Cancelar* del menú, o al momento de tu check-in._\\n\\n`;\n    } else {\n        text += `• Estado de pago: *Completamente pagado (100%)*\\n\\n`;\n    }\n\n    text += `Conserva tu código *${code}* para cualquier consulta.\\n` +\n            `¡Te esperamos con los brazos abiertos en *Satori Hotel*! 🌿\\n\\n` +\n            `Escribe *menú* para volver al inicio.`;\n} else {\n    let errorMsg = apiResponse.error || apiResponse.message || apiResponse.detail;\n    if (errorMsg && typeof errorMsg === 'object') errorMsg = errorMsg.message || JSON.stringify(errorMsg);\n    if (!errorMsg) errorMsg = JSON.stringify(apiResponse);\n    text = `⚠️ Lo sentimos, no pudimos completar tu reserva.\\nMotivo: ${errorMsg}.\\n\\nSi el tiempo de 15 minutos expiró, las habitaciones se liberaron automáticamente. Escribe *menú* para intentar de nuevo.`;\n}\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: text,\n        locks_confirmed: Boolean(apiResponse.reservationGroupId),\n        session: { state: 'menu', step: 'esperando_opcion', agent_active: false,\n                   wa_id, sender_name, reservation_draft: {} }\n    }\n}];"
       },
       "id": "ddd8663a-3778-43b7-bb5c-4cc0952108fd",
       "name": "H Reserva Exitosa",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3872,
-        3072
+        -2928,
+        2640
       ]
     },
     {
@@ -1602,8 +1602,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -3872,
-        3232
+        -2928,
+        2448
       ]
     },
     {
@@ -1615,8 +1615,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        896
+        400,
+        1600
       ]
     },
     {
@@ -1628,8 +1628,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4544,
-        896
+        600,
+        1600
       ]
     },
     {
@@ -1720,20 +1720,21 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -4352,
-        896
+        800,
+        1600
       ]
     },
     {
       "parameters": {
+        "method": "GET",
         "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/group/' + $json.search_code }}",
         "options": {
+          "timeout": 15000,
           "response": {
             "response": {
               "neverError": true
             }
-          },
-          "timeout": 15000
+          }
         }
       },
       "id": "650b7cf1-120c-4519-ad63-5ea9123adba5",
@@ -1741,8 +1742,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4096,
-        752
+        1050,
+        1500
       ],
       "onError": "continueRegularOutput"
     },
@@ -1751,12 +1752,12 @@
         "method": "POST",
         "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/group/' + $json.cancel_code + '/cancellation' }}",
         "options": {
+          "timeout": 15000,
           "response": {
             "response": {
               "neverError": true
             }
-          },
-          "timeout": 15000
+          }
         }
       },
       "id": "c04975e0-7302-4d6e-b68e-966e35733810",
@@ -1764,8 +1765,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4096,
-        912
+        1050,
+        1700
       ],
       "onError": "continueRegularOutput"
     },
@@ -1778,8 +1779,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3840,
-        752
+        1300,
+        1500
       ]
     },
     {
@@ -1791,8 +1792,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3840,
-        912
+        1300,
+        1700
       ]
     },
     {
@@ -1800,12 +1801,12 @@
         "method": "POST",
         "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/group/' + $json.pay_code + '/pay-remaining' }}",
         "options": {
+          "timeout": 15000,
           "response": {
             "response": {
               "neverError": true
             }
-          },
-          "timeout": 15000
+          }
         }
       },
       "id": "e89d1001-0001-4000-8000-000000000001",
@@ -1813,8 +1814,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4096,
-        1072
+        1050,
+        1900
       ],
       "onError": "continueRegularOutput"
     },
@@ -1827,20 +1828,21 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3840,
-        1072
+        1300,
+        1900
       ]
     },
     {
       "parameters": {
+        "method": "GET",
         "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/reviews?limit=5' }}",
         "options": {
+          "timeout": 15000,
           "response": {
             "response": {
               "neverError": true
             }
-          },
-          "timeout": 15000
+          }
         }
       },
       "id": "e89d1003-0003-4000-8000-000000000003",
@@ -1848,8 +1850,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4752,
-        576
+        -3504,
+        1008
       ],
       "onError": "continueRegularOutput"
     },
@@ -1862,8 +1864,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4528,
-        576
+        -3280,
+        1008
       ]
     },
     {
@@ -1875,8 +1877,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        736
+        -3504,
+        1168
       ]
     },
     {
@@ -1888,8 +1890,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        1648
+        -3300,
+        1168
       ]
     },
     {
@@ -1932,8 +1934,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -4560,
-        1648
+        -3100,
+        1168
       ]
     },
     {
@@ -1944,12 +1946,12 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.payload) }}",
         "options": {
+          "timeout": 15000,
           "response": {
             "response": {
               "neverError": true
             }
-          },
-          "timeout": 15000
+          }
         }
       },
       "id": "e89d1008-0008-4000-8000-000000000008",
@@ -1957,8 +1959,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4336,
-        1632
+        -2880,
+        1168
       ],
       "onError": "continueRegularOutput"
     },
@@ -1971,21 +1973,21 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4112,
-        1632
+        -2660,
+        1168
       ]
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\n\nconst msg = `🤖 *Asistente Inteligente de Reservas — Satori Hotel*\\n\\n` +\n            `¡Hola ${sender_name}! Puedes escribir en *un solo mensaje* todos los detalles de tu viaje en tus propias palabras.\\n\\n` +\n            `*Ejemplo:*\\n` +\n            `_«Quiero reservar del 2026-10-20 al 2026-10-23 para 2 adultos y 1 niño, viajo con mi perrito. Mi nombre es Juan Gómez y mi cédula es 1094900111»_\\n\\n` +\n            `Escribe los datos de tu reserva o escribe *menú* para regresar al menú principal.`;\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: msg,\n        session: {\n            state: 'ia_reserva',\n            step: 'esperando_mensaje',\n            agent_active: false,\n            wa_id,\n            sender_name,\n            ia_draft: {}\n        }\n    }\n}];"
+        "jsCode": "const J = $input.first().json;\nconst wa_id = J.wa_id;\nconst sender_name = J.sender_name || 'Huésped';\n\nconst msg = `🤖 *Asistente Inteligente de Reservas — Satori Hotel*\\n\\n` +\n            `¡Hola ${sender_name}! Puedes escribir en *un solo mensaje* todos los detalles de tu viaje en tus propias palabras.\\n\\n` +\n            `*Ejemplo:*\\n` +\n            `_«Quiero reservar del 2026-10-20 al 2026-10-23 para 2 adultos y 1 niño, viajo con mi perrito. Mi nombre es Juan Gómez y mi cédula es 1094900111»_\\n\\n` +\n            `🔒 _Aviso de Privacidad (Ley 1581 de 2012): Al enviar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva._\\n\\n` +\n            `Escribe los datos de tu reserva o escribe *menú* para regresar al menú principal.`;\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: msg,\n        session: {\n            state: 'ia_reserva',\n            step: 'esperando_mensaje',\n            agent_active: false,\n            wa_id,\n            sender_name,\n            ia_draft: {}\n        }\n    }\n}];"
       },
       "id": "e89d1010-0010-4000-8000-000000000010",
       "name": "H F1 Inicio IA",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4752,
-        432
+        -3504,
+        700
       ]
     },
     {
@@ -1997,8 +1999,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5056,
-        2896
+        -3300,
+        700
       ]
     },
     {
@@ -2089,8 +2091,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -4864,
-        2864
+        -3100,
+        700
       ]
     },
     {
@@ -2101,12 +2103,12 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.geminiRequest) }}",
         "options": {
+          "timeout": 20000,
           "response": {
             "response": {
               "neverError": true
             }
-          },
-          "timeout": 20000
+          }
         }
       },
       "id": "e89d1013-0013-4000-8000-000000000013",
@@ -2114,8 +2116,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4656,
-        2672
+        -2900,
+        560
       ],
       "onError": "continueRegularOutput"
     },
@@ -2128,8 +2130,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4448,
-        2672
+        -2680,
+        560
       ]
     },
     {
@@ -2162,20 +2164,21 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -4240,
-        2672
+        -2480,
+        560
       ]
     },
     {
       "parameters": {
+        "method": "GET",
         "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/rooms/availability?checkIn=' + $json.checkIn + '&checkOut=' + $json.checkOut + '&adults=' + $json.adults + '&children=' + $json.children + '&pet=' + $json.pet }}",
         "options": {
+          "timeout": 15000,
           "response": {
             "response": {
               "neverError": true
             }
-          },
-          "timeout": 15000
+          }
         }
       },
       "id": "e89d1015-0015-4000-8000-000000000015",
@@ -2183,8 +2186,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4080,
-        2496
+        -2260,
+        500
       ],
       "onError": "continueRegularOutput"
     },
@@ -2197,8 +2200,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3872,
-        2496
+        -2040,
+        500
       ]
     },
     {
@@ -2209,12 +2212,12 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ waId: $json.wa_id, roomId: $json.roomId, checkIn: $json.checkIn, checkOut: $json.checkOut }) }}",
         "options": {
+          "timeout": 15000,
           "response": {
             "response": {
               "neverError": true
             }
-          },
-          "timeout": 15000
+          }
         }
       },
       "id": "e89d1017-0017-4000-8000-000000000017",
@@ -2222,23 +2225,109 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4656,
-        2816
+        -2900,
+        740
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "const apiResponse = $input.first().json || {};\nconst source = $('H Normalizar IA').first().json;\nconst wa_id = source.wa_id;\nconst sender_name = source.sender_name;\nconst draft = source.session.ia_draft || {};\nconst room = draft.selectedRoom || {};\n\nif (!apiResponse.lockToken) {\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: '⚠️ No pudimos bloquear la habitación seleccionada. Puede que otro huésped la haya tomado. Escribe *menú* para intentar de nuevo.',\n            session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }\n        }\n    }];\n}\n\ndraft.lockToken = apiResponse.lockToken;\nconst nights = Math.max(1, Math.round((new Date(draft.checkOut) - new Date(draft.checkIn)) / 86400000));\nconst total = Number(apiResponse.totalPrice || (nights * Number(room.pricePerNight || 0)));\nconst half = (total / 2).toFixed(2);\nconst totalStr = total.toFixed(2);\n\nconst summary = `🧾 *Resumen de Reserva Asistida por IA*\\n\\n` +\n    `• Habitación: *${room.name || room.type} #${room.number}*\\n` +\n    `• Fechas: *${draft.checkIn}* al *${draft.checkOut}* (${nights} noche${nights > 1 ? 's' : ''})\\n` +\n    `• Huéspedes: *${draft.adults} adulto(s), ${draft.children} niño(s)*\\n` +\n    `• Mascota: *${draft.hasPet ? 'Sí' : 'No'}*\\n` +\n    `• Titular: *${draft.guestName}* (${draft.guestDocument || 'S/D'})\\n` +\n    `• Total estadía: *$${totalStr}*\\n\\n` +\n    `💳 *¿Cómo deseas abonar tu estadía?*\\n` +\n    `1️⃣ *Pagar el 100% ($${totalStr})*\\n` +\n    `2️⃣ *Pagar el 50% de anticipo ($${half})*\\n` +\n    `3️⃣ *Cancelar*\\n\\n` +\n    `_Responde 1, 2 o 3._`;\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: summary,\n        session: { state: 'ia_reserva', step: 'ia_pago', agent_active: false, wa_id, sender_name, ia_draft: draft }\n    }\n}];"
+        "jsCode": "const apiResponse = $input.first().json || {};\nconst source = $('H Normalizar IA').first().json;\nconst wa_id = source.wa_id;\nconst sender_name = source.sender_name;\nconst draft = source.session.ia_draft || {};\nconst room = draft.selectedRoom || {};\n\nif (!apiResponse.lockToken) {\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: '⚠️ No pudimos bloquear la habitación seleccionada. Puede que otro huésped la haya tomado. Escribe *menú* para intentar de nuevo.',\n            session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }\n        }\n    }];\n}\n\ndraft.lockToken = apiResponse.lockToken;\nconst nights = Math.max(1, Math.round((new Date(draft.checkOut) - new Date(draft.checkIn)) / 86400000));\nconst nightly = Number(room.pricePerNight || 0);\nconst baseStay = nights * nightly;\nconst totalGuests = Number(draft.adults || 1) + Number(draft.children || 0);\nconst baseCap = Number(room.baseAdultsCapacity || 2);\nconst extraGuests = Math.max(0, totalGuests - baseCap);\nconst extraGuestPrice = Number(room.extraGuestPrice || 0);\nconst extraTotal = extraGuests * extraGuestPrice;\nconst total = baseStay + extraTotal;\nconst half = (total / 2).toFixed(2);\nconst totalStr = total.toFixed(2);\nconst extraDesc = extraGuests > 0 ? `(${extraGuests} adic. x $${extraGuestPrice.toFixed(2)})` : '(Sin recargo)';\ndraft.baseStay = baseStay;\ndraft.extraGuests = extraGuests;\ndraft.extraGuestPrice = extraGuestPrice;\ndraft.extraTotal = extraTotal;\ndraft.total = total;\n\nconst summary = `🧾 *Resumen de Reserva Asistida por IA*\\n\\n` +\n    `• Habitación: *${room.name || room.type} #${room.number}*\\n` +\n    `• Fechas: *${draft.checkIn}* al *${draft.checkOut}* (${nights} noche${nights > 1 ? 's' : ''})\\n` +\n    `• Huéspedes: *${draft.adults} adulto(s), ${draft.children} niño(s)*\\n` +\n    `• Mascota: *${draft.hasPet ? 'Sí' : 'No'}*\\n` +\n    `• Titular: *${draft.guestName}* (${draft.guestDocument || 'S/D'})\\n` +\n    `• Tarifa base (${nights} noche${nights > 1 ? 's' : ''}): *$${baseStay.toFixed(2)}*\\n` +\n    `• Recargo persona adicional: *$${extraTotal.toFixed(2)}* _${extraDesc}_\\n` +\n    `• Total estadía: *$${totalStr}*\\n\\n` +\n    `💳 *¿Cómo deseas abonar tu estadía?*\\n` +\n    `1️⃣ *Pagar el 100% ($${totalStr})*\\n` +\n    `2️⃣ *Pagar el 50% de anticipo ($${half})*\\n` +\n    `3️⃣ *Cancelar*\\n\\n` +\n    `_Responde 1, 2 o 3._`;\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: summary,\n        session: { state: 'ia_reserva', step: 'ia_pago', agent_active: false, wa_id, sender_name, ia_draft: draft }\n    }\n}];"
       },
       "id": "e89d1018-0018-4000-8000-000000000018",
       "name": "H Resumen y Pago IA",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4448,
-        2816
+        -2680,
+        740
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rel_locks_cond",
+              "leftValue": "={{ $json.release_locks }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e89d1020-0020-4000-8000-000000000020",
+      "name": "¿Liberar Bloqueo Temporal?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2280,
+        1960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/unlock' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ locks: $json.locks_to_release || [] }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "e89d1021-0021-4000-8000-000000000021",
+      "name": "API Liberar Bloqueo Temporal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2040,
+        1960
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/unlock' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ locks: $('¿Limpiar Sesión?').first().json.locks_to_release || [] }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "e89d1022-0022-4000-8000-000000000022",
+      "name": "API Liberar Bloqueo Inactivo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -640,
+        2060
+      ],
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
@@ -2449,48 +2538,6 @@
         ],
         [
           {
-            "node": "H Normalizar Huespedes e Identidad",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "H Normalizar Huespedes e Identidad",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "H Normalizar Huespedes e Identidad",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "H Normalizar Huespedes e Identidad",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "H Normalizar Huespedes e Identidad",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "H Normalizar Huespedes e Identidad",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "H Normalizar IA",
             "type": "main",
             "index": 0
@@ -2499,6 +2546,48 @@
         [
           {
             "node": "H Normalizar Paso Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Normalizar Huespedes e Identidad",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Normalizar Huespedes e Identidad",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Normalizar Huespedes e Identidad",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Normalizar Huespedes e Identidad",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Normalizar Huespedes e Identidad",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Normalizar Huespedes e Identidad",
             "type": "main",
             "index": 0
           }
@@ -2592,6 +2681,11 @@
         [
           {
             "node": "Redis Guardar Sesión",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "¿Liberar Bloqueo Temporal?",
             "type": "main",
             "index": 0
           }
@@ -3328,6 +3422,29 @@
           }
         ]
       ]
+    },
+    "¿Liberar Bloqueo Temporal?": {
+      "main": [
+        [
+          {
+            "node": "API Liberar Bloqueo Temporal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Redis Borrar Sesión Inactiva": {
+      "main": [
+        [
+          {
+            "node": "API Liberar Bloqueo Inactivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -3335,9 +3452,9 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "ab56fb37-75c4-4da5-8566-aaa6c28d5b45",
+  "versionId": "95b73084-75bb-4c9c-8cf0-cee022e5ab6a",
   "meta": {
-    "instanceId": "f752e19a132d29c7b175857bd723ae324bcce2f3da55f9809b8f4d8d8eabaa9c"
+    "instanceId": "a2b2756b7d02dafdbab44931cfca775be6db84f775ed0cd81ff5c5cf2ade7177"
   },
   "nodeGroups": [],
   "id": "v830jcp3Bw9klLb6",

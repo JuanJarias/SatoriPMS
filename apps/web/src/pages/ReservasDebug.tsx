@@ -110,6 +110,7 @@ export default function ReservasDebug() {
         adults: Number(form.adults),
         children: Number(form.children),
         hasPet: Boolean(form.hasPet),
+        source: 'web',
         rooms: [{
           roomId: selectedRoomId,
           lockToken: lock.data.lockToken,

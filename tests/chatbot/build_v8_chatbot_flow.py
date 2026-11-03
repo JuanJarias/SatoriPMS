@@ -4,7 +4,7 @@ import uuid
 import sys
 
 def generate_v8():
-    with open('flows/n8n/V6_ChatbotReservas.json', 'r', encoding='utf-8') as f:
+    with open('flows/n8n/pastVersions/V6_ChatbotReservas.json', 'r', encoding='utf-8') as f:
         flow = json.load(f)
 
     flow['name'] = 'V8_ChatbotReservas'
@@ -66,7 +66,21 @@ if (!textual) {
   route = 'ia_reserva';
 }
 
-return [{ json: { wa_id: p.wa_id, sender_name: p.sender_name, message_text: p.message_text, message_type: p.message_type, agent_active: agentActive, session: S, route } }];"""
+const prevLocks = [];
+if (S.reservation_draft) {
+  if (Array.isArray(S.reservation_draft.lockTokens)) {
+    S.reservation_draft.lockTokens.forEach(lt => {
+      if (lt && lt.roomId && lt.lockToken) prevLocks.push({ roomId: lt.roomId, lockToken: lt.lockToken });
+    });
+  } else if (S.reservation_draft.roomId && S.reservation_draft.lockToken) {
+    prevLocks.push({ roomId: S.reservation_draft.roomId, lockToken: S.reservation_draft.lockToken });
+  }
+}
+if (S.ia_draft && S.ia_draft.selectedRoom && S.ia_draft.lockToken) {
+  prevLocks.push({ roomId: S.ia_draft.selectedRoom.id, lockToken: S.ia_draft.lockToken });
+}
+
+return [{ json: { wa_id: p.wa_id, sender_name: p.sender_name, message_text: p.message_text, message_type: p.message_type, agent_active: agentActive, session: S, prev_locks: prevLocks, route } }];"""
 
     # Update H Menú Evaluador Opción
     nodes_dict['H Menú Evaluador Opción']['parameters']['jsCode'] = """const J = $input.first().json;
@@ -76,12 +90,35 @@ const ids = {
   menu_ia: '2', 
   menu_resenas: '3', 
   menu_escribir_resena: '4', 
-  menu_agente: '5', 
-  menu_cancelar: '6' 
+  menu_cancelar: '5', 
+  menu_agente: '6' 
 };
 const normalized = ids[text] || text;
 const m = normalized.replace(/[\\uFE0F\\u20E3]/g, '').match(/^\\D*([1-6])\\D*$/);
 return [{ json: Object.assign({}, J, { opcion: m ? m[1] : 'invalido' }) }];"""
+
+    # Update Switch Opción Seleccionada rules so 5 = Revisar o Cancelar and 6 = Agente
+    menu_switch = nodes_dict['Switch Opción Seleccionada']
+    menu_rules = [
+        ("o1", "={{ $json.opcion }}", "1", "1 Reserva"),
+        ("o2", "={{ $json.opcion }}", "2", "2 IA"),
+        ("o3", "={{ $json.opcion }}", "3", "3 Reseñas"),
+        ("o4", "={{ $json.opcion }}", "4", "4 Escribir reseña"),
+        ("o5", "={{ $json.opcion }}", "5", "5 Revisar o Cancelar"),
+        ("o6", "={{ $json.opcion }}", "6", "6 Agente"),
+    ]
+    menu_switch['parameters']['rules']['values'] = [
+        {
+            "conditions": {
+                "options": { "caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 3 },
+                "conditions": [{ "id": rid, "leftValue": lval, "rightValue": rval, "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+            },
+            "renameOutput": True,
+            "outputKey": out_key
+        }
+        for (rid, lval, rval, out_key) in menu_rules
+    ]
 
     # Update H Menú Principal
     nodes_dict['H Menú Principal']['parameters']['jsCode'] = """const J = $input.first().json;
@@ -256,7 +293,7 @@ if (step === 'huespedes') {
   const extraGuests = Math.max(0, adults + children - base);
   const draft = Object.assign({}, D, { adults, children, extraGuests, extraGuestPrice: extraPrice, extraTotal: extraGuests * extraPrice });
 
-  return [output(`✅ Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\nIndica el nombre completo de la persona titular de la reserva.`, keep(draft, 'nombre'))];
+  return [output(`✅ Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\n🔒 *Aviso de Privacidad (Ley 1581 de 2012):* Al continuar y suministrar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva y estadía.\\n\\nIndica el nombre completo de la persona titular de la reserva:`, keep(draft, 'nombre'))];
 }
 
 if (step === 'nombre') {
@@ -283,10 +320,15 @@ if (step === 'acompanantes') {
   const companions = noCompanions ? '' : text;
   const nights = Math.max(1, Math.round((new Date(D.checkOut) - new Date(D.checkIn)) / 86400000));
   const nightly = Number(D.room && D.room.pricePerNight || 0);
-  const total = nights * nightly + Number(D.extraTotal || 0);
+  const baseStay = nights * nightly;
+  const extraGuests = Number(D.extraGuests || 0);
+  const extraGuestPrice = Number(D.extraGuestPrice || (D.room && D.room.extraGuestPrice) || 0);
+  const extraTotal = Number(D.extraTotal != null ? D.extraTotal : (extraGuests * extraGuestPrice));
+  const total = baseStay + extraTotal;
   const half = (total / 2).toFixed(2);
   const totalStr = total.toFixed(2);
-  const draft = Object.assign({}, D, { companions, nights, total });
+  const draft = Object.assign({}, D, { companions, nights, baseStay, extraTotal, total });
+  const extraDesc = extraGuests > 0 ? `(${extraGuests} adic. x $${extraGuestPrice.toFixed(2)})` : '(Sin recargo)';
 
   const summary = `🧾 *Resumen de tu Reserva*\\n\\n` +
     `• Habitación: *${D.room.name || D.room.type} #${D.room.number}*\\n` +
@@ -296,6 +338,8 @@ if (step === 'acompanantes') {
     `• Mascota: *${D.hasPet ? 'Sí' : 'No'}*\\n` +
     `• Titular: *${D.guestName}* (${D.document})\\n` +
     `• Acompañantes: *${companions || 'Ninguno'}*\\n` +
+    `• Tarifa base (${nights} noche${nights > 1 ? 's' : ''}): *$${baseStay.toFixed(2)}*\\n` +
+    `• Recargo persona adicional: *$${extraTotal.toFixed(2)}* _${extraDesc}_\\n` +
     `• Total estadía: *$${totalStr}*\\n\\n` +
     `💳 *¿Cómo deseas realizar el pago?*\\n` +
     `1️⃣ *Pagar el 100% ahora ($${totalStr})*\\n` +
@@ -400,6 +444,7 @@ return [{
         wa_id,
         sender_name,
         response_text: text,
+        locks_confirmed: Boolean(apiResponse.reservationGroupId),
         session: { state: 'menu', step: 'esperando_opcion', agent_active: false,
                    wa_id, sender_name, reservation_draft: {} }
     }
@@ -1026,6 +1071,7 @@ const msg = `🤖 *Asistente Inteligente de Reservas — Satori Hotel*\\n\\n` +
             `¡Hola ${sender_name}! Puedes escribir en *un solo mensaje* todos los detalles de tu viaje en tus propias palabras.\\n\\n` +
             `*Ejemplo:*\\n` +
             `_«Quiero reservar del 2026-10-20 al 2026-10-23 para 2 adultos y 1 niño, viajo con mi perrito. Mi nombre es Juan Gómez y mi cédula es 1094900111»_\\n\\n` +
+            `🔒 _Aviso de Privacidad (Ley 1581 de 2012): Al enviar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva._\\n\\n` +
             `Escribe los datos de tu reserva o escribe *menú* para regresar al menú principal.`;
 
 return [{
@@ -1486,9 +1532,22 @@ if (!apiResponse.lockToken) {
 
 draft.lockToken = apiResponse.lockToken;
 const nights = Math.max(1, Math.round((new Date(draft.checkOut) - new Date(draft.checkIn)) / 86400000));
-const total = Number(apiResponse.totalPrice || (nights * Number(room.pricePerNight || 0)));
+const nightly = Number(room.pricePerNight || 0);
+const baseStay = nights * nightly;
+const totalGuests = Number(draft.adults || 1) + Number(draft.children || 0);
+const baseCap = Number(room.baseAdultsCapacity || 2);
+const extraGuests = Math.max(0, totalGuests - baseCap);
+const extraGuestPrice = Number(room.extraGuestPrice || 0);
+const extraTotal = extraGuests * extraGuestPrice;
+const total = baseStay + extraTotal;
 const half = (total / 2).toFixed(2);
 const totalStr = total.toFixed(2);
+const extraDesc = extraGuests > 0 ? `(${extraGuests} adic. x $${extraGuestPrice.toFixed(2)})` : '(Sin recargo)';
+draft.baseStay = baseStay;
+draft.extraGuests = extraGuests;
+draft.extraGuestPrice = extraGuestPrice;
+draft.extraTotal = extraTotal;
+draft.total = total;
 
 const summary = `🧾 *Resumen de Reserva Asistida por IA*\\n\\n` +
     `• Habitación: *${room.name || room.type} #${room.number}*\\n` +
@@ -1496,6 +1555,8 @@ const summary = `🧾 *Resumen de Reserva Asistida por IA*\\n\\n` +
     `• Huéspedes: *${draft.adults} adulto(s), ${draft.children} niño(s)*\\n` +
     `• Mascota: *${draft.hasPet ? 'Sí' : 'No'}*\\n` +
     `• Titular: *${draft.guestName}* (${draft.guestDocument || 'S/D'})\\n` +
+    `• Tarifa base (${nights} noche${nights > 1 ? 's' : ''}): *$${baseStay.toFixed(2)}*\\n` +
+    `• Recargo persona adicional: *$${extraTotal.toFixed(2)}* _${extraDesc}_\\n` +
     `• Total estadía: *$${totalStr}*\\n\\n` +
     `💳 *¿Cómo deseas abonar tu estadía?*\\n` +
     `1️⃣ *Pagar el 100% ($${totalStr})*\\n` +
@@ -1519,6 +1580,126 @@ return [{
         "position": [-2680, 740]
     }
 
+    # Update Preparar Salida to detect when active locks must be immediately released in Redis
+    nodes_dict['Preparar Salida']['parameters']['jsCode'] = """const J = $input.first().json;
+const now = Date.now();
+const session = Object.assign({}, J.session || { state: 'menu', step: 'inicio', agent_active: false }, { last_activity: now });
+let prevLocks = [];
+try { prevLocks = $('Cargar Sesión y Detectar Ruta').first().json.prev_locks || []; } catch (e) { prevLocks = []; }
+const newDraft = session.reservation_draft || {};
+const newIaDraft = session.ia_draft || {};
+const stillLocked = (Array.isArray(newDraft.lockTokens) && newDraft.lockTokens.length > 0)
+  || Boolean(newDraft.lockToken)
+  || Boolean(newIaDraft.lockToken);
+const locksToRelease = (!stillLocked && !J.locks_confirmed && prevLocks.length > 0) ? prevLocks : [];
+return [{ json: { wa_id: J.wa_id, response_text: J.response_text || 'Entendido. Procesando...', response_payload: J.response_payload || null, redis_key: 'session:' + J.wa_id, redis_value: JSON.stringify(session), last_activity: now, locks_to_release: locksToRelease, release_locks: locksToRelease.length > 0 } }];"""
+
+    # Update ¿Limpiar Sesión? to extract active locks before deleting inactive session in Redis
+    nodes_dict['¿Limpiar Sesión?']['parameters']['jsCode'] = """const raw = $input.first().json.value;
+let session = {};
+try { session = typeof raw === 'string' ? JSON.parse(raw) : (raw || {}); } catch (error) {}
+const stored = Number(session.last_activity || 0);
+const mine = Number($('Preparar Salida').first().json.last_activity || 0);
+const sameSession = stored > 0 && stored === mine;
+const elapsed = Date.now() - stored >= 660000;
+const staleLocks = [];
+if (session.reservation_draft) {
+  if (Array.isArray(session.reservation_draft.lockTokens)) {
+    session.reservation_draft.lockTokens.forEach(lt => {
+      if (lt && lt.roomId && lt.lockToken) staleLocks.push({ roomId: lt.roomId, lockToken: lt.lockToken });
+    });
+  } else if (session.reservation_draft.roomId && session.reservation_draft.lockToken) {
+    staleLocks.push({ roomId: session.reservation_draft.roomId, lockToken: session.reservation_draft.lockToken });
+  }
+}
+if (session.ia_draft && session.ia_draft.selectedRoom && session.ia_draft.lockToken) {
+  staleLocks.push({ roomId: session.ia_draft.selectedRoom.id, lockToken: session.ia_draft.lockToken });
+}
+return [{ json: { redis_key: $('Preparar Salida').first().json.redis_key, stale: sameSession && elapsed, locks_to_release: staleLocks } }];"""
+
+    # Node: ¿Liberar Bloqueo Temporal?
+    if_release_locks = {
+        "parameters": {
+            "conditions": {
+                "options": {
+                    "caseSensitive": True,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                },
+                "conditions": [
+                    {
+                        "id": "rel_locks_cond",
+                        "leftValue": "={{ $json.release_locks }}",
+                        "rightValue": "",
+                        "operator": {
+                            "type": "boolean",
+                            "operation": "true",
+                            "singleValue": True
+                        }
+                    }
+                ],
+                "combinator": "and"
+            },
+            "options": {}
+        },
+        "id": "e89d1020-0020-4000-8000-000000000020",
+        "name": "¿Liberar Bloqueo Temporal?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [-2280, 1960]
+    }
+
+    # Node: API Liberar Bloqueo Temporal
+    api_unlock = {
+        "parameters": {
+            "method": "POST",
+            "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/unlock' }}",
+            "sendBody": True,
+            "specifyBody": "json",
+            "jsonBody": "={{ JSON.stringify({ locks: $json.locks_to_release || [] }) }}",
+            "options": {
+                "timeout": 10000,
+                "response": {
+                    "response": {
+                        "neverError": True
+                    }
+                }
+            }
+        },
+        "id": "e89d1021-0021-4000-8000-000000000021",
+        "name": "API Liberar Bloqueo Temporal",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [-2040, 1960],
+        "onError": "continueRegularOutput"
+    }
+
+    # Node: API Liberar Bloqueo Inactivo
+    api_unlock_stale = {
+        "parameters": {
+            "method": "POST",
+            "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/unlock' }}",
+            "sendBody": True,
+            "specifyBody": "json",
+            "jsonBody": "={{ JSON.stringify({ locks: $('¿Limpiar Sesión?').first().json.locks_to_release || [] }) }}",
+            "options": {
+                "timeout": 10000,
+                "response": {
+                    "response": {
+                        "neverError": True
+                    }
+                }
+            }
+        },
+        "id": "e89d1022-0022-4000-8000-000000000022",
+        "name": "API Liberar Bloqueo Inactivo",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [-640, 2060],
+        "onError": "continueRegularOutput"
+    }
+
     # Add all new nodes to flow['nodes']
     new_nodes = [
         api_pagar_saldo,
@@ -1539,7 +1720,10 @@ return [{
         api_disp_ia,
         h_mostrar_disp_ia,
         api_lock_ia,
-        h_resumen_pago_ia
+        h_resumen_pago_ia,
+        if_release_locks,
+        api_unlock,
+        api_unlock_stale
     ]
 
     for n in new_nodes:
@@ -1708,6 +1892,28 @@ return [{
     connections["H Resumen y Pago IA"] = {
         "main": [
             [{"node": "Preparar Salida", "type": "main", "index": 0}]
+        ]
+    }
+
+    connections["Preparar Salida"] = {
+        "main": [
+            [
+                {"node": "Redis Guardar Sesión", "type": "main", "index": 0},
+                {"node": "¿Liberar Bloqueo Temporal?", "type": "main", "index": 0}
+            ]
+        ]
+    }
+
+    connections["¿Liberar Bloqueo Temporal?"] = {
+        "main": [
+            [{"node": "API Liberar Bloqueo Temporal", "type": "main", "index": 0}],
+            []
+        ]
+    }
+
+    connections["Redis Borrar Sesión Inactiva"] = {
+        "main": [
+            [{"node": "API Liberar Bloqueo Inactivo", "type": "main", "index": 0}]
         ]
     }
 

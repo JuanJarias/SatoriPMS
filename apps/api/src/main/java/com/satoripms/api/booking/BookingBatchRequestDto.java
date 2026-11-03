@@ -32,6 +32,8 @@ public class BookingBatchRequestDto {
     private List<BookingRoomLockDto> rooms;
     /** Opción de pago: 'deposit' (abono del 50%) o 'full' (pago total del 100%) */
     private String paymentOption;
+    /** Canal de origen de la reserva ('chatbot' o 'web'; por defecto 'chatbot') */
+    private String source;
     /** Monto pagado especificado manualmente si aplica */
     private java.math.BigDecimal paidAmount;
 }

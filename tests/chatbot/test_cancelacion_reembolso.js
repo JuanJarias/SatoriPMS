@@ -1,7 +1,7 @@
 /**
  * Test: Cancelación de Reserva con Regla de Reembolso RN-03 (CU-05 / V8)
  *
- * Flujo: Menú -> Opción 6 (Revisar o Cancelar) -> Código de reserva ->
+ * Flujo: Menú -> Opción 5 (Revisar o Cancelar) -> Código de reserva ->
  *        Opción Cancelar -> 'Sí, confirmar'.
  *
  * Aserción: El backend debe actualizar:
@@ -128,10 +128,10 @@ async function run() {
     console.log(`  • Reserva a cancelar: ID ${activeBooking.id}, Código: ${codePrefix}`);
     console.log(`  • Habitación: ${activeBooking.roomNumber}, Fechas: ${activeBooking.checkIn} a ${activeBooking.checkOut}`);
 
-    console.log('[2/5] Enviando "menu" y seleccionando Opción 6 (Revisar o Cancelar)...');
+    console.log('[2/5] Enviando "menu" y seleccionando Opción 5 (Revisar o Cancelar)...');
     await sendMsg('menu');
     await sleep(2000);
-    await sendMsg('6');
+    await sendMsg('5');
     await sleep(2000);
 
     console.log(`[3/5] Consultando código de reserva: ${codePrefix}...`);

@@ -127,6 +127,29 @@ public class BookingService {
     }
 
     /**
+     * Libera de forma inmediata uno o varios bloqueos temporales en Redis cuando el usuario
+     * cancela el proceso de reserva, reinicia la sesión en el chatbot o expira por inactividad.
+     *
+     * @param locks Lista de habitaciones con sus respectivos tokens de bloqueo a liberar
+     * @return Cantidad de bloqueos efectivamente liberados en Redis
+     */
+    public int releaseTemporaryLocks(List<BookingRoomLockDto> locks) {
+        if (locks == null || locks.isEmpty()) {
+            return 0;
+        }
+        int releasedCount = 0;
+        for (BookingRoomLockDto lock : locks) {
+            if (lock != null && lock.getRoomId() != null
+                    && lock.getLockToken() != null && !lock.getLockToken().isBlank()) {
+                if (redisLockService.release(lock.getRoomId(), lock.getLockToken().trim())) {
+                    releasedCount++;
+                }
+            }
+        }
+        return releasedCount;
+    }
+
+    /**
      * Confirma una o varias habitaciones en estado de reserva pendiente de pago.
      *
      * @param request Datos de la reserva grupal o individual y tokens de bloqueo
@@ -284,7 +307,10 @@ public class BookingService {
                 roomPaidAmount = paidAmount.multiply(roomFraction).setScale(2, java.math.RoundingMode.HALF_UP);
             }
             booking.setPaidAmount(roomPaidAmount);
-            booking.setSource("chatbot");
+            String resolvedSource = (request.getSource() != null && !request.getSource().isBlank())
+                    ? request.getSource().trim().toLowerCase()
+                    : "chatbot";
+            booking.setSource(resolvedSource);
             booking.setLockId(request.getRooms().get(index).getLockToken());
             booking.setReservationGroupId(reservationGroupId);
             booking.setCompanions(request.getCompanions());
@@ -370,16 +396,17 @@ public class BookingService {
         String policyDesc;
         if (hoursUntilCheckIn > 72) {
             refundPct = 100;
-            policyDesc = "Reembolso del 100% (+72h antes del check-in)";
+            policyDesc = "Reembolso del 100% de lo abonado (+72h antes del check-in)";
         } else if (hoursUntilCheckIn >= 24) {
             refundPct = 50;
-            policyDesc = "Reembolso del 50% (entre 24h y 72h antes del check-in)";
+            policyDesc = "Reembolso del 50% de lo abonado (entre 24h y 72h antes del check-in)";
         } else {
             refundPct = 0;
             policyDesc = "Sin reembolso (menos de 24h antes del check-in)";
         }
 
-        BigDecimal estimatedRefund = totalGroupPrice.multiply(BigDecimal.valueOf(refundPct))
+        // El reembolso se calcula estrictamente sobre el monto efectivamente pagado (totalPaidAmount)
+        BigDecimal estimatedRefund = totalPaidAmount.multiply(BigDecimal.valueOf(refundPct))
                 .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
 
         boolean isActive = "confirmed".equalsIgnoreCase(first.getStatus()) || "pending_payment".equalsIgnoreCase(first.getStatus());
@@ -472,10 +499,10 @@ public class BookingService {
         String policyDesc;
         if (hoursUntilCheckIn > 72) {
             refundPct = 100;
-            policyDesc = "Reembolso del 100% (+72h antes del check-in)";
+            policyDesc = "Reembolso del 100% de lo abonado (+72h antes del check-in)";
         } else if (hoursUntilCheckIn >= 24) {
             refundPct = 50;
-            policyDesc = "Reembolso del 50% (entre 24h y 72h antes del check-in)";
+            policyDesc = "Reembolso del 50% de lo abonado (entre 24h y 72h antes del check-in)";
         } else {
             refundPct = 0;
             policyDesc = "Sin reembolso (menos de 24h antes del check-in)";

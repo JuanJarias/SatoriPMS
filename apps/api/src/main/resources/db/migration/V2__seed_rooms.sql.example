@@ -14,6 +14,12 @@
 -- migración — la tabla room queda vacía hasta que la crees, no rompe nada.
 
 INSERT INTO room (number, name, type, base_adults_capacity, max_adults_capacity, children_capacity, allows_pets, price_per_night, extra_guest_price) VALUES
-('EJ-1', 'Nombre de ejemplo 1', 'ESTANDAR', 2, 3, 1, TRUE, 100000, 20000),
-('EJ-2', 'Nombre de ejemplo 2', 'DELUXE',   2, 4, 2, TRUE, 150000, 25000),
-('EJ-3', 'Nombre de ejemplo 3', 'SUITE',    4, 6, 2, TRUE, 200000, 30000);
+('101', 'Habitación de referencia 101', 'ESTANDAR', 2, 3, 1, TRUE,  120000, 20000),
+('102', 'Habitación de referencia 102', 'ESTANDAR', 2, 3, 1, TRUE,  120000, 20000),
+('103', 'Habitación de referencia 103', 'ESTANDAR', 2, 3, 1, FALSE, 120000, 20000),
+('201', 'Habitación de referencia 201', 'DOBLE',    2, 4, 2, TRUE,  160000, 25000),
+('202', 'Habitación de referencia 202', 'DOBLE',    2, 4, 2, TRUE,  160000, 25000),
+('203', 'Habitación de referencia 203', 'DOBLE',    2, 4, 2, FALSE, 160000, 25000),
+('301', 'Habitación de referencia 301', 'SUITE',    4, 6, 2, TRUE,  220000, 30000),
+('302', 'Habitación de referencia 302', 'SUITE',    4, 6, 2, TRUE,  220000, 30000),
+('303', 'Habitación de referencia 303', 'SUITE',    4, 6, 2, TRUE,  250000, 30000);
