@@ -1,44 +1,85 @@
-# Módulo — Facturación y Finanzas
+# Facturación y Finanzas — SatoriPMS
 
-## 1. Requerimientos y Casos de Uso
+## 1. Propósito del Módulo
 
-**CU-06, Consultar ingresos y egresos.** Vista consolidada de las entradas (hospedaje y tienda) y las salidas de dinero por rangos de fecha.
+El módulo de **Facturación y Finanzas** centraliza todas las reglas económicas de **Torre Satori**: la cotización de estadías con personas adicionales y eventos especiales, el control de anticipos del 50% y pagos totales del 100%, el cálculo estricto de reembolsos sobre lo abonado, la liquidación de cuentas al finalizar la estadía, el registro de gastos operativos, el cálculo de pago de turnos de recepción y la exportación del balance mensual en Excel.
 
-**HU-01, Exportar informe a Excel.** Generación y descarga de un archivo con la relación contable mensual, para declaraciones y balances.
+---
 
-**HU-07, Cálculo de sueldo de recepción.** Cálculo automático de la compensación mensual o quincenal de la recepcionista, según la fórmula que defina el administrador.
+## 2. Cálculo de Tarifas de Hospedaje y Eventos Especiales
 
-**HU-13, Registrar egresos operativos.** Registro de gastos menores (mantenimiento, aseo, compras de inventario) con soporte digital.
+### A. Tarifa Base y Recargo por Persona Adicional
+Cada habitación del hotel cuenta con:
+- Una tarifa base por noche (`Precio por noche : "price_per_night"`).
+- Una capacidad base de personas incluidas en esa tarifa (`Capacidad base de adultos : "base_adults_capacity"`).
+- Un valor adicional fijo por cada huésped que supere la capacidad base sin exceder el tope máximo permitido en la habitación (`Precio por persona adicional : "extra_guest_price"`).
 
-## 2. Reglas de Negocio
+El valor total de la estadía se obtiene sumando el costo de las noches reservadas más el recargo correspondiente a las personas adicionales. Tanto en el flujo de reserva guiada como en el asistente con inteligencia artificial en WhatsApp y en la aplicación web, el sistema muestra de forma explícita y separada la **tarifa base**, el **recargo por persona adicional** y el **total de la estadía** antes de solicitar el pago.
 
-**Cálculo de estadía.** El valor total se compone de la suma del precio por noche de las habitaciones seleccionadas, multiplicado por el número de noches, más los recargos por huéspedes adicionales calculados según RN-01.
+### B. Eventos Especiales, Temporadas y Descuentos por Fechas
+El administrador puede definir en el calendario del sistema **eventos especiales o campañas promocionales** (por ejemplo, descuentos en días de temporada baja o tarifas especiales para festividades locales de Sevilla como el Festival Bandola o Semana Santa). Cuando las fechas seleccionadas por el viajero coinciden con un evento activo, el sistema aplica automáticamente el porcentaje de descuento o el ajuste tarifario configurado sobre las noches correspondientes.
 
-**Modalidades de cobro del hospedaje.** El huésped puede pagar el 100 % al reservar o abonar el 50 % como anticipo. El sistema registra cuánto se pagó en `paid_amount` y mantiene el saldo pendiente como la diferencia con el total. El saldo se puede liquidar después desde el chatbot, con la opción de revisar la reserva, hasta quedar la reserva como pagada.
+---
 
-**Reembolsos.** Una cancelación genera un reembolso calculado sobre el monto efectivamente pagado, con el porcentaje de RN-03 según las horas restantes hasta el check-in: 100 % con más de 72 horas, 50 % entre 24 y 72 horas y 0 % con menos de 24 horas o no-show. La reserva cancelada se conserva como historial.
+## 3. Modalidades de Pago y Control de Saldos
 
-**RN-05, recibos.** Todo pago confirmado por concepto de hospedaje genera un comprobante de recibo inmutable asociado a la reserva, con fecha de emisión, monto y referencia.
+Al confirmar una reserva, el sistema admite dos modalidades financieras:
 
-## 3. Origen de los Datos Financieros
+1. **Pago Completo del 100% (`Opción de pago : "full"`):**
+   - El huésped abona la totalidad del valor de la reserva.
+   - El monto abonado (`Monto abonado : "paid_amount"`) queda igual al precio total (`Precio total : "total_price"`), el saldo pendiente en `$0.00` y el estado financiero en `Pagada : "paid"`.
+2. **Anticipo del 50% (`Opción de pago : "deposit"`):**
+   - El huésped garantiza su reserva abonando exactamente la mitad (50%) del valor total de la estadía.
+   - El monto abonado registra ese 50% inicial, el estado financiero queda en `Pago parcial : "partial"` y el 50% restante figura como saldo pendiente.
+   - **Liquidación del segundo 50%:** El huésped puede pagar el saldo restante en cualquier momento antes de su llegada desde la opción *"Revisar o Cancelar"* del menú de WhatsApp, o bien cancelarlo directamente en la recepción del hotel al momento de su ingreso o salida.
 
-| Concepto | Origen |
-|---|---|
-| Ingresos por hospedaje | `booking.paid_amount` de las reservas, menos los reembolsos aplicados |
-| Ingresos por tienda | `consumption.quantity` por `consumption.unit_price` de los consumos y ventas pagados |
-| Reembolsos | Reservas canceladas, con el monto calculado según RN-03 |
-| Egresos | Gastos operativos registrados con HU-13 |
+---
 
-## 4. Funcionalidades
+## 4. Política de Reembolso por Cancelación (Estrictamente sobre lo Abonado)
 
-**Consulta consolidada (CU-06).** El administrador elige un rango de fechas y ve el total de ingresos separado por hospedaje y tienda, el total de egresos y el balance del período. Puede filtrar por categoría de egreso y por tipo de ingreso.
+Cuando un huésped solicita cancelar su reserva confirmada, el sistema calcula el monto a devolver **exclusivamente sobre el dinero que el cliente haya pagado efectivamente hasta ese momento** (`Monto abonado : "paid_amount"`), nunca sobre el valor total no pagado de la estadía.
 
-**Registro de egresos (HU-13).** Cada egreso guarda categoría, fecha, valor y un soporte digital (factura o recibo) cuyo archivo se almacena fuera de la base de datos, que solo conserva la referencia y los metadatos. Editar o eliminar un egreso queda registrado en la auditoría con el usuario que hizo el cambio.
+Tomando como punto de referencia la hora oficial de entrada al hotel (**15:00 horas / 3:00 p. m.** del día de llegada), se aplican tres tramos de antelación:
 
-**Informe mensual (HU-01).** Exporta a Excel la relación de ingresos y egresos del mes, con el detalle por concepto, apta para declaraciones y balances.
+| Antelación respecto a la hora de entrada (15:00) | Porcentaje de Reembolso | Ejemplo con reserva de \$200.000 pagada al 100% | Ejemplo con reserva de \$200.000 abonada al 50% (\$100.000 pagados) |
+|---|---|---|---|
+| **Más de 72 horas antes** | **100% de lo abonado** | Se reembolsan **\$200.000** | Se reembolsan **\$100.000** |
+| **Entre 24 y 72 horas antes** | **50% de lo abonado** | Se reembolsan **\$100.000** | Se reembolsan **\$50.000** |
+| **Menos de 24 horas antes o no presentación** | **0% (Sin reembolso)** | Se reembolsan **\$0** | Se reembolsan **\$0** |
 
-**Sueldo de recepción (HU-07).** El administrador define el modelo de compensación y el sistema calcula automáticamente el valor para el período indicado.
+Antes de ejecutar la cancelación definitiva, el sistema presenta este cálculo exacto al huésped y le solicita su confirmación expresa. *(Los rangos horarios y porcentajes están diseñados para ajustarse como parámetros administrativos según la directriz final del propietario del hotel).*
 
-## 5. Acceso
+---
 
-Los reportes financieros consolidados, los egresos, el informe mensual y el sueldo son exclusivos del rol Administrador. La recepcionista no tiene acceso a la información financiera global.
+## 5. Liquidación de Cuenta a la Salida del Huésped (Check-out)
+
+En el momento en que el huésped entrega la habitación, el sistema consolida en una sola vista todos los rubros económicos de su estadía:
+- Valor total del alojamiento menos los abonos ya realizados.
+- Suma de todos los productos de la tienda interna consumidos durante la estadía y cargados a la habitación que aún figuren como no pagados (`Consumo pagado : "paid = false"`).
+- **Total neto a pagar en recepción:** Una vez recibido el pago de los rubros abiertos, todos los consumos pasan a estado pagado, la reserva queda en estado `Finalizada : "finished"` y el ingreso queda asentado en el balance del hotel.
+
+---
+
+## 6. Registro de Gastos Operativos y Cálculo de Turnos de Recepción
+
+Para que el administrador conozca la utilidad real del negocio sin recurrir a cuadernos externos, el módulo financiero incluye:
+
+### A. Ingresos y Egresos Operativos
+- **Ingresos automáticos:** Cada pago de reserva (anticipo del 50%, pago del 100% o liquidación de saldo) y cada venta pagada de la tienda interna genera automáticamente un movimiento de ingreso (`Tipo de movimiento : "income"`).
+- **Egresos manuales:** El administrador puede registrar los gastos del hotel (`Tipo de movimiento : "expense"`), clasificándolos por categoría (nómina y turnos, servicios públicos de energía/agua/internet, compra de insumos de aseo y lavandería, reabastecimiento de vitrina o mantenimiento locativo), indicando fecha, valor y descripción.
+
+### B. Liquidación Configurable de Turnos de Recepción
+Atendiendo la dinámica operativa de Torre Satori, el módulo permite calcular el pago correspondiente al personal de recepción a partir de parámetros editables por el administrador (sin valores fijos rígidos):
+- Valor de la hora o del turno ordinario diurno.
+- Recargos configurables por turno nocturno, dominical o festivo.
+- Registro de horas o turnos trabajados en el período y generación automática del egreso de nómina una vez aprobado por el administrador.
+
+---
+
+## 7. Exportación Contable en Formato Excel
+
+En cualquier momento o al cierre del mes, el **Administrador** puede seleccionar un rango de fechas y descargar un **Informe Contable en Excel (`.xlsx`)** listo para revisión gerencial o contable, el cual incluye:
+1. Resumen ejecutivo de ingresos totales, egresos totales y utilidad neta del período.
+2. Detalle de ingresos por hospedaje (diferenciando ventas logradas por el chatbot de WhatsApp frente a reservas tomadas en recepción).
+3. Detalle de ingresos por ventas de la tienda interna.
+4. Relación desglosada de todos los gastos y pagos de turnos registrados en el período.

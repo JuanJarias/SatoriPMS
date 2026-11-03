@@ -11,6 +11,6 @@
 -- El hash de ejemplo de abajo es solo un placeholder — reemplázalo por
 -- uno generado de verdad antes de usarlo.
 
-INSERT INTO system_user (username, password_hash, role, name) VALUES
+INSERT INTO system_users (username, password_hash, role, name) VALUES
 ('Admin', '$2a$12$Uy2lw7y1LED32eVFbbxvvO/96LQIj30HMF8LWpauAeqok7nrMaJS.', 'admin', 'Administrador de Torre Satori')
 ON CONFLICT (username) DO NOTHING;

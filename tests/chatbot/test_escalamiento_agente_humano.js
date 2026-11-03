@@ -1,7 +1,7 @@
 /**
  * Test: Escalamiento a Agente Humano / Recepción (CU-07 / V8)
  *
- * Flujo: Menú -> Opción 5 (Hablar con un agente).
+ * Flujo: Menú -> Opción 6 (Hablar con un agente).
  *
  * Aserción: El chatbot debe activar el modo de atención humana (agent_active: true)
  *           y transferir la conversación a recepción para atención personalizada.
@@ -72,8 +72,8 @@ async function run() {
     await sendMsg('menu');
     await sleep(2000);
 
-    console.log('[2/2] Seleccionando Opción 5 (Hablar con un agente)...');
-    const res = await sendMsg('5');
+    console.log('[2/2] Seleccionando Opción 6 (Hablar con un agente)...');
+    const res = await sendMsg('6');
     await sleep(3000);
 
     // ─── ASERCIÓN FINAL ───

@@ -1,45 +1,58 @@
-# Módulo — Seguridad, Identidad y Cumplimiento
+# Seguridad y Protección de Datos — SatoriPMS
 
-## 1. Autenticación y Autorización
+## 1. Propósito del Módulo
 
-**Mecanismo.** La aplicación web se autentica con JSON Web Tokens (JWT) firmados con una clave secreta y con un tiempo de expiración configurable mediante variables de entorno (`JWT_SECRET` y `JWT_EXPIRES_IN`). El token incluye el rol del usuario. El cliente web lo envía en cada solicitud y, cuando expira o es rechazado, regresa al inicio de sesión.
+El módulo de **Seguridad y Protección de Datos** define las medidas de resguardo de la información, el control de acceso del personal del hotel y el cumplimiento legal en el tratamiento de los datos personales de los huéspedes de **Torre Satori**.
 
-**Autorización por rol.** Existen dos roles, `admin` y `receptionist`, definidos con una restricción a nivel de base de datos. El backend valida el rol en cada solicitud; ocultar una opción en la interfaz nunca reemplaza esa validación. El administrador gestiona usuarios, configuración global y reportes financieros. La recepcionista opera reservas, estadías, tienda y conversaciones, sin acceso a reportes financieros globales ni a la administración de usuarios.
+---
 
-**Contraseñas.** Se almacenan con cifrado unidireccional BCrypt; nunca en texto plano ni en registros de log. La recuperación de contraseña (HU-11) permite restablecerla sin que la contraseña anterior se revele en ningún momento.
+## 2. Control de Acceso por Roles en la Aplicación Web
 
-**Cuentas desactivadas.** Un usuario desactivado no puede iniciar sesión, pero conserva su historial en los registros de auditoría.
+El acceso a las funciones administrativas y operativas del panel web se protege mediante inicio de sesión con usuario y contraseña, emitiendo una credencial digital firmada con vigencia controlada (`Credencial de sesión : "JWT"` configurada con `Clave secreta de firma : "JWT_SECRET"` y `Tiempo de expiración : "JWT_EXPIRATION"`).
 
-**CORS.** Solo los dominios autorizados (frontend local en desarrollo y dominio de producción) pueden realizar peticiones cruzadas a la API.
+El sistema distingue estrictamente dos perfiles de usuario:
 
-## 2. Seguridad de las Integraciones
+| Funcionalidad del Sistema | Administrador (`"admin"`) | Recepcionista (`"receptionist"`) |
+|---|---|---|
+| Consultar calendario de ocupación y disponibilidad | Permitido | Permitido |
+| Registrar llegadas (Check-in), salidas (Check-out) y reservas manuales | Permitido | Permitido |
+| Atender conversaciones de WhatsApp escaladas a humano | Permitido | Permitido |
+| Registrar ventas y cargos de la tienda interna | Permitido | Permitido |
+| **Crear, editar y eliminar habitaciones del hotel** | **Exclusivo Administrador** | No permitido |
+| **Configurar eventos especiales, temporadas y descuentos** | **Exclusivo Administrador** | No permitido |
+| **Administrar catálogo de productos, precios y ajuste de inventario** | **Exclusivo Administrador** | No permitido |
+| **Consultar reportes financieros, registrar gastos y exportar Excel contable** | **Exclusivo Administrador** | No permitido |
+| **Configurar parámetros de turnos y liquidar pagos de nómina** | **Exclusivo Administrador** | No permitido |
+| **Crear, editar o desactivar cuentas de usuarios del personal** | **Exclusivo Administrador** | No permitido |
 
-**WhatsApp (Meta).** La verificación inicial del webhook (GET) valida el `hub.verify_token` contra `WHATSAPP_VERIFY_TOKEN`. Cada evento recibido (POST) se acepta solo si la firma criptográfica SHA-256 del encabezado `X-Hub-Signature-256`, calculada con el App Secret de Meta, coincide con el cuerpo recibido; los eventos sin firma válida se descartan. Cada `message_id` se registra para ignorar los reintentos duplicados de entrega.
+### Reglas de Cuentas del Personal
+- **Almacenamiento seguro de contraseñas:** Ninguna contraseña se guarda en texto visible; el sistema almacena únicamente su huella criptográfica irreversible (`Contraseña cifrada : "password_hash"`).
+- **Retiro de personal sin pérdida de historial:** Cuando un empleado deja de laborar en el hotel, su cuenta no se elimina físicamente de la base de datos para conservar el registro histórico de qué operaciones realizó en su momento; en su lugar, el administrador desactiva la cuenta (`Usuario activo : "active = false"`), bloqueando de inmediato su ingreso al sistema.
 
-**MercadoPago.** Una reserva solo se confirma por el webhook de pago, verificado con `MERCADOPAGO_WEBHOOK_SECRET`; nunca por una pantalla de éxito del cliente.
+---
 
-**Google Gemini.** La clave `GEMINI_API_KEY` solo vive en el entorno del backend y de n8n. Toda salida del modelo se trata como una sugerencia y se valida antes de aceptarla. Al modelo solo se envía la información mínima necesaria para interpretar el mensaje.
+## 3. Seguridad en las Comunicaciones y el Chatbot
 
-**Red interna.** PostgreSQL y Redis solo escuchan en `127.0.0.1`; el backend y n8n se comunican dentro de la red interna de Docker. Solo n8n (para el webhook de Meta), el backend y la aplicación web se exponen, y siempre por HTTPS.
+1. **Aislamiento de servicios internos:** La base de datos principal y el motor de memoria rápida se ejecutan dentro de una red interna privada de contenedores y no están expuestos a internet público. Únicamente el servidor de aplicaciones y el canal de recepción de mensajes de WhatsApp reciben tráfico externo autorizado.
+2. **Verificación de autenticidad de mensajes de WhatsApp:** Las notificaciones entrantes desde la plataforma oficial de Meta incluyen una firma criptográfica en su encabezado (`Firma de seguridad de Meta : "X-Hub-Signature-256"`), la cual permite validar que el mensaje proviene genuinamente de WhatsApp y no de un tercero no autorizado.
+3. **Control de mensajes duplicados:** En caso de que la red telefónica o Meta reenvíe un mismo mensaje por intermitencia de conexión, el sistema identifica el código único del mensaje (`Identificador de mensaje : "message_id"`) para evitar procesarlo dos veces.
+4. **Protección de claves y credenciales:** Todas las contraseñas de base de datos, llaves de inteligencia artificial (`Clave de Google Gemini : "GEMINI_API_KEY"`) y tokens de conexión a WhatsApp (`Token de WhatsApp : "WHATSAPP_API_TOKEN"`) se cargan desde variables de entorno locales ([.env.example](file:///home/guarinve/Documentos/SatoriPMS/.env.example)) excluidas del repositorio de código.
 
-## 3. Gestión de Secretos
+---
 
-Los secretos (`JWT_SECRET`, claves de bases de datos, tokens de WhatsApp, claves de Gemini y de MercadoPago) se definen exclusivamente por variables de entorno. El archivo `.env` real nunca se versiona; solo se versiona la plantilla `.env.example` con los nombres de las variables. Los valores de desarrollo no se reutilizan en producción, y los tokens de Meta y el secreto JWT se rotan periódicamente.
+## 4. Cumplimiento de la Ley 1581 de 2012 (Protección de Datos Personales)
 
-## 4. Trazabilidad y Auditoría (HU-15)
+En cumplimiento del régimen colombiano de Habeas Data y protección de datos personales:
+- **Aviso de privacidad e información previa:** Tanto en el flujo de reserva guiada paso a paso como en el asistente con inteligencia artificial en WhatsApp, antes de recopilar el nombre completo y el número de documento de identidad del huésped, el asistente presenta el aviso de privacidad informando que los datos suministrados serán tratados por Torre Satori con la única finalidad de gestionar su reserva, registro hotelero y facturación.
+- **Finalidad exclusiva y confidencialidad:** Los números telefónicos, nombres, documentos de identidad y registros de acompañantes se utilizan únicamente para la prestación del servicio de hospedaje y no se comparten ni comercializan con terceros.
 
-El sistema genera registros de auditoría inmutables para todas las acciones operativas críticas: creación, modificación y cancelación de reservas; ejecución de check-in y check-out; ventas de tienda y ajustes de inventario; registro, edición y eliminación de egresos; y cambios en usuarios del sistema, tarifas o políticas.
+---
 
-Cada registro almacena `timestamp`, `user_id`, `action_type`, `entity_id` y `details_json`. Los registros no se editan ni se eliminan desde la aplicación, y solo el administrador puede consultarlos, con filtros por fecha, usuario y tipo de acción.
+## 5. Trazabilidad y Auditoría de Operaciones Críticas
 
-## 5. Protección de Datos Personales (Ley 1581 de 2012, Colombia)
-
-La Ley Estatutaria 1581 de 2012 desarrolla el derecho de las personas a conocer, actualizar y rectificar la información que se recoge sobre ellas en bases de datos, y aplica a cualquier entidad que trate datos personales en Colombia. SatoriPMS la aplica con las siguientes medidas.
-
-**Necesidad y finalidad.** El chatbot y la aplicación web solo recolectan los datos esenciales para prestar el servicio de hospedaje: nombre, número de WhatsApp y documento de identidad, además de los nombres de los acompañantes. Los datos solo se usan para la finalidad informada: gestionar la reserva y la estadía, y mejorar el servicio.
-
-**Autorización.** Antes de recolectar datos en el canal conversacional, el chatbot presenta el aviso de privacidad con la finalidad del tratamiento y los derechos del titular.
-
-**Derechos del titular.** El huésped puede solicitar conocer, actualizar, rectificar o suprimir sus datos ante el hotel. Los datos asociados a registros contables o a obligaciones legales se conservan por el tiempo que la norma exige.
-
-**Seguridad y confidencialidad.** El tráfico se protege con HTTPS en todos los canales. Los datos sensibles se ofuscan en los archivos de log y no aparecen en enlaces públicos. El acceso a la información de huéspedes se limita según el rol, y los archivos de soporte (recibos y facturas) se protegen con permisos y enlaces controlados.
+Para brindar total transparencia al propietario del hotel, el sistema contempla el registro de auditoría de las acciones sensibles realizadas desde el panel web:
+- Creación, modificación de tarifas o eliminación de habitaciones.
+- Creación o modificación de eventos especiales y descuentos por fechas.
+- Cancelaciones manuales de reservas y aplicación de reembolsos.
+- Ajustes de precios o de existencias en la tienda interna y registro de egresos financieros.
+Cada evento conserva la fecha y hora exacta, el usuario responsable y el detalle de la modificación realizada.

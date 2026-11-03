@@ -1,7 +1,7 @@
 /**
  * Test: Pago de Saldo Restante de Reserva Parcial (CU-06 / V8)
  *
- * Flujo: Menú -> Opción 6 (Revisar Reserva) -> Ingreso de Código ->
+ * Flujo: Menú -> Opción 5 (Revisar Reserva) -> Ingreso de Código ->
  *        Opción 1 (Pagar Saldo Restante).
  *
  * Aserción: El backend debe actualizar:
@@ -128,10 +128,10 @@ async function run() {
     console.log(`  • Reserva encontrada: ID ${partialBooking.id}, Código: ${codePrefix}`);
     console.log(`  • Total: $${partialBooking.totalPrice}, Pagado actualmente: $${partialBooking.paidAmount}`);
 
-    console.log('[2/4] Enviando "menu" y seleccionando Opción 6 (Revisar Reserva)...');
+    console.log('[2/4] Enviando "menu" y seleccionando Opción 5 (Revisar Reserva)...');
     await sendMsg('menu');
     await sleep(2000);
-    await sendMsg('6');
+    await sendMsg('5');
     await sleep(2000);
 
     console.log(`[3/4] Ingresando código de reserva: ${codePrefix}...`);

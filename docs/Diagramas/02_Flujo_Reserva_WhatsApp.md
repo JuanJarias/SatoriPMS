@@ -1,76 +1,90 @@
-# Diagrama 02 — Flujo Integral de Reserva por WhatsApp
+# 02. Flujo de Reserva Automatizada por WhatsApp — SatoriPMS
 
-Este diagrama describe el ciclo conversacional completo de reserva a través de **WhatsApp Business**, desde la recepción del mensaje inicial hasta la confirmación de la reserva y persistencia transaccional en la base de datos con abono parcial o total.
+## 1. Propósito del Diagrama
+
+Este diagrama detalla paso a paso cómo un huésped realiza una reserva a través del asistente de WhatsApp de **Torre Satori** (tanto por la ruta guiada como mediante el asistente con inteligencia artificial), incluyendo la consulta de disponibilidad real, el bloqueo temporal de 15 minutos, la presentación del aviso de privacidad de datos personales, el desglose transparente de tarifa base y recargo por persona adicional, y las tres opciones de cierre: pago del 100%, anticipo del 50% o cancelación con liberación inmediata del bloqueo.
 
 ---
 
+## 2. Diagrama de Secuencia del Proceso de Reserva
+
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#E8EEF5', 'primaryTextColor': '#1B365D', 'primaryBorderColor': '#2C4D75', 'lineColor': '#2C4D75' }}}%%
 sequenceDiagram
     autonumber
-    actor Guest as 📱 Huésped (WhatsApp)
-    participant Meta as ☁️ Meta Cloud API
-    participant N8N as ⚡ n8n (Flujo V8)
-    participant Gemini as 🤖 Gemini Flash Lite
-    participant Redis as 🔴 Redis 7
-    participant API as ☕ Spring Boot API
-    participant DB as 🐘 PostgreSQL 16
+    actor H as Huésped (WhatsApp)
+    participant N as Orquestador Chatbot (n8n V8)
+    participant IA as Inteligencia Artificial (Gemini)
+    participant A as Servidor Central (Spring Boot API)
+    participant R as Memoria Rápida (Redis 7)
+    participant DB as Base de Datos (PostgreSQL 16)
 
-    Note over Guest,Meta: 1. Inicio y saludo del huésped
-    Guest->>Meta: "Hola, quisiera reservar para 2 personas del 15 al 18 de nov"
-    Meta->>N8N: Webhook Event (Mensaje entrante JSON)
+    H->>N: Escribe "Hola" o "Menú"
+    N->>R: Consulta o inicia sesión (session:{waId})
+    N-->>H: Presenta Menú Principal (Opciones 1 a 6)
 
-    Note over N8N,Redis: 2. Control de sesión y silenciamiento
-    N8N->>Redis: GET session:{waId}:agent_active
-    Redis-->>N8N: null / false (Bot activo)
+    alt Opción 1: Reserva Guiada Paso a Paso
+        H->>N: Selecciona "1. Hacer una reserva"
+        N-->>H: Solicita fecha de entrada y luego fecha de salida
+        H->>N: Envía fechas de estadía (checkIn y checkOut)
+        N->>A: Consulta habitaciones libres<br/>(GET /api/rooms/availability)
+        A->>DB: Busca habitaciones activas sin cruce de fechas
+        A->>R: Descarta habitaciones con bloqueo temporal activo
+        A-->>N: Devuelve lista de habitaciones disponibles
+        N-->>H: Muestra habitaciones con tarifa base y capacidad
+        H->>N: Elige número de habitación(es)
+    else Opción 2: Asistente con Inteligencia Artificial
+        H->>N: Selecciona "2. Asistente IA"
+        N-->>H: Da bienvenida e informa Aviso de Privacidad (Ley 1581)
+        H->>N: Describe en un solo mensaje fechas, personas, mascota y datos
+        N->>IA: Solicita extraer datos estructurados del texto
+        IA-->>N: Devuelve fechas, adultos, niños, mascota, nombre y cédula
+        N->>A: Consulta disponibilidad filtrada por capacidad y mascota<br/>(GET /api/rooms/availability)
+        A->>DB: Verifica reservas activas y capacidad
+        A->>R: Verifica ausencia de bloqueos temporales
+        A-->>N: Devuelve habitaciones compatibles
+        N-->>H: Muestra opciones disponibles para elegir
+        H->>N: Responde con el número de la habitación deseada
+    end
 
-    Note over N8N,Gemini: 3. Interpretación y extracción con IA (HU-09)
-    N8N->>Gemini: Prompt con mensaje natural + schema JSON
-    Gemini-->>N8N: JSON: {checkIn: "2026-11-15", checkOut: "2026-11-18", guests: 2}
+    rect rgb(255, 248, 231)
+        Note over N,R: Bloqueo Temporal Garantizado por 15 Minutos (900 segundos)
+        N->>A: Solicita bloquear la habitación elegida<br/>(POST /api/bookings/lock)
+        A->>R: Ejecuta script atómico por intervalo de fechas<br/>(lock:room:{roomId}:intervals + metadata TTL 900s)
+        R-->>A: Confirma bloqueo y entrega código (lockToken)
+        A-->>N: Devuelve lockToken y vigencia (900s)
+    end
 
-    Note over N8N,API: 4. Consulta de inventario real (CU-01.1)
-    N8N->>API: GET /api/bookings/availability?checkIn=2026-11-15&checkOut=2026-11-18
-    API->>DB: SELECT habitaciones libres sin reserva CONFIRMED/CHECKED_IN
-    DB-->>API: Lista de habitaciones disponibles
-    API->>Redis: Filtrar habitaciones con lock activo (room:*:lock)
-    API-->>N8N: 200 OK: [Hab 101 - Suite Bambú ($180k), Hab 102 - Estándar ($140k)]
+    opt Solo en Reserva Guiada: Captura de Huéspedes y Datos Personales
+        N-->>H: Confirma bloqueo por 15 min y pregunta adultos y niños
+        H->>N: Indica cantidad de adultos y niños
+        N-->>H: Presenta Aviso de Privacidad (Ley 1581 de 2012)<br/>y solicita nombre completo del titular
+        H->>N: Envía nombre completo, luego documento, mascota y acompañantes
+    end
 
-    N8N->>Meta: Mensaje con catálogo de habitaciones disponibles
-    Meta->>Guest: Presenta opciones interactivas y tarifas por noche
+    N-->>H: Muestra Resumen Completo de Reserva:<br/>• Tarifa base por noches<br/>• Recargo por persona adicional (si supera capacidad base)<br/>• Total estadía<br/>Opciones: 1) Pagar 100%  2) Anticipo 50%  3) Cancelar
 
-    Note over Guest,API: 5. Selección y Bloqueo Temporal de 15 Minutos (CU-01.2 / RN-02)
-    Guest->>Meta: Selecciona "Habitación 101 - Suite Bambú"
-    Meta->>N8N: Evento de selección
-    N8N->>API: POST /api/bookings/lock {roomId: 1, checkIn: "2026-11-15", checkOut: "2026-11-18"}
-    API->>Redis: EVAL script Lua: SET room:1:lock token NX EX 900
-    Redis-->>API: 1 (Candado adquirido con TTL de 15 minutos)
-    API-->>N8N: 200 OK: {lockToken: "uuid-lock-101", expiresAt: "15:45:00"}
-
-    Note over N8N,Guest: 6. Captura de datos personales y elección de abono
-    N8N->>Meta: Solicita nombre completo y documento del titular
-    Guest->>Meta: "Carlos Mendoza, CC 1118234567"
-    Meta->>N8N: Datos del huésped normalizados
-    N8N->>Meta: Modalidad de abono: 50% anticipo ($270k) o 100% total ($540k)
-    Guest->>Meta: Selecciona "50% Anticipo"
-
-    Note over N8N,DB: 7. Confirmación y Registro Transaccional (CU-01.4 / Flyway V5)
-    Meta->>N8N: Opción de pago confirmada
-    N8N->>API: POST /api/bookings/batch {rooms: [1], titular: "Carlos Mendoza", doc: "1118234567", paidAmount: 270000, totalAmount: 540000}
-    API->>DB: INSERT INTO booking (status='CONFIRMED', payment_status='partial', paid_amount=270000)
-    Note over DB: Validación excluyente EXCLUDE USING gist (Cero solapamiento)
-    DB-->>API: 201 Created: {groupCode: "ST-7842A", bookingId: 42}
-    API->>Redis: DEL room:1:lock (Libera candado temporal en memoria)
-    API-->>N8N: 201 Created con código de reserva de 8 caracteres
-
-    Note over N8N,Guest: 8. Voucher digital de confirmación inmediata
-    N8N->>Meta: Envía voucher con código ST-7842A, fechas, abono y saldo pendiente
-    Meta->>Guest: 📄 ¡Reserva Confirmada! Código: ST-7842A. Saldo pendiente: $270.000 COP al check-in.
+    alt Elige Opción 1 (Pago 100%) u Opción 2 (Anticipo 50%)
+        H->>N: Selecciona modalidad de pago (1 = 100% / 2 = 50%)
+        N->>A: Solicita confirmar reserva en firme<br/>(POST /api/bookings/confirm)
+        A->>R: Verifica que el lockToken siga vigente
+        A->>DB: Guarda huésped y reserva agrupada (reservationGroupId)<br/>status = 'confirmed', payment_status = 'paid' o 'partial'
+        A->>R: Elimina de inmediato el bloqueo temporal
+        A-->>N: Devuelve código de reserva (8 caracteres), total, abonado y saldo
+        N->>R: Reinicia sesión de usuario a estado de menú
+        N-->>H: Envía confirmación exitosa con código único y desglose de pago
+    else Elige Opción 3 (Cancelar) o Reinicia con "Menú"
+        H->>N: Selecciona "3. Cancelar" o escribe "menú"
+        N->>R: Limpia borrador de sesión del usuario
+        N->>A: Solicita liberar el bloqueo de inmediato<br/>(POST /api/bookings/unlock)
+        A->>R: Elimina intervalo y metadatos del bloqueo
+        N-->>H: Confirma cancelación y liberación inmediata de la habitación
+    end
 ```
 
 ---
 
-### Puntos Clave de la Arquitectura Conversacional
+## 3. Aspectos Clave del Flujo
 
-1. **Idempotencia de Sesión:** Redis almacena el estado de la conversación bajo la clave `session:{waId}`, permitiendo que el usuario retome el flujo si se interrumpe momentáneamente.
-2. **Candado de 15 Minutos:** Durante el paso 5, la habitación queda completamente invisible para otros usuarios. Si el cliente no completa los datos antes de que expire el TTL, Redis purga la llave automáticamente y la habitación vuelve al inventario público.
-3. **Persistencia de Abono:** En el paso 7, la base de datos almacena el valor efectivamente pagado en la columna `paid_amount` (`V5__add_paid_amount_and_review_entity.sql`), estableciendo el estado de pago como `partial` para liquidar el saldo pendiente al momento del check-in.
+1. **Dos caminos complementarios hacia la misma reserva:** Tanto el viajero que prefiere ser guiado pregunta por pregunta como el que prefiere redactar un solo mensaje en lenguaje natural convergen en las mismas reglas de validación del servidor central.
+2. **Transparencia en el cobro de personas adicionales:** Antes de que el huésped elija cómo pagar, el resumen discrimina siempre la tarifa base de las noches y el valor adicional cuando el grupo supera la capacidad base de la habitación.
+3. **Liberación inmediata ante desistimiento:** Si el viajero decide cancelar en el paso de pago o escribe *"menú"* para empezar de nuevo, el flujo invoca de inmediato la liberación del candado en memoria (`Liberar bloqueo : "POST /api/bookings/unlock"`), evitando que la habitación quede retenida innecesariamente.

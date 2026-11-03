@@ -1,39 +1,42 @@
-# Módulo — Tienda e Inventario
+# Tienda Interna e Inventario — SatoriPMS
 
-## 1. Propósito
+## 1. Propósito del Módulo
 
-La tienda del hotel vende snacks, bebidas y souvenirs, tanto a huéspedes alojados como a clientes de mostrador. El módulo gestiona el catálogo, las existencias, las ventas y los consumos cargados a las habitaciones, y entrega reportes de rotación para decidir qué reabastecer.
+El módulo de **Tienda Interna e Inventario** permite administrar la vitrina de productos adicionales que ofrece **Torre Satori** en su recepción (bebidas frías, café especial de Sevilla, mecato, artículos de aseo personal y recuerdos), facilitando tanto el registro de consumos cargados a la cuenta de una habitación como las ventas directas en efectivo o transferencia, y manteniendo el control exacto de las existencias en bodega.
 
-## 2. Requerimientos y Casos de Uso
+---
 
-**CU-05, Vender producto.** Venta en mostrador de productos del hotel. El pago puede hacerse de inmediato en efectivo o con tarjeta, o cargarse a la cuenta de la habitación reservada para liquidarse en el check-out.
+## 2. Administración del Catálogo de Productos (Rol Administrador)
 
-**CU-07, Administrar catálogo.** Creación de productos, edición de precio y descripción, y reabastecimiento de existencias.
+El **Administrador** gestiona el catálogo de artículos disponibles desde la aplicación web:
 
-**HU-14, Rotación de productos.** Reporte de rotación e inventario que identifica los productos de mayor y menor salida en periodos específicos.
+1. **Creación y edición de productos:** Permite registrar cada artículo con su nombre comercial (`Nombre del producto : "name"`), su precio unitario de venta vigente (`Precio de venta : "price"`) y la cantidad de unidades disponibles en inventario (`Existencias en inventario : "stock"`).
+2. **Abastecimiento de inventario:** Cuando el hotel compra nueva mercancía a sus proveedores, el administrador incrementa la cantidad de unidades disponibles del producto correspondiente.
+3. **Alertas visuales de existencias bajas:** El panel resalta automáticamente aquellos productos cuyas unidades disponibles estén próximas a agotarse (por ejemplo, 5 unidades o menos), permitiendo reabastecer la vitrina a tiempo antes de fines de semana o puentes festivos.
 
-## 3. Flujos Funcionales
+---
 
-**Alta de producto.** La recepcionista o el administrador ingresa nombre, descripción, precio, categoría, foto de la factura de compra y cantidad inicial de stock. El sistema valida que no exista un producto duplicado con el mismo nombre y que el precio y el stock sean valores numéricos válidos.
+## 3. Regla de Protección Contable al Retirar Productos
 
-**Edición y reabastecimiento.** Se puede modificar el precio, la descripción y la categoría de un producto, y sumar unidades al stock cuando llega mercancía. Cada reabastecimiento suma sobre el stock actual, nunca lo reemplaza.
+Para garantizar que los informes financieros y las cuentas históricas de meses anteriores nunca se descuadren ni pierdan información:
+- **Desactivación lógica en lugar de borrado físico:** Si el administrador decide retirar un producto que ya cuenta con ventas registradas en el historial del hotel, el sistema no elimina el registro de la base de datos; en su lugar, lo marca como inactivo (`Producto activo : "active = false"`).
+- **Efecto inmediato:** Un producto inactivo deja de aparecer en el selector de ventas de recepción para evitar nuevos cobros, pero conserva intacto su nombre y trazabilidad en todas las facturas y reportes contables pasados.
+- **Congelamiento del precio unitario en cada venta:** Cada vez que se registra un consumo, el sistema guarda en ese registro el precio exacto que tenía el producto en ese momento (`Precio unitario histórico : "unit_price"`). Así, si el administrador sube el precio de una bebida el mes siguiente, los consumos anteriores conservan el valor real al que fueron vendidos.
 
-**Desactivación.** Un producto se retira del catálogo cambiando `active` a falso. Un producto desactivado no aparece en las ventas, pero conserva su historial.
+---
 
-**Venta directa.** La recepcionista selecciona los productos y las cantidades. El sistema valida que haya existencias suficientes, descuenta las unidades vendidas del inventario y registra la venta como pagada.
+## 4. Registro de Ventas y Consumos en Recepción
 
-**Cargo a habitación.** Durante una estadía en curso, la recepcionista selecciona la reserva y registra el consumo con `paid = false`. El sistema valida el stock, descuenta las unidades y deja el consumo asociado a la reserva. En el check-out, los consumos pendientes se consolidan en la cuenta final del huésped.
+El **Recepcionista** (o el Administrador) puede registrar la salida de un producto bajo dos modalidades operativas:
 
-**Rotación de productos (HU-14).** El reporte lista los productos por cantidad vendida en un rango de fechas, con orden ascendente para ver los de menor salida y descendente para los de mayor salida, junto con el stock disponible de cada uno.
+### A. Consumo con Cargo a la Habitación (Huésped Alojado)
+1. El recepcionista selecciona la habitación ocupada (lo cual vincula el consumo con la reserva activa mediante `Identificador de reserva : "booking_id"`), elige el producto y digita la cantidad solicitada (`Cantidad consumida : "quantity"`).
+2. El sistema verifica que existan unidades suficientes en inventario y descuenta automáticamente la cantidad entregada.
+3. El recepcionista indica si el huésped pagó el producto de inmediato o si desea **cargarlo a la cuenta de su habitación**:
+   - **Si queda pendiente de pago (`Consumo pagado : "paid = false"`):** El valor se acumula en el estado de cuenta de la habitación y será exigido automáticamente por el sistema al momento de realizar la salida del huésped (Check-out).
+   - **Si se paga en el acto (`Consumo pagado : "paid = true"`):** Queda asentado en la reserva como un consumo ya saldado y se suma de inmediato a los ingresos de caja del día.
 
-## 4. Reglas de Negocio
-
-**RN-04, inmutabilidad histórica.** Un producto que posea registros de ventas o consumos asociados no puede eliminarse físicamente de la base de datos; únicamente puede desactivarse (`active = false`), para evitar inconsistencias contables.
-
-**Validación de stock.** Toda venta o cargo a habitación valida que haya existencias suficientes en inventario antes de descontar unidades. Si no las hay, la operación se rechaza e informa el stock disponible.
-
-**Precio histórico.** Cada consumo guarda el `unit_price` vigente al momento de la venta, de modo que un cambio posterior de precio no altera los registros anteriores.
-
-## 5. Datos Involucrados
-
-El catálogo vive en la tabla `product` y las ventas y cargos en la tabla `consumption`, ligada a la reserva mediante `booking_id`. El booleano `paid` distingue el consumo pagado de contado del que se liquida en el check-out. Los ingresos de tienda alimentan el módulo de Facturación y Finanzas.
+### B. Venta Directa de Mostrador (Sin Reserva Asociada)
+Si un visitante o un huésped que ya cerró su cuenta compra un producto pagándolo de inmediato en recepción:
+1. El recepcionista registra la venta sin vincularla a ninguna habitación (`Identificador de reserva : "booking_id = null"`).
+2. El consumo se marca automáticamente como pagado (`Consumo pagado : "paid = true"`), se descuentan las unidades del inventario y el ingreso se registra directamente en la contabilidad del hotel bajo la categoría de tienda.

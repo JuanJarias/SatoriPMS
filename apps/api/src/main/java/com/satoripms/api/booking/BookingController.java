@@ -22,11 +22,11 @@ import java.util.Map;
  * 
  * Gestiona el ciclo de vida completo de las reservas del hotel:
  * 1. Consulta de disponibilidad con filtros de fechas, capacidad y mascotas.
- * 2. Bloqueo temporal en Redis (anti-doble reserva con TTL de 15 minutos).
+ * 2. Bloqueo temporal en Redis (anti-doble reserva con TTL de 15 minutos) y liberación inmediata.
  * 3. Confirmación atómica por lote con soporte de abono parcial (50%) o total (100%).
  * 4. Consulta de detalles de reserva por código de grupo de 8 caracteres o UUID.
  * 5. Liquidación de saldo restante para reservas parciales.
- * 6. Cancelación con cálculo de política de reembolso proporcional (RN-03).
+ * 6. Cancelación con cálculo de política de reembolso proporcional sobre lo pagado (RN-03).
  * 7. Vista administrativa de depuración en tiempo real.
  */
 @RestController
@@ -100,6 +100,44 @@ public class BookingController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /**
+     * Libera de forma inmediata uno o varios bloqueos temporales en memoria (Redis)
+     * cuando el huésped cancela antes de pagar, reinicia su sesión en el chatbot
+     * o la sesión se limpia por inactividad.
+     *
+     * @param body Objeto con un bloqueo individual ({roomId, lockToken}) o una lista ({locks: [...]})
+     * @return Cantidad de bloqueos liberados
+     */
+    @PostMapping("/bookings/unlock")
+    public ResponseEntity<?> unlockRooms(@RequestBody(required = false) Map<String, Object> body) {
+        if (body == null || body.isEmpty()) {
+            return ResponseEntity.ok(Map.of("released", 0));
+        }
+        List<BookingRoomLockDto> locksToRelease = new ArrayList<>();
+        Object locksObj = body.get("locks");
+        if (locksObj instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    Object rId = map.get("roomId");
+                    Object token = map.get("lockToken");
+                    if (rId != null && token != null) {
+                        BookingRoomLockDto dto = new BookingRoomLockDto();
+                        dto.setRoomId(Long.valueOf(String.valueOf(rId)));
+                        dto.setLockToken(String.valueOf(token));
+                        locksToRelease.add(dto);
+                    }
+                }
+            }
+        } else if (body.get("roomId") != null && body.get("lockToken") != null) {
+            BookingRoomLockDto dto = new BookingRoomLockDto();
+            dto.setRoomId(Long.valueOf(String.valueOf(body.get("roomId"))));
+            dto.setLockToken(String.valueOf(body.get("lockToken")));
+            locksToRelease.add(dto);
+        }
+        int released = bookingService.releaseTemporaryLocks(locksToRelease);
+        return ResponseEntity.ok(Map.of("released", released));
     }
 
     /**
