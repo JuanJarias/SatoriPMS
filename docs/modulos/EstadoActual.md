@@ -78,6 +78,8 @@ Los estados utilizados corresponden estrictamente al vocabulario de la sección 
 | [`docs/Presupuesto/Presupuesto_SatoriPMS.xlsx`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Presupuesto_SatoriPMS.xlsx) | Existente y verificado | Libro financiero oficial (5 hojas, 684 fórmulas, redacción cliente) | 2026-11-03 |
 | [`docs/Presupuesto/Presupuesto.md`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Presupuesto.md) | Existente y verificado | Resumen ejecutivo y desglose presupuestal alineado al `.xlsx` | 2026-11-03 |
 | [`docs/Presupuesto/Actividad4_Crisis_Presupuestal.md`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Actividad4_Crisis_Presupuestal.md) | Existente y verificado | Análisis de escenarios de contingencia alineado al `.xlsx` | 2026-11-03 |
+| [`docs/Presentaciones/SatoriPMS-#2.pdf`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presentaciones/SatoriPMS-%232.pdf) | Existente y verificado | Presentación comercial y de negocio del Hotel Torre Satori PMS | 2026-11-05 |
+| [`docs/Presentaciones/Torre_Satori_Recuperacion.pdf`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presentaciones/Torre_Satori_Recuperacion.pdf) | Existente y verificado | Presentación ejecutiva de escenarios de crisis y recuperación presupuestal | 2026-11-05 |
 | [`docs/Reuniones/ReunionCliente.md`](file:///home/guarinve/Documentos/SatoriPMS/docs/Reuniones/ReunionCliente.md) | Existente y verificado | Transcripción histórica intacta de levantamiento con el cliente | 2026-10-08 |
 | [`docs/Actividades/ACTIVIDAD 4 (Escenarios de Crisis Presupuestal).pdf`](file:///home/guarinve/Documentos/SatoriPMS/docs/Actividades/ACTIVIDAD%204%20(Escenarios%20de%20Crisis%20Presupuestal).pdf) | Existente y verificado | Enunciado de referencia en formato PDF (intacto) | 2026-10-20 |
 
@@ -265,7 +267,7 @@ Las decisiones arquitectónicas y de negocio vigentes se detallan en la Sección
 
 ### 3.16 Fecha del Último Punto de Control
 
-- **2026-11-03** (Punto de control establecido tras completar la Fase 2 de la revisión integral).
+- **2026-11-05** (Punto de control tras la incorporación de las presentaciones ejecutivas y de negocio).
 
 ---
 
@@ -273,7 +275,24 @@ Las decisiones arquitectónicas y de negocio vigentes se detallan en la Sección
 
 Ordenado cronológicamente con lo más reciente primero, conforme a la sección 4.B y 12.B de [`GEMINI.md`](file:///home/guarinve/Documentos/SatoriPMS/GEMINI.md).
 
-### 4.1 Entrada del 2026-11-03 — Revisión Integral del Proyecto, Correcciones en Código/Flujo V8 y Normalización Documental
+### 4.1 Entrada del 2026-11-05 — Incorporación de Presentaciones Ejecutivas y de Negocio
+
+- **Fecha:** `2026-11-05`
+- **Categoría:** Cambio realizado (documentación visual y presentaciones de negocio).
+- **Descripción:** Se incorporaron en la carpeta `docs/Presentaciones/` dos presentaciones ejecutivas en formato PDF:
+  1. [`SatoriPMS-#2.pdf`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presentaciones/SatoriPMS-%232.pdf): Presentación visual comercial y estratégica del proyecto Torre Satori PMS (15 diapositivas), orientada a clientes, inversionistas y partes interesadas.
+  2. [`Torre_Satori_Recuperacion.pdf`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presentaciones/Torre_Satori_Recuperacion.pdf): Presentación ejecutiva y minimalista de evaluación de resiliencia financiera, optimización de infraestructura y planes de contingencia ante restricciones presupuestales severas (17 diapositivas), alineada a la identidad visual de la marca y al análisis presupuestal de la Actividad 4.
+- **Motivo:** Disponer de material formal y de alta calidad para la sustentación y presentación del proyecto ante docentes, evaluadores y socios comerciales.
+- **Estado anterior y posterior:**
+  - *Anterior:* La carpeta `docs/Presentaciones/` no existía en el repositorio ni estaba documentada.
+  - *Posterior:* Carpeta creada con dos documentos PDF formalmente inventariados y verificados.
+- **Elementos afectados:** `docs/Presentaciones/SatoriPMS-#2.pdf`, `docs/Presentaciones/Torre_Satori_Recuperacion.pdf`, `docs/modulos/EstadoActual.md` y `docs/CambiosPendientes.md`.
+- **Consecuencias y dependencias:** Se consolida el material gráfico y de negocio para exposiciones estratégicas del proyecto.
+- **Verificaciones realizadas:** Inspección de metadatos con `pdfinfo` (15 y 17 páginas respectivamente) y verificación de renderizado visual y legibilidad.
+- **Problemas identificados:** Ninguno.
+- **Estado final:** `Existente y verificado`.
+
+### 4.2 Entrada del 2026-11-03 — Revisión Integral del Proyecto, Correcciones en Código/Flujo V8 y Normalización Documental
 
 - **Fecha:** `2026-11-03`
 - **Categoría:** Cambio realizado (código, flujo conversacional, pruebas, presupuesto y documentación completa) + Decisiones aprobadas.
@@ -294,7 +313,7 @@ Ordenado cronológicamente con lo más reciente primero, conforme a la sección 
 - **Problemas identificados:** Los binarios `mvn` y `npm` no se encuentran instalados directamente en el `PATH` del sistema operativo anfitrión (se ejecutan dentro de los contenedores Docker o en GitHub Actions), por lo que la compilación Maven/Vite fuera de contenedor no se ejecutó en esta sesión.
 - **Estado final:** `Existente y verificado`.
 
-### 4.2 Entrada del 2026-10-25 — Implementación del Flujo Conversacional Híbrido V8, Historial de Chat y Reservas Grupales (Commit `605c230`)
+### 4.3 Entrada del 2026-10-25 — Implementación del Flujo Conversacional Híbrido V8, Historial de Chat y Reservas Grupales (Commit `605c230`)
 
 - **Fecha:** `2026-10-25`
 - **Categoría:** Cambio realizado (enviado al repositorio remoto en `origin/feat/database-redis-setup`).
@@ -370,4 +389,4 @@ Cada decisión documenta su contexto, la alternativa adoptada, las alternativas 
 ## 6. Fechas de Control
 
 - **Fecha de la última revisión integral:** `2026-11-03`
-- **Fecha del último punto de control:** `2026-11-03`
+- **Fecha del último punto de control:** `2026-11-05`
