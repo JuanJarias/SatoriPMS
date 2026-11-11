@@ -9,7 +9,13 @@ Seguridad: JWT, roles Administrador y Recepcionista, bcrypt/Argon2, auditoría i
 Tiempo real y operación: SSE o WebSocket para calendario (HU-03). /api/v1/health, Sentry, pg_dump cifrado diario 3:00 a. m. a R2 (30 días), CI con Postgres 16 efímero y pytest con concurrencia RN-02.
 Chatbot: n8n solo es adaptador; contexto conversacional en FastAPI/PostgreSQL, no en Redis. Gemini solo recomienda, nunca confirma disponibilidad ni precios.
 Pendiente definir (no asumir): proveedor WhatsApp, pasarela (Wompi o MercadoPago), fórmula sueldo (HU-07), descuentos (HU-12 en DB), datos obligatorios registro, política conservación documentos.
-Modos de trabajo: El dueño debe poder explicar y defender cada línea. Modos por ID: AGY (escribe y explica), GUIADO (concepto, esqueleto con TODOs, revisa código) o MÍO (solo revisa y señala errores). Sin modo asignado: GUIADO.
+Decisiones:
+1. Estados en español en DB (BLOQUEADA_TEMPORAL, CONFIRMADA, EN_CURSO, EXPIRADA, CANCELADA); React usa una única capa de traducción.
+2. Candado es fila en tabla reservas con expires_at y EXCLUDE gist. Antes de insertar, expira en la misma transacción bloqueos vencidos de esa habitación.
+3. Recepción confirma manualmente con auditoría; chatbot solo con webhook de pago validado. Pasarela tras puerto con mock sandbox; proveedor por definir.
+4. Tablero: no reabrir tarjetas "Done" antiguas; crear M0..Mn y marcar viejas como legacy-java.
+5. Tiempo real con SSE (si el tiempo aprieta, polling TanStack Query primero). No-Show 12:00 queda fuera de alcance. Frontend TypeScript se conserva (9 habitaciones).
+Modos de trabajo: El dueño debe poder explicar y defender cada línea. Modos por ID: AGY (escribe y explica), GUIADO (concepto, esqueleto con TODOs, revisa código) o MÍO (solo revisa y señala errores). Sin modo asignado: GUIADO. MÍO por defecto para: EXCLUDE/Alembic, bloqueo con expiración, JWT con roles y validación de webhook.
 Aprendizaje: Cada lote deja docs/aprendizaje/<ID>.md: qué hace, por qué así, cómo probarlo y 3 preguntas de defensa con respuesta.
 Reglas de cambio: antes de cada cambio escribir POR QUÉ · QUÉ · ARCHIVOS · cómo verificaré. Commits humanizados en español, push solo a migracion-fastapi, nunca a main.
 Comunicación: Chat <= 10 líneas, detalle a docs/. Precedencia: documentos oficiales > AGENTS.md > docs/audit/ anteriores.
