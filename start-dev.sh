@@ -91,7 +91,7 @@ done
 # ------------------------------------------------------------------------------
 if [ "$DESTROY_ONLY" = true ]; then
     log_step "DESTRUCCIÓN DE INFRAESTRUCTURA"
-    log_warn "Esta acción eliminará TODOS los contenedores y los volúmenes (incluyendo la BD Postgres y Redis)."
+    log_warn "Esta acción eliminará TODOS los contenedores y los volúmenes (incluyendo la BD Postgres)."
     read -p "¿Estás seguro de que deseas destruir todo? (escribe 'si' para confirmar): " -r confirm
 
     if [[ "$confirm" != "si" && "$confirm" != "yes" && "$confirm" != "SI" ]]; then
@@ -117,7 +117,7 @@ fi
 # ------------------------------------------------------------------------------
 check_dependencies() {
     log_step "PASO 1: Verificando dependencias del sistema"
-    local deps=("docker" "node" "npm" "java" "mvn")
+    local deps=("docker" "node" "npm" "python3")
     local missing=0
 
     for cmd in "${deps[@]}"; do
@@ -157,24 +157,11 @@ check_env() {
 }
 
 # ------------------------------------------------------------------------------
-# Fase 2.5: Compilación rápida del Backend (Host)
-# ------------------------------------------------------------------------------
-build_backend_jar() {
-    log_info "Compilando JAR con Maven local (rápido, ~3 segundos)..."
-    (cd "$ROOT_DIR/apps/api" && mvn -q -DskipTests package)
-    log_success "JAR compilado exitosamente."
-}
-
-# ------------------------------------------------------------------------------
 # Fase 3: Desplegar / Actualizar Infraestructura
 # ------------------------------------------------------------------------------
 deploy_infra() {
     log_step "PASO 3: Levantando Infraestructura Backend (Docker)"
     
-    if [ ! -f "$ROOT_DIR/apps/api/target/api-0.1.0-SNAPSHOT.jar" ] || [ "$UPDATE_INFRA" = true ]; then
-        build_backend_jar
-    fi
-
     local compose_cmd="docker compose"
 
     if [ "$UPDATE_INFRA" = true ]; then

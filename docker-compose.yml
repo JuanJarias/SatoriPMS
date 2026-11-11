@@ -18,21 +18,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Caché y bloqueos ───────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: satori_redis
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # ── Orquestación del chatbot ───────────────────────────
   n8n:
     profiles: ["n8n"]
@@ -56,14 +41,10 @@ services:
       - n8n_data:/home/node/.n8n
       - ./flows/n8n:/home/node/.n8n/workflows:ro
     depends_on:
-      api:
-        condition: service_started
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
 
-  # ── Backend API ────────────────────────────────────────
+  # ── Backend API (FastAPI) ──────────────────────────────
   api:
     build: ./apps/api
     container_name: satori_api
@@ -71,18 +52,13 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres:5432/satoripms
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-satori}:${POSTGRES_PASSWORD:-satori_dev}@postgres:5432/${POSTGRES_DB:-satoripms}
       POSTGRES_USER: ${POSTGRES_USER:-satori}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-satori_dev}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
 volumes:
   postgres_data:
-  redis_data:
   n8n_data:
