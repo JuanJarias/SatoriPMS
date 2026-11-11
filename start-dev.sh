@@ -200,7 +200,7 @@ start_frontend() {
     echo -e "${BOLD}${GREEN}======================================================================${NC}"
     echo -e "${BOLD}Resumen de Acceso a Servicios:${NC}"
     echo -e "   • App Web (Frontend):  ${CYAN}http://localhost:5173${NC}"
-    echo -e "   • Backend API:         ${CYAN}http://localhost:8080/swagger-ui/index.html${NC}"
+    echo -e "   • Backend API:         ${CYAN}http://localhost:8080/docs${NC}"
     if [[ ",${compose_profiles}," == *",n8n,"* ]]; then
         echo -e "   • n8n Chatbot:         ${CYAN}${n8n_public_url:-http://localhost:5678}${NC}"
     else
