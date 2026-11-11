@@ -19,6 +19,72 @@ Como ingeniero telemático, tu formación está centrada en **capas de comunicac
 
 ---
 
+## 0.1 Investigación Fundamental: El Motor del Backend (FastAPI + ASGI + Pydantic)
+
+### 1. ¿Qué es FastAPI bajo la óptica telemática?
+FastAPI no es un monolito pesado como Spring Boot o Django; es un **servidor de aplicaciones asíncrono y modular** construido sobre dos pilares:
+1. **Starlette (Capa de Transporte y Red):** Maneja el protocolo HTTP de bajo nivel, websockets, enrutamiento de peticiones y middlewares.
+2. **Pydantic (Capa de Presentación / Protocolo de Datos):** Motor de validación de esquemas y tipos de datos compilado en Rust. Se encarga de verificar que los campos, formatos y tamaños de cada paquete JSON entrante cumplan el contrato del API antes de que lleguen a la lógica del hotel.
+
+### 2. El Salto Arquitectónico: WSGI vs. ASGI (Sockets No Bloqueantes)
+* **El modelo antiguo (WSGI — Flask / Django tradicional):** Asignaba un hilo del sistema operativo por cada socket TCP. Si 50 usuarios pedían disponibilidad al mismo tiempo, el servidor requería 50 hilos. Si la base de datos tardaba 100 ms en responder, los 50 hilos quedaban congelados esperando I/O (Input/Output).
+* **El modelo de FastAPI (ASGI — Asynchronous Server Gateway Interface con Uvicorn):** Utiliza un **Event Loop asíncrono sobre llamadas al kernel (`epoll` en Linux / `kqueue` en macOS)**. Funciona igual que NGINX o Node.js: un solo hilo puede gestionar miles de conexiones TCP simultáneas. Cuando un endpoint ejecuta `await db.execute(...)`, el hilo no se bloquea; delega la espera de red al kernel y atiende inmediatamente otra petición.
+
+### 3. El Ciclo de Vida de una Petición HTTP en FastAPI
+Cuando un huésped o recepcionista interactúa con SatoriPMS, la trama viaja a través de las siguientes etapas:
+
+```
+[Cliente: WhatsApp o Web]
+       │
+       ▼ (1. Conexión TCP / TLS)
+[Servidor ASGI: Uvicorn en Puerto 8080]
+       │
+       ▼ (2. Capa Middleware: CORS & Headers)
+[Filtro CORS: Permite origen localhost:5173 o dominio Vercel]
+       │
+       ▼ (3. Enrutamiento: APIRouter)
+[Router correspondiente: /api/v1/rooms o /bookings o /auth]
+       │
+       ▼ (4. Capa de Validación: Pydantic DTO)
+[¿El JSON tiene checkIn, checkOut válidos? Si no -> Error 422 Unprocessable Entity]
+       │
+       ▼ (5. Inyección de Dependencias: Depends)
+[get_db(): Abre socket a Postgres en Supabase]
+[get_current_user(): Valida firma criptográfica de JWT si la ruta es protegida]
+       │
+       ▼ (6. Lógica de Dominio del Hotel)
+[Consulta disponibilidad, expira bloqueos vencidos o inserta bloqueo temporal]
+       │
+       ▼ (7. Serialización y Respuesta)
+[Convierte modelos SQLAlchemy a JSON y envía HTTP 200 OK]
+```
+
+### 4. Qué Estudiar de FastAPI y Dónde (Tiempo estimado: 35 minutos)
+No necesitas leer toda la documentación; lee únicamente estas 4 secciones canónicas en orden:
+1. **Primeros Pasos y Parámetros (10 min):**
+   * Aprende la diferencia entre:
+     - **Path Parameter (en la URL):** `GET /api/v1/rooms/{room_id}` (identifica un recurso específico).
+     - **Query Parameter (tras el signo `?`):** `GET /api/v1/rooms/availability?check_in=2026-11-15&check_out=2026-11-18&adults=2` (filtros de búsqueda).
+     - **Request Body (en el payload JSON):** `POST /api/v1/bookings/lock` con `{ "room_id": 1, ... }` (datos para crear o mutar recursos).
+   * *Lectura:* [FastAPI Tutorial - First Steps](https://fastapi.tiangolo.com/tutorial/first-steps/) y [Path & Query Parameters](https://fastapi.tiangolo.com/tutorial/path-params/).
+2. **Esquemas de Entrada y Salida con Pydantic (10 min):**
+   * Observa cómo una clase como `class LockRequest(BaseModel): room_id: int, check_in: date, check_out: date` valida automáticamente tipos y descarta peticiones malformadas.
+   * *Lectura:* [FastAPI - Request Body](https://fastapi.tiangolo.com/tutorial/body/).
+3. **Inyección de Dependencias (`Depends`) (10 min):**
+   * Es el concepto más potente de FastAPI. Permite inyectar sesiones de base de datos (`db: AsyncSession = Depends(get_db)`) asegurando que la conexión se abra al inicio y se cierre al final automáticamente, evitando fugas de conexiones en el pool.
+   * *Lectura:* [FastAPI - Dependencies](https://fastapi.tiangolo.com/tutorial/dependencies/).
+4. **Estructura Modular con `APIRouter` (5 min):**
+   * Cómo dividir el sistema en submódulos limpios (`routers/rooms.py`, `routers/bookings.py`, `routers/auth.py`) y montarlos en `main.py` con `app.include_router(...)`.
+   * *Lectura:* [FastAPI - Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/).
+
+### 5. Criterio de Suficiencia de FastAPI ("Semáforo Verde")
+Estás listo para entender y dirigir el código de FastAPI si puedes responder esto:
+* [x] **Check 1:** ¿Sé qué diferencia hay entre `def mi_endpoint()` y `async def mi_endpoint()`? (Respuesta: `async def` permite usar `await` para llamadas no bloqueantes a PostgreSQL o Meta; si no se usa I/O de red, se puede usar `def` plano y FastAPI lo ejecuta en un threadpool externo).
+* [x] **Check 2:** ¿Por qué la documentación interactiva en `/docs` (Swagger) se genera automáticamente sin programar HTML? (Respuesta: porque FastAPI lee directamente las anotaciones de tipo de Python y los modelos Pydantic, generando el estándar OpenAPI 3.1 en formato JSON).
+* [x] **Check 3:** ¿Qué error devuelve FastAPI cuando un cliente envía un texto en lugar de un número en un campo entero? (Respuesta: HTTP 422 Unprocessable Entity indicando exactamente qué campo falló en la validación).
+
+---
+
 ## MÓDULO 0: Infraestructura, PostgreSQL 16 y Restricción GiST (Lote M0)
 
 ### 1. El Puente Mental Telemático
