@@ -1,7 +1,7 @@
 # Plan Maestro de Migración a FastAPI y Acotamiento de Alcance (Sprint 5)
 
 **Fecha de elaboración:** 2026-11-10  
-**Fecha de ajuste:** 2026-11-10 (Ajuste de capacidad con colchón ≥4h y lote de Despliegue MVP)  
+**Fecha de ajuste:** 2026-11-10 (Integración WhatsApp Real en P1, Meta Cloud API, Capacidad 48h y Plan B de Demo)  
 **Fecha límite Sprint 5:** 2026-11-20  
 **Rama de trabajo:** `migracion-fastapi` (NUNCA main)  
 **Referencia de especificación legada:** Tag `legacy-java-backup` (commit `d0b17ad17db04fe5b6027838ff108bd418c04413`) y directorio `docs/legacy-ref/`
@@ -22,7 +22,7 @@ El código Java alojado en el tag `legacy-java-backup` actúa exclusivamente com
 | **E1 Reservas y Chatbot** | `POST /api/bookings/batch` | `apps/api/.../BookingController.java:128` | **REESCRIBIR** | Confirmación atómica de reservas por recepción física o vía webhook sandbox con firma HMAC. |
 | **E1 Reservas y Chatbot** | `GET /api/bookings/group/{code}` | `apps/api/.../BookingController.java:150` | **PORTAR** | Consulta de detalle de reserva por código alfanumérico de grupo (8 caracteres). Lógica de dominio reusable. |
 | **E1 Reservas y Chatbot** | `RedisLockService.java` | `apps/api/.../RedisLockService.java:1-85` | **DESCARTAR** | Prohibido Redis. El bloqueo anti-solapamiento es responsabilidad exclusiva de PostgreSQL con `btree_gist`. |
-| **E1 Reservas y Chatbot** | `BookingBatchPersistenceIntegrationTest.java` | `apps/api/.../BookingBatchPersistenceIntegrationTest.java:1-92` | **PORTAR** | Reescribir a `pytest` local con Postgres 16 para verificar concurrencia y rechazo de solapamiento de fechas (RN-02). |
+| **E1 Reservas y Chatbot** | `BookingBatchPersistenceIntegrationTest.java` | `apps/api/.../BookingBatchPersistenceIntegrationTest.java:1-92` | **PORTAR** | Reescribir a `pytest` local con Postgres 16 (Docker Compose) para verificar concurrencia y rechazo de solapamiento de fechas (RN-02). |
 | **E2 Operación Web** | `GET /api/bookings/debug` | `apps/api/.../BookingController.java:232` | **PORTAR** | Consumido por la pantalla `ReservasDebug.tsx`. Provee auditoría de todas las reservas y estados de habitación. |
 | **E2 Operación Web** | `WebSocketConfig.java` | `apps/api/.../WebSocketConfig.java:1-25` | **DESCARTAR** | Se reemplaza inicialmente por polling con TanStack Query y opcionalmente SSE `/api/v1/events/calendar`. |
 | **E3 Facturación y Finanzas** | `POST /api/bookings/group/{code}/cancellation` (RN-03) | `apps/api/.../BookingController.java:178` | **PORTAR (P2)** | Cálculo de reembolso proporcional (>72h: 100%, 24-72h: 50%, <24h: 0%). Reubicado a P2 para proteger el núcleo. |
@@ -56,10 +56,10 @@ Análisis de llamadas HTTP reales frente a datos simulados (`mockData.ts`):
 | :--- | :--- | :--- | :--- | :--- |
 | **RN-01** | Capacidad y recargo persona adicional | Documentos Oficiales | Parcial (`Booking.java:39`, lógica en service) | **P1 (M2)**: Validar capacidad máx. de 9 habitaciones y recargo. |
 | **RN-02** | Anti-solapamiento (EXCLUDE) y bloqueo 15 min | Documentos Oficiales | Roto (delegaba bloqueo a Redis y EXCLUDE no cubría bloqueo) | **P1 (M0, M2)**: `EXCLUDE USING gist` en PostgreSQL 16 con `expires_at`. |
-| **RN-03** | Reembolso proporcional cancelación (>72h/24h/0h) | Documentos Oficiales | Funcional (`BookingService.java:310`) | **P2 (M5a)**: Portar a Python si hay margen de tiempo. |
+| **RN-03** | Reembolso proporcional cancelación (>72h/24h/0h) | Documentos Oficiales | Funcional (`BookingService.java:310`) | **P2 (M5b)**: Portar a Python si hay margen de tiempo. |
 | **RN-04** | Tienda e inventario (sin stock negativo) | Documentos Oficiales | Ausente | **v1.1**: Fuera de alcance de Sprint 5. |
 | **RN-05** | Check-in 15:00 / Check-out 11:00 | Issue GitHub #11 | Mock en frontend | **P1 (M4)**: Estados `EN_CURSO` al check-in con auditoría. |
-| **RN-06** | Notificación WhatsApp 24h antes | Issue GitHub #12 | Parcial en n8n | **v1.1**: Requiere integración final WhatsApp Cloud API. |
+| **RN-06** | Notificación WhatsApp 24h antes | Issue GitHub #12 | Parcial en n8n | **v1.1**: Requiere integración final WhatsApp Cloud API comercial. |
 | **RN-07** | Exportación reporte a Excel (openpyxl) | Issue GitHub #13 | Ausente | **v1.1**: Fuera de alcance de Sprint 5. |
 | **RN-08** | Factura / Recibo digital | Issue GitHub #14 | Ausente | **v1.1**: Fuera de alcance de Sprint 5. |
 | **RN-09** | Control inventario amenidades | Issue GitHub #15 | Ausente | **v1.1**: Fuera de alcance de Sprint 5. |
@@ -73,52 +73,57 @@ Análisis de llamadas HTTP reales frente a datos simulados (`mockData.ts`):
 ## 2. Capacidad, Ajuste de Presupuesto y Creación del Colchón
 
 * **Período de Ejecución:** 2026-11-11 al 2026-11-20 (10 días calendario).
-* **Dedicación Disponible:** 1 persona × 4 horas/día = **40.0 horas totales**.
+* **Dedicación Disponible:**
+  * 8 días laborables (11, 12, 13, 16, 17, 18, 19 y 20 nov) × 4 h/día = **32.0 horas**.
+  * Fin de semana de alta dedicación (sábado 14 y domingo 15 nov) × 8 h/día = **16.0 horas**.
+  * **Total Capacidad Bruta Disponible:** **48.0 horas**.
 * **Reserva Obligatoria de Calidad y Sustentación:** **10.0 horas** reservadas para:
   * Pruebas de integración, verificación de concurrencia y QA (3.5 h).
   * Documentación pedagógica en `docs/aprendizaje/<ID>.md` con preguntas de sustentación (4.0 h).
-  * Preparación de guion y ensayo de la demostración end-to-end (2.5 h).
-* **Presupuesto Neto Disponible para Desarrollo:** **30.0 horas**.
-* **Horas Reales de Desarrollo P1:** **25.5 horas**.
-* **Colchón Neto de Seguridad:** **4.5 horas** (Supera el mínimo requerido de ≥4 h).
+  * Preparación de guion y ensayo de la demostración end-to-end con Plan B (2.5 h).
+* **Presupuesto Neto Disponible para Desarrollo:** **38.0 horas**.
+* **Horas Reales de Desarrollo P1:** **29.0 horas**.
+* **Colchón Neto de Seguridad (Holgura P1):** **9.0 horas** (Supera ampliamente el mínimo de ≥4.0 h).
 
-### 2.1 Reubicaciones de P1 a P2 para Crear el Colchón
-Para garantizar la entrega puntual sin comprometer la demo en vivo, se retiró de P1 lo que menos aporta a la demostración funcional:
-1. **Pipeline de CI automatizado con Postgres efímero (-2.0 h):** Se traslada a P2 (M5d). En M0 la verificación de la migración y la restricción `EXCLUDE` se ejecuta localmente con `pytest` y docker-compose. Configurar runners de GitHub Actions no añade valor a la sustentación presencial.
-2. **Subflujos secundarios y errores complejos en n8n (-1.5 h):** Se reubican en P2/v1.1. En M3 se programa exclusivamente el **camino feliz mínimo** de cotización y reserva para WhatsApp.
-3. **Mecanismo genérico de auditoría global (-1.0 h):** Se traslada a P2. En M1/M4 se realiza inserción directa de auditoría solo para los eventos estrictos de la demo (login, confirmación, check-in).
-4. **Filtros avanzados de disponibilidad y reglas complejas (-1.5 h):** Se traslada a P2. M2 se enfoca en las 9 habitaciones fijas del hotel, validación de capacidad (RN-01) y bloqueo temporal atómico.
-5. **Optimización de vistas frontend y fallback a polling (-0.5 h):** M4 se acota al flujo feliz de recepción (login + grilla 9 habs + botón check-in).
+```
+Presupuesto Total Disponible (48.0 h):
+├── Reserva Calidad, Docs Aprendizaje y Demo: 10.0 h
+├── Lotes de Desarrollo P1 (Núcleo + WhatsApp Real + Despliegue): 29.0 h
+└── Colchón Neto de Imprevistos (Holgura P1): 9.0 h (≥ 4.0 h CUMPLIDO)
+```
 
 ---
 
 ## 3. Plan en Lotes (M0 a Mn)
 
-### 3.1 Lotes P1 (Núcleo Entregable Sprint 5 — Meta Obligatoria: 25.5 h)
+### 3.1 Lotes P1 (Núcleo Entregable Sprint 5 — Meta Obligatoria: 29.0 h)
 
 | ID | Épica | Tarea | Prioridad | Modo | Horas Est. | Depende de | Cómo se verificará | Por qué ese modo |
 | :--- | :--- | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
-| **M0** | E1 | **Infraestructura Base, PostgreSQL 16 y Migración Inicial Alembic con EXCLUDE**:<br>• Configuración FastAPI + SQLAlchemy 2.0 async + Alembic.<br>• Contenedor Docker Compose con `postgres:16` y extensión `btree_gist`.<br>• Modelos base: `Room` (9 habs seedeadas), `Guest`, `Booking`, `AuditLog`.<br>• Migración Alembic con constraint `EXCLUDE USING gist (room_id WITH =, daterange(check_in, check_out, '[)') WITH &&) WHERE (status IN ('BLOQUEADA_TEMPORAL', 'CONFIRMADA', 'EN_CURSO'))`.<br>• Endpoint `/api/v1/health` (sin CI en GitHub Actions por ahora). | **P1** | **MÍO** (en constraint y migración) / **AGY** (scaffolding y config) | **4.5 h** | Ninguna | `alembic upgrade head`; script sql insertando dos rangos solapados en estado CONFIRMADA y verificando error `ExclusionViolation` de PostgreSQL; `curl /api/v1/health` retornando 200 con estado de DB. | **MÍO** en la constraint EXCLUDE porque es la regla arquitectural más sensible (RN-02) y pregunta segura del tribunal. AGY en Docker/scaffolding para ganar tiempo. |
-| **M1** | E6 | **Identidad, Seguridad RBAC y Auditoría Inmutable**:<br>• Modelo `User` con contraseña en Argon2/bcrypt y roles `Administrador`, `Recepcionista`.<br>• Endpoints `/api/v1/auth/login` y `/api/v1/auth/me`.<br>• Middleware/dependencias FastAPI `get_current_user` y `require_role(...)`.<br>• Registro inmutable de eventos de auditoría para operaciones críticas. | **P1** | **MÍO** (en JWT y RBAC) / **GUIADO** (en auditoría) | **4.0 h** | M0 | Tests en pytest probando: login válido entrega JWT, login inválido 401; usuario recepcionista accediendo a ruta admin recibe 403; inserción de evento de auditoría en mutaciones clave. | **MÍO** obligatorio por regla de seguridad para dominar la generación del token, expiración y claims de rol. |
-| **M2** | E1/E2 | **Motor de Habitaciones, Disponibilidad y Bloqueo Temporal con Expiración**:<br>• Catálogo de 9 habitaciones con capacidades y tarifas.<br>• Endpoint `GET /api/v1/rooms/availability` consultando disponibilidad real e **ignorando bloqueos vencidos inline** (`WHERE expires_at IS NULL OR expires_at > NOW()`). **No depende del job de M5.**<br>• Endpoint `POST /api/v1/bookings/lock`: crea fila `BLOQUEADA_TEMPORAL` con `expires_at = NOW() + 15 min`. Expira atómicamente bloqueos vencidos de la habitación en la misma transacción previa al insert.<br>• Endpoint `POST /api/v1/bookings/unlock`: cancela/libera el bloqueo temporal.<br>• Validación RN-01 (capacidad) y RN-12 (consentimiento Ley 1581). | **P1** | **MÍO** (en expiración atómica y bloqueo) / **GUIADO** (en catálogo y DTOs) | **6.0 h** | M0, M1 | Test concurrente en pytest: 2 peticiones simultáneas bloqueando la misma habitación y fecha; una tiene éxito (200) y la otra recibe 409 Conflict. Verificación de que bloqueo con `expires_at` pasado no bloquea nuevas búsquedas sin necesidad de job en background. | **MÍO** obligatorio para dominar la transacción SQL atómica de expiración + inserción del bloqueo temporal bajo la protección del EXCLUDE gist. |
-| **M3** | E1 | **Integración Webhook de Pagos Sandbox y Confirmación Atómica de Reservas (Camino Feliz)**:<br>• Puerto de pasarela de pago con adaptador sandbox.<br>• Endpoint `POST /api/v1/payments/webhook`: validación de firma criptográfica HMAC `X-Hub-Signature-256`, verificación de idempotencia contra tabla de eventos.<br>• Transición atómica de reserva de `BLOQUEADA_TEMPORAL` a `CONFIRMADA`.<br>• Endpoint `/api/v1/bookings/group/{code}` para consulta de voucher.<br>• Adaptación de flujo n8n para el **camino feliz mínimo** eliminando nodos Redis y conectando por HTTP a FastAPI. | **P1** | **MÍO** (en HMAC e idempotencia) / **GUIADO** (en n8n y DTOs) | **4.0 h** | M2 | Enviar webhook simulado sin firma o firma alterada -> 401; enviar webhook válido -> 200 y reserva cambia a `CONFIRMADA`; reenviar webhook idéntico -> 200 sin duplicar procesamiento; ejecución del flujo feliz en n8n. | **MÍO** obligatorio para defender la seguridad financiera: verificación criptográfica de la autenticidad del pago e idempotencia. |
-| **M4** | E2 | **Integración Frontend Operativo Web (Recepción y Calendario)**:<br>• Adaptación de llamadas en frontend React (`apps/web`): conectar `ReservasDebug.tsx` y vista de grilla/calendario de recepción a FastAPI.<br>• Login web consumiendo `/api/v1/auth/login` y guardando token en memoria/storage seguro.<br>• Pantalla de recepción con listado de reservas activas (`CONFIRMADA`, `EN_CURSO`), confirmación manual en sitio y check-in operativo (RN-06). | **P1** | **GUIADO** | **3.5 h** | M1, M2, M3 | `npm run build` sin errores de tipo TypeScript; flujo en navegador: iniciar sesión como Recepcionista, visualizar la reserva creada en M3 en el panel, pulsar botón de check-in y verificar transición a `EN_CURSO` en DB con evento en auditoría. | **GUIADO** porque el frontend ya cuenta con componentes estructurados en React/Tailwind y solo requiere reemplazar mocks por TanStack Query hooks. |
-| **M-DEP** | Transversal | **Despliegue MVP en la Nube (Opción 2 Simplificada)**:<br>• Frontend: Vercel o Cloudflare Pages desplegando `apps/web` con variable `VITE_API_URL`.<br>• Base de datos: PostgreSQL 16 con extensión `btree_gist` en Supabase o Neon.<br>• Backend: FastAPI en Railway desplegando desde la rama `migracion-fastapi` (NUNCA main). Migraciones de Alembic ejecutadas al arrancar (`alembic upgrade head`). Healthcheck `/api/v1/health`.<br>• Secretos exclusivamente vía variables de entorno en los paneles (sin credenciales en git).<br>• n8n: Desplegado en Railway (mismo proyecto) o local con túnel Cloudflare/ngrok para la demo.<br>• **Documentación de riesgo:** Mitigación del arranque en frío (cold start) en capas gratuitas. | **P1** | **GUIADO** | **3.5 h** | M0, M1, M2, M3, M4 | Ping HTTP exitoso a `/api/v1/health` en Railway; acceso público HTTPS al frontend en Vercel; creación de reserva completa vía webhook sandbox en producción. | **GUIADO** para asegurar que el estudiante configure y domine cada panel de despliegue sin errores de credenciales. |
+| **M-META** | E1 | **Configuración Meta Cloud API, WhatsApp Real y Webhook n8n**:<br>• Cuenta en Meta for Developers y configuración de App con WhatsApp Cloud API.<br>• Generación de Token de Acceso Permanente (System User) y registro de número de prueba con destinatarios permitidos.<br>• Configuración del Webhook público HTTPS en n8n (`hub.verify_token`, `hub.challenge`).<br>• Verificación de límites oficiales (máx 5 destinatarios en test, ventana 24 h). | **P1** | **GUIADO** | **2.5 h** | Ninguna (arranca 11-nov en paralelo) | Envío y recepción de mensaje de texto real desde WhatsApp en teléfono físico hacia n8n con confirmación en log de n8n. | **GUIADO** porque requiere pasos en la consola de Meta donde el estudiante debe configurar sus propias credenciales. |
+| **M0** | E1 | **Infraestructura Base, PostgreSQL 16 (Local y Supabase con `btree_gist`), Alembic Inicial con EXCLUDE y Pytest Concurrente**:<br>• FastAPI + SQLAlchemy 2.0 async + Alembic.<br>• Contenedor local con `postgres:16` y verificación de `CREATE EXTENSION btree_gist` en **Supabase**.<br>• Modelos base: `Room` (9 habs seedeadas), `Guest`, `Booking`, `AuditLog`.<br>• Migración Alembic con constraint `EXCLUDE USING gist (room_id WITH =, daterange(check_in, check_out, '[)') WITH &&) WHERE (status IN ('BLOQUEADA_TEMPORAL', 'CONFIRMADA', 'EN_CURSO'))`.<br>• Endpoint `/api/v1/health`.<br>• **Pytest local de concurrencia RN-02** con Docker Compose. | **P1** | **MÍO** (en constraint y migración) / **AGY** (scaffolding y config) | **4.5 h** | Ninguna | `alembic upgrade head`; script sql insertando dos rangos solapados en estado CONFIRMADA y verificando error `ExclusionViolation` de PostgreSQL; `pytest` local de concurrencia pasando en verde. | **MÍO** en la constraint EXCLUDE porque es la regla arquitectural más sensible (RN-02) y pregunta segura del tribunal. AGY en Docker/scaffolding para ganar tiempo. |
+| **M1** | E6 | **Identidad, Seguridad RBAC y Auditoría de Reservas y Check-in/out**:<br>• Modelo `User` con contraseña en Argon2/bcrypt y roles `Administrador`, `Recepcionista`.<br>• Endpoints `/api/v1/auth/login` y `/api/v1/auth/me`.<br>• Dependencias FastAPI `get_current_user` y `require_role(...)`.<br>• Inserción inmutable en tabla `audit_log` para eventos críticos (login, confirmación de reserva y check-in/out). | **P1** | **MÍO** (en JWT y RBAC) / **GUIADO** (en auditoría) | **4.0 h** | M0 | Tests en pytest probando: login válido entrega JWT, login inválido 401; usuario recepcionista accediendo a ruta admin recibe 403; inserción de fila en `audit_log` comprobable en DB. | **MÍO** obligatorio por regla de seguridad para dominar la generación del token, expiración y claims de rol. |
+| **M2** | E1/E2 | **Motor de Habitaciones, Disponibilidad y Bloqueo Temporal con Expiración**:<br>• Catálogo de 9 habitaciones con capacidades y tarifas.<br>• Endpoint `GET /api/v1/rooms/availability` consultando disponibilidad real e **ignorando bloqueos vencidos inline** (`WHERE expires_at IS NULL OR expires_at > NOW()`). **No depende del job de M5.**<br>• Endpoint `POST /api/v1/bookings/lock`: crea fila `BLOQUEADA_TEMPORAL` con `expires_at = NOW() + 15 min`. Expira atómicamente bloqueos vencidos de la habitación en la misma transacción previa al insert.<br>• Endpoint `POST /api/v1/bookings/unlock`: cancela/libera el bloqueo temporal.<br>• Validación RN-01 (capacidad) y RN-12 (consentimiento Ley 1581). | **P1** | **MÍO** (en expiración atómica y bloqueo) / **GUIADO** (en catálogo y DTOs) | **5.5 h** | M0, M1 | Test concurrente en pytest: 2 peticiones simultáneas bloqueando la misma habitación y fecha; una tiene éxito (200) y la otra recibe 409 Conflict. Verificación de que bloqueo con `expires_at` pasado no bloquea nuevas búsquedas sin necesidad de job en background. | **MÍO** obligatorio para dominar la transacción SQL atómica de expiración + inserción del bloqueo temporal bajo la protección del EXCLUDE gist. |
+| **M3** | E1 | **Integración Webhook Sandbox, Confirmación Atómica y n8n con WhatsApp Real (Camino Feliz Completo)**:<br>• Puerto de pasarela de pago con adaptador sandbox.<br>• Endpoint `POST /api/v1/payments/webhook`: validación de firma criptográfica HMAC `X-Hub-Signature-256`, verificación de idempotencia contra tabla de eventos.<br>• Transición atómica de reserva de `BLOQUEADA_TEMPORAL` a `CONFIRMADA`.<br>• Endpoint `/api/v1/bookings/group/{code}` para consulta de voucher.<br>• **Camino feliz completo en n8n + WhatsApp Real:** Saludo inicial -> consulta disponibilidad -> selección habitación -> bloqueo temporal 15 min -> link de pago sandbox -> webhook de confirmación -> mensaje de voucher en WhatsApp. Contexto conversacional en FastAPI/PostgreSQL (tabla `conversation`), estrictamente sin Redis. | **P1** | **MÍO** (en HMAC e idempotencia) / **GUIADO** (en n8n y DTOs) | **5.5 h** | M-META, M2 | Enviar webhook simulado sin firma o firma alterada -> 401; enviar webhook válido -> 200 y reserva cambia a `CONFIRMADA`; recepción real del mensaje de confirmación con voucher en WhatsApp físico; flujo n8n sin nodos Redis. | **MÍO** obligatorio para defender la seguridad financiera: verificación criptográfica de la autenticidad del pago e idempotencia. |
+| **M4** | E2 | **Integración Frontend Operativo Web (Recepción y Calendario)**:<br>• Adaptación de llamadas en frontend React (`apps/web`): conectar `ReservasDebug.tsx` y vista de grilla/calendario de recepción a FastAPI.<br>• Login web consumiendo `/api/v1/auth/login` y guardando token en memoria/storage seguro.<br>• Pantalla de recepción con listado de reservas activas (`CONFIRMADA`, `EN_CURSO`), confirmación manual en sitio y check-in operativo con auditoría (RN-05, RN-06). | **P1** | **GUIADO** | **3.5 h** | M1, M2, M3 | `npm run build` sin errores de tipo TypeScript; flujo en navegador: iniciar sesión como Recepcionista, visualizar la reserva creada en M3 en el panel, pulsar botón de check-in y verificar transición a `EN_CURSO` en DB con evento en auditoría. | **GUIADO** porque el frontend ya cuenta con componentes estructurados en React/Tailwind y solo requiere reemplazar mocks por TanStack Query hooks. |
+| **M-DEP** | Transversal | **Despliegue MVP en la Nube (Opción 2 Simplificada)**:<br>• Frontend: Vercel desplegando `apps/web` con variable `VITE_API_URL`.<br>• Base de datos: PostgreSQL 16 con extensión `btree_gist` en **Supabase**.<br>• Backend: FastAPI en Railway desplegando desde la rama `migracion-fastapi` (NUNCA main). Migraciones de Alembic ejecutadas al arrancar (`alembic upgrade head`). Healthcheck `/api/v1/health`.<br>• Secretos exclusivamente vía variables de entorno en los paneles (sin credenciales en git).<br>• n8n: Desplegado en Railway (mismo proyecto) o local con túnel Cloudflare/ngrok para la demo.<br>• **Documentación de riesgo:** Mitigación del arranque en frío (cold start) en capas gratuitas. | **P1** | **GUIADO** | **3.5 h** | M0, M1, M2, M3, M4 | Ping HTTP exitoso a `/api/v1/health` en Railway; acceso público HTTPS al frontend en Vercel; creación de reserva completa vía WhatsApp real y webhook sandbox en producción. | **GUIADO** para asegurar que el estudiante configure y domine cada panel de despliegue sin errores de credenciales. |
 
-**Subtotal Horas P1 (incluido Despliegue):** **25.5 horas**.
+**Subtotal Horas Desarrollo P1:** **29.0 horas**.
 
 ---
 
-### 3.2 Lotes P2 (Alcance Secundario — Si sobra tiempo del colchón: 8.0 h)
+### 3.2 Lotes P2 (Alcance Secundario — Si sobra tiempo del colchón: 10.5 h)
 
 | ID | Épica | Tarea | Prioridad | Modo | Horas Est. | Depende de | Cómo se verificará | Por qué ese modo |
 | :--- | :--- | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
-| **M5a** | E3 | **Cancelaciones y Reembolsos Proporcionales (RN-03)**:<br>• Endpoint `/api/v1/bookings/group/{code}/cancellation`.<br>• Portar algoritmo de cálculo de reembolso proporcional (>72h: 100%, 24-72h: 50%, <24h: 0%).<br>• Transición a `CANCELADA` y liberación de fechas en PostgreSQL. | **P2** | **GUIADO** | **2.5 h** | M3 | Pytest con 3 casos de prueba temporales calculando montos exactos de devolución. | Lógica pura de cálculo matemático de fechas ya especificada en el Java legado. |
-| **M5b** | E1/E2 | **Job Periódico APScheduler y Notificaciones de Expiración**:<br>• Tarea en segundo plano cada 60 s que marca reservas vencidas en estado `EXPIRADA`.<br>• Disparo de webhook a n8n para notificar al huésped que su enlace de pago caducó. | **P2** | **AGY** | **1.5 h** | M2 | Ejecución local del scheduler verificando log y actualización de estado en DB a los 60s. | Proceso accesorio en background (la disponibilidad de M2 ya ignora expirados inline). |
-| **M5c** | E2 | **Server-Sent Events (SSE) para Calendario en Tiempo Real**:<br>• Endpoint `/api/v1/events/calendar`.<br>• Emisión de eventos SSE cuando una reserva es confirmada, cancelada o cambia a check-in. | **P2** | **AGY** | **2.0 h** | M4 | Conexión `EventSource` en frontend actualizando la grilla sin recargar la página. | Mejora de experiencia de usuario sobre el polling de TanStack Query. |
-| **M5d** | Transversal | **Pipeline CI en GitHub Actions**:<br>• Workflow en `.github/workflows/ci.yml` levantando contenedor Postgres 16 con `btree_gist` efímero.<br>• Ejecución automatizada de `pytest` con tests de concurrencia y validación de tipos `mypy`. | **P2** | **AGY** | **2.0 h** | M0, M-DEP | Ejecución en verde del commit en GitHub Actions. | Automatización de soporte técnico. |
+| **M5a** | E1 | **Gemini 2.0 Flash (HU-09 - Recomendador Asistido de Habitaciones)**:<br>• Integración de nodo Gemini en n8n para responder preguntas en lenguaje natural sobre las 9 habitaciones.<br>• Regla estricta: Gemini solo recomienda amenidades, nunca confirma disponibilidad ni inventario en firme. | **P2** | **GUIADO** | **2.5 h** | M3 | Pruebas de preguntas conversacionales en WhatsApp (ej. "¿Tienen balcón con vista cafetera?") respondiendo con recomendación contextual. | Primer ítem de P2: aporta enriquecimiento conversacional pero no bloquea la reserva transaccional de P1. |
+| **M5b** | E3 | **Cancelaciones y Reembolsos Proporcionales (RN-03)**:<br>• Endpoint `/api/v1/bookings/group/{code}/cancellation`.<br>• Portar algoritmo de cálculo de reembolso proporcional (>72h: 100%, 24-72h: 50%, <24h: 0%).<br>• Transición a `CANCELADA` y liberación de fechas en PostgreSQL. | **P2** | **GUIADO** | **2.0 h** | M3 | Pytest con 3 casos de prueba temporales calculando montos exactos de devolución. | Lógica pura de cálculo matemático de fechas ya especificada en el Java legado. |
+| **M5c** | E1/E2 | **Job Periódico APScheduler y Notificaciones de Expiración**:<br>• Tarea en segundo plano cada 60 s que marca reservas vencidas en estado `EXPIRADA`.<br>• Disparo de webhook a n8n para notificar al huésped que su enlace de pago caducó. | **P2** | **AGY** | **1.5 h** | M2 | Ejecución local del scheduler verificando log y actualización de estado en DB a los 60s. | Proceso accesorio en background (la disponibilidad de M2 ya ignora expirados inline). |
+| **M5d** | E2 | **Server-Sent Events (SSE) para Calendario en Tiempo Real**:<br>• Endpoint `/api/v1/events/calendar`.<br>• Emisión de eventos SSE cuando una reserva es confirmada, cancelada o cambia a check-in. | **P2** | **AGY** | **2.0 h** | M4 | Conexión `EventSource` en frontend actualizando la grilla sin recargar la página. | Mejora de experiencia de usuario sobre el polling de TanStack Query. |
+| **M5e** | E6 | **Auditoría Global Genérica con Middleware Interceptor**:<br>• Interceptor que audita automáticamente toda mutación POST/PUT/DELETE en el sistema. | **P2** | **AGY** | **1.5 h** | M1 | Registro automático de llamadas administrativas no cubiertas por la auditoría directa de P1. | Generalización arquitectural de auditoría. |
+| **M5f** | Transversal | **Pipeline CI Automatizado en GitHub Actions**:<br>• Workflow en `.github/workflows/ci.yml` levantando contenedor Postgres 16 con `btree_gist` efímero.<br>• Ejecución automatizada de `pytest` y validación de tipos `mypy`. | **P2** | **AGY** | **2.0 h** | M0, M-DEP | Ejecución en verde del commit en GitHub Actions. | Automatización de soporte técnico. |
 
-**Subtotal Horas P2:** **8.0 horas** *(Solo se inician si P1 se concluye antes del 18 de noviembre)*.
+**Subtotal Horas P2:** **11.5 horas** *(Solo se activan en orden de prioridad comenzando por Gemini M5a si P1 termina antes de tiempo)*.
 
 ---
 
@@ -129,88 +134,91 @@ Para garantizar la entrega puntual sin comprometer la demo en vivo, se retiró d
 * **E5 Fidelización y Reseñas Públicas (HU-12):** Sistema de cupones de descuento para huéspedes recurrentes y publicación en web.
 * **Reportes en Excel con openpyxl (RN-07 / HU-10):** Generación de sábanas de ocupación e ingresos en formato `.xlsx`.
 * **Respaldos Automatizados a R2:** Tarea cron diaria a las 3:00 a. m. con `pg_dump` cifrado y rotación a 30 días en Cloudflare R2.
-* **Infraestructura de Producción Definitiva:** Servidor VPS con Cloudflare Tunnel propio, verificación de Meta para WhatsApp Cloud API comercial y capacitación presencial en Sevilla.
+* **Infraestructura de Producción Definitiva:** Servidor VPS con Cloudflare Tunnel propio, verificación formal de negocio con Meta para WhatsApp Cloud API comercial sin restricciones y capacitación presencial en Sevilla.
 * **RN-13 (No-Show a las 12:00):** Descartada explícitamente según acuerdos de arquitectura.
 
 ---
 
-## 4. Balance Presupuestal y Mitigación de Riesgos
+## 4. Decisiones Técnicas y Arquitectura de Integración
 
-```
-Presupuesto Total Disponible (10 días x 4 h/d):   40.0 h
-Reserva Obligatoria (QA, docs/aprendizaje, demo): 10.0 h
---------------------------------------------------------
-Presupuesto Neto Disponible para Desarrollo:      30.0 h
-Total Horas Estimadas Lotes P1 (M0..M4 + M-DEP):  25.5 h
---------------------------------------------------------
-Colchón Neto de Seguridad (Holgura P1):            4.5 h (≥ 4.0 h CUMPLIDO)
-```
+### 4.1 Recepción del Webhook de WhatsApp y Seguridad
+* **Flujo y Responsabilidad:**
+  ```
+  Meta Cloud API  ──(Webhook HTTPS)──►  n8n  ──(HTTP + X-Service-Key)──►  FastAPI Backend  ──►  PostgreSQL
+  ```
+* **Justificación en una línea:** n8n actúa como adaptador visual y conversacional para normalizar los payloads de WhatsApp Cloud API, permitiendo a FastAPI enfocarse en la lógica transaccional pura y la persistencia de sesión sin acoplarse a los esquemas cambiantes de Meta.
+* **Manejo de HMAC:** La firma HMAC `X-Hub-Signature-256` se valida en **FastAPI exclusivamente para el webhook de la pasarela de pagos**, garantizando integridad e idempotencia en la confirmación financiera. La comunicación entre n8n y FastAPI se protege mediante una clave de servicio pre-compartida (`X-Service-Key` en headers HTTP).
 
-### 4.1 Estrategia de Despliegue para n8n
-* **Opción Principal:** n8n self-hosted en Railway dentro del mismo proyecto, conectado a Supabase/Neon o con volumen persistente SQLite.
-  * *Justificación:* Otorga una URL HTTPS pública fija para recibir los webhooks de WhatsApp y de la pasarela sandbox de forma continua 24/7 sin depender de que la computadora personal del alumno permanezca encendida ni de la variabilidad de su red local.
-* **Opción Fallback:** n8n local en Docker expuesto con túnel Cloudflare Tunnel / ngrok gratuito durante los ensayos y la sustentación en vivo (costo $0 absoluto).
+### 4.2 Elección de PostgreSQL Alojado: Supabase vs. Neon
+* **Elección Definitiva:** **Supabase**.
+* **Justificación en una línea:** Se elige Supabase porque incluye PostgreSQL 16 con la extensión `btree_gist` preinstalada y activa por defecto, pooler integrado (puerto 5432/6543) y visor de tablas intuitivo para verificar bloqueos en vivo.
+* **Verificación en M0:** Durante M0 se conecta el cliente local a Supabase y se ejecuta `SELECT * FROM pg_extension WHERE extname = 'btree_gist';` asegurando que la restricción de exclusión `EXCLUDE USING gist` aplique sin errores.
 
-### 4.2 Riesgo de Arranque en Frío (Cold Start) en Capas Gratuitas
-* **Riesgo:** Plataformas como Railway, Render o Supabase pausan o suspenden las instancias inactivas en planes gratuitos. El primer webhook o la primera petición web después de inactividad puede tardar de 30 a 50 segundos en despertar.
-* **Mitigación Planificada:** 
-  1. Configuración de endpoint ligero `/api/v1/health` que responde en milisegundos con verificación de conexión a DB.
-  2. Protocolo de sustentación: ejecución de un ping preventivo (`curl https://satori-api.up.railway.app/api/v1/health`) 5 minutos antes de la presentación con el jurado calificador para calentar las instancias.
-
-### 4.3 Estrategia de Tablero de GitHub Projects
-* Las tarjetas existentes en el tablero **se REUTILIZAN y reubican** asignándoles su épica canónica (E1..E6) y la etiqueta `portar-python`. No se duplican tarjetas creando historias paralelas M0..Mn.
+### 4.3 Estrategia para n8n Alojado
+* **Opción Principal:** n8n self-hosted en Railway dentro del mismo entorno de FastAPI, con SQLite persistente o Postgres.
+  * *Justificación:* Ofrece una URL pública HTTPS fija requerida por Meta para registrar el webhook y opera 24/7 sin depender de la red wifi del alumno.
+* **Opción Fallback (Costo $0):** n8n local en Docker expuesto mediante túnel Cloudflare Tunnel / ngrok gratuito durante los ensayos y la sustentación.
 
 ---
 
-## 5. Escenario de Demostración End-to-End (Flujo de Aceptación P1)
+## 5. Matriz de Riesgos y Mitigaciones
 
-El tribunal de evaluación validará el éxito de la migración mediante el siguiente flujo integral de 6 pasos desplegado y operativo:
+| Riesgo Técnico | Impacto | Probabilidad | Estrategia de Mitigación |
+| :--- | :---: | :---: | :--- |
+| **Dependencia de Meta Cloud API:** Token temporal expira (24h), número de prueba limitado a 5 destinatarios registrados o ventana de 24h de Meta cerrada. | Alto | Media | 1. Generar **System User** en Meta Business Suite con token permanente (`whatsapp_business_messaging`).<br>2. Registrar con anticipación los números de celular del alumno y del evaluador en el portal de desarrolladores.<br>3. Disponer del **Plan B de Demo** listo en Swagger para ejecutar si Meta bloquea el tráfico. |
+| **Arranque en Frío (Cold Start) en Capas Gratuitas:** Railway o Supabase suspenden instancias inactivas; la primera petición demora entre 30 y 50 segundos. | Medio | Alta | 1. Implementación de endpoint ultraligero `/api/v1/health` en FastAPI.<br>2. Protocolo de sustentación: ejecución de un ping preventivo (`curl https://satori-api.up.railway.app/api/v1/health`) 5 minutos antes de la sesión de demo para despertar los servicios. |
+| **Caída de Conectividad / Red en Sustentación:** Falla de internet para alcanzar Vercel/Railway o Meta. | Crítico | Baja | El sistema puede ejecutarse localmente de inmediato mediante `./start-dev.sh` levantando PostgreSQL y FastAPI local en 30 segundos. |
+
+---
+
+## 6. Escenario de Demostración End-to-End: WhatsApp Real y Plan B Paralelo
+
+Para la sustentación del Sprint 5, se dispone de un recorrido principal interactivo con WhatsApp físico y, en paralelo, un **Plan B de contingencia** ejecutable mediante Swagger UI (`/docs`) o script HTTP que garantiza que ningún fallo externo en Meta o la red impida demostrar el 100% de la funcionalidad del backend:
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor H as Huésped (WhatsApp)
-    participant N as n8n (Railway / Túnel)
-    participant API as FastAPI Backend (Railway)
-    participant DB as PostgreSQL 16 (Supabase/Neon)
-    actor R as Recepcionista (Vercel Web)
+flowchart TD
+    subgraph CaminoA["DEMO PRINCIPAL: WhatsApp Real (Meta + n8n)"]
+        A1["1. Huésped saluda y pide fechas por WhatsApp físico"] --> A2["2. n8n consulta FastAPI y sugiere Habitación 101"]
+        A2 --> A3["3. Huésped acepta: FastAPI genera BLOQUEADA_TEMPORAL (15m, GiST)"]
+        A3 --> A4["4. Huésped paga en Sandbox; Webhook HMAC confirma en FastAPI"]
+        A4 --> A5["5. Huésped recibe mensaje de confirmación con Voucher en WhatsApp"]
+        A5 --> A6["6. Recepcionista hace login web y ejecuta Check-in (EN_CURSO con auditoría)"]
+    end
 
-    H->>N: 1. Consulta disponibilidad "2 adultos, 15 al 18 nov"
-    N->>API: GET /api/v1/rooms/availability
-    API->>DB: Query daterange && (ignora expires_at vencidos inline)
-    DB-->>API: 9 Habitaciones libres
-    API-->>N: Lista con Habitación 101 (Balcón Café)
-    N-->>H: Sugiere Habitación 101 y precio total
-
-    H->>N: 2. "Deseo reservar la Habitación 101" + datos
-    N->>API: POST /api/v1/bookings/lock (room_id, fechas)
-    API->>DB: Expira bloqueos vencidos + INSERT BLOQUEADA_TEMPORAL (expires_at +15m)
-    Note over DB: Protegido por EXCLUDE USING gist.<br/>Intento concurrente daría 409 Conflict.
-    DB-->>API: Bloqueo asignado (Lock Token)
-    API-->>N: Token y Link de Pago Sandbox
-    N-->>H: Envía resumen y botón de pago
-
-    H->>API: 3. Simulación de pago en Pasarela Sandbox
-    API->>API: 4. Webhook recibido en /api/v1/payments/webhook
-    Note over API: Valida firma HMAC X-Hub-Signature-256.<br/>Verifica idempotencia en tabla de eventos.
-    API->>DB: UPDATE booking SET status = 'CONFIRMADA'
-    API->>DB: INSERT into audit_log (actor='GATEWAY', action='PAYMENT_CONFIRMED')
-    API-->>N: Notificación de pago exitoso
-    N-->>H: Envía confirmación con código de reserva (ej. SAT-8X92)
-
-    R->>API: 5. Login en Panel Web (POST /api/v1/auth/login)
-    API-->>R: JWT con rol 'Recepcionista'
-    R->>API: 6. Carga grilla de calendario / reservas activas
-    API->>DB: SELECT bookings con estado CONFIRMADA
-    DB-->>API: Reserva SAT-8X92 Habitación 101
-    API-->>R: Visualización en tiempo real en React
-    R->>API: Clic en "Registrar Check-in" -> status: 'EN_CURSO'
-    API->>DB: UPDATE booking y registro en audit_log
+    subgraph CaminoB["PLAN B: Fallback Swagger / Script (Siempre Listo)"]
+        B1["1. GET /api/v1/rooms/availability con parámetros en Swagger"]
+        B2["2. Respuesta JSON con las 9 habitaciones libres"]
+        B3["3. POST /api/v1/bookings/lock (demostrar 200 y colisión 409)"]
+        B4["4. POST /api/v1/payments/webhook con firma HMAC y token"]
+        B5["5. GET /api/v1/bookings/group/{code} retorna CONFIRMADA"]
+        B6["6. POST /api/v1/bookings/{id}/check-in y verificación en tabla audit_log"]
+    end
 ```
 
-1. **Consulta Conversacional:** El huésped consulta por WhatsApp disponibilidad para Sevilla; n8n consulta `GET /api/v1/rooms/availability` en FastAPI, que filtra fechas libres en PostgreSQL.
-2. **Bloqueo Anti-Doble Reserva (RN-02):** El huésped selecciona la habitación; FastAPI inserta el bloqueo temporal en PostgreSQL con `expires_at = NOW() + 15 min`. Se demuestra en vivo que un segundo intento simultáneo sobre las mismas fechas es rechazado por el motor relacional (`EXCLUDE gist`).
-3. **Pago en Pasarela:** El huésped procede al pago mediante enlace seguro hacia la pasarela sandbox.
-4. **Webhook Seguro e Idempotencia:** La pasarela notifica el pago a `POST /api/v1/payments/webhook`. FastAPI valida la firma HMAC `X-Hub-Signature-256`, garantiza idempotencia y actualiza el estado a `CONFIRMADA`.
-5. **Autenticación Web:** La recepcionista accede al portal web React autenticándose con usuario y clave, recibiendo un token JWT con rol `Recepcionista`.
-6. **Operación en Sitio:** La recepcionista visualiza de inmediato la reserva confirmada en la grilla del hotel, consulta los datos del huésped y efectúa el check-in (pasando la reserva a `EN_CURSO`) dejando registro inmutable en la tabla de auditoría.
+### Tabla Comparativa Paso a Paso: WhatsApp Real vs. Plan B
+
+| Paso | Objetivo del Negocio | Demostración Principal (WhatsApp Real) | Plan B de Contingencia (Swagger UI `/docs` / Script) |
+| :---: | :--- | :--- | :--- |
+| **1** | **Consulta de Disponibilidad** | Huésped envía mensaje: *"Hola, deseo reservar del 15 al 18 de noviembre para 2 personas"*. n8n procesa y consulta `GET /api/v1/rooms/availability`. | Se ejecuta `GET /api/v1/rooms/availability?check_in=2026-11-15&check_out=2026-11-18&adults=2` en Swagger UI. Retorna código HTTP 200 con el catálogo de habitaciones disponibles. |
+| **2** | **Selección y Cotización** | Bot responde con tarjeta interactiva mostrando Habitación 101 (Balcón Café), precio base y desglose de tarifas. Huésped confirma selección. | Se observa el objeto JSON de la Habitación 101 con tarifa por noche calculada según RN-01. |
+| **3** | **Bloqueo Temporal Anti-Doble Reserva (RN-02)** | n8n llama a `POST /api/v1/bookings/lock`. FastAPI expira bloqueos vencidos e inserta `BLOQUEADA_TEMPORAL` con `expires_at = NOW() + 15 min`. Se envía link sandbox. | Se ejecuta `POST /api/v1/bookings/lock`. Retorna 200 con `lock_token`. Inmediatamente se ejecuta una segunda petición idéntica en otra pestaña: **recibe 409 Conflict por `EXCLUDE USING gist`**. |
+| **4** | **Simulación de Pago y Webhook HMAC** | Huésped abre enlace sandbox y simula pago aprobado. Pasarela dispara `POST /api/v1/payments/webhook` hacia FastAPI con cabecera `X-Hub-Signature-256`. | Se envía payload de pago simulado a `POST /api/v1/payments/webhook` con firma HMAC calculada. FastAPI valida criptográficamente la firma, comprueba idempotencia y actualiza a `CONFIRMADA`. |
+| **5** | **Entrega de Voucher al Huésped** | Huésped recibe mensaje automático en WhatsApp: *"¡Reserva confirmada! Código SAT-8X92 para Habitación 101"*. | Se ejecuta `GET /api/v1/bookings/group/SAT-8X92`. Retorna estado `CONFIRMADA`, monto pagado y datos del titular. |
+| **6** | **Operación en Recepción y Check-in (RN-06)** | Recepcionista ingresa a `apps/web` (Vercel) con usuario/clave, recibe JWT con rol `Recepcionista`, ve la reserva en la grilla y pulsa *"Realizar Check-in"* (pasa a `EN_CURSO` y registra en `audit_log`). | Se hace login en `POST /api/v1/auth/login` obteniendo JWT. Se llama a `POST /api/v1/bookings/{id}/check-in`. Se consulta `SELECT * FROM audit_log` en Supabase mostrando actor, acción y fecha. |
+
+---
+
+## 7. Detalle del Lote M-META (Lanzamiento 11 de Noviembre en Paralelo)
+
+Para garantizar que la integración con WhatsApp Cloud API no retrase el desarrollo de FastAPI, el lote **M-META** se ejecuta desde el primer día:
+
+### 7.1 Pasos que Requieren Acción Manual del Usuario
+1. **Crear App en Meta:** Ingresar a [developers.facebook.com](https://developers.facebook.com/), crear una app tipo "Business" y agregar el producto "WhatsApp".
+2. **Generar Token Permanente:** En el panel de Meta Business Suite, crear un **System User** (Usuario del Sistema) con rol de administrador y generar un Access Token permanente asignándole el permiso `whatsapp_business_messaging`.
+3. **Registrar Destinatarios de Prueba:** En la sección "API Setup" de WhatsApp en Meta, agregar los números de teléfono móviles autorizados (número del estudiante y del jurado/profesor) para recibir mensajes de prueba.
+4. **Configurar Webhook:** En la configuración de WhatsApp en Meta, registrar la URL del Webhook de n8n (`https://<n8n-url>/webhook/whatsapp`) e ingresar el `WHATSAPP_VERIFY_TOKEN` definido.
+
+### 7.2 Verificaciones Oficiales contra la Documentación de Meta
+* **Límites de la Cuenta de Prueba:** Las cuentas de prueba gratuitas de Meta permiten enviar mensajes únicamente a un máximo de **5 números de teléfono pre-registrados** y verificados con código SMS.
+* **Ventana de Atención al Cliente (Customer Service Window):** Meta permite enviar mensajes de formato libre solo dentro de una ventana de **24 horas** a partir del último mensaje enviado por el usuario. Si la ventana expira, solo se pueden enviar plantillas aprobadas (templates).
+* **Vigencia de Tokens:** El token temporal otorgado en el "Graph API Explorer" caduca en 24 horas. Para la sustentación debe utilizarse estrictamente el token de System User que no expira.
