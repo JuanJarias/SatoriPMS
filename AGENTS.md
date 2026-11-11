@@ -1,8 +1,15 @@
 # Torre Satori PMS
-Monolito modular (hotel, Sevilla, Valle del Cauca) + chatbot WhatsApp.
-Stack único: Python 3.12 + FastAPI · PostgreSQL 16 (btree_gist) · SQLAlchemy + Alembic · React 18 (Vite, TS) · n8n + Gemini 2.0 Flash · Cloudflare R2.
-Prohibido: Java, Spring, JPA/Hibernate, Maven, Flyway, Redis.
-Épicas: Autenticación, Reservas, Calendario, Finanzas, Tienda, Reseñas.
-RN-02 sin solapamiento (EXCLUDE USING gist) · RN-10 RBAC Recepcionista/Admin · RN-11 sueldo mensual (fijo/comisión/mixto) · RN-12 autorización datos Ley 1581 · RN-13 No-Show libera a las 12:00.
-Reglas de trabajo: responder en español y conciso; cada afirmación con archivo:línea o comando; estados Funcional/Parcial/Roto/Ausente/No verificable; no inventar; detalle a docs/audit/, chat ≤10 líneas.
-Reglas de cambios: nunca modificar sin aprobación de IDs; antes de cada cambio escribir POR QUÉ, QUÉ y ARCHIVOS; después de cada cambio correr su verificación y reportar PASS/FAIL; un commit por ID en rama propia.
+Hotel Torre Satori (Sevilla, Valle del Cauca), 9 habitaciones, ~40 reservas/mes. Proyecto Integrador II, Icesi. Hoy: 2026-11-10; fin Sprint 5: 2026-11-20.
+Monolito modular hexagonal: reservas y disponibilidad · habitaciones y estadías · clientes, reseñas y fidelización · tienda e inventario · finanzas y reportes · identidad y auditoría · conversaciones y notificaciones · recomendación asistida. WhatsApp (huésped) y web (admin, recepcionista) usan la MISMA API.
+Stack: Python 3.12 + FastAPI + Pydantic · PostgreSQL 16 (btree_gist) · SQLAlchemy + Alembic · APScheduler en proceso · React 18 + Vite (TypeScript conservado; desviación aceptada de JS), Tailwind, TanStack Query · n8n self-hosted + Gemini 2.0 Flash (solo adaptador y recomendador) · WhatsApp Cloud API · Cloudflare R2 · openpyxl. Prohibido: Java, Spring, JPA, Maven, Flyway, Redis.
+Épicas: E1 Reservas y chatbot WhatsApp · E2 Operación web (calendario, check-in/out) · E3 Facturación y finanzas · E4 Tienda e inventario · E5 Reseñas y fidelización · E6 Roles y auditoría.
+RN-02: EXCLUDE USING gist sobre room_id + daterange(check_in, check_out, '[)') para estados activos (BLOQUEADA_TEMPORAL, CONFIRMADA, EN_CURSO). Bloqueo con expires_at = NOW() + 15 min; job cada 60 s marca EXPIRADA y avisa a n8n. Disponibilidad ignora bloqueos vencidos. Reserva se confirma solo con webhook de pago validado, nunca por pantalla de éxito.
+RN conocidas: RN-01 capacidad y recargo persona adicional · RN-02 anterior · RN-03 reembolsos por cancelación · RN-04 tienda. Demás RN salen de issues/tablero; si no hay fuente: no verificada.
+Seguridad: JWT, roles Administrador y Recepcionista, bcrypt/Argon2, auditoría inmutable (fecha, actor, acción, entidad), webhooks con firma HMAC X-Hub-Signature-256 + idempotencia en DB, R2 privado con URL firmada 15 min, secretos solo en env, Ley 1581 (datos mínimos, HTTPS, sin datos personales en logs).
+Tiempo real y operación: SSE o WebSocket para calendario (HU-03). /api/v1/health, Sentry, pg_dump cifrado diario 3:00 a. m. a R2 (30 días), CI con Postgres 16 efímero y pytest con concurrencia RN-02.
+Chatbot: n8n solo es adaptador; contexto conversacional en FastAPI/PostgreSQL, no en Redis. Gemini solo recomienda, nunca confirma disponibilidad ni precios.
+Pendiente definir (no asumir): proveedor WhatsApp, pasarela (Wompi o MercadoPago), fórmula sueldo (HU-07), descuentos (HU-12 en DB), datos obligatorios registro, política conservación documentos.
+Modos de trabajo: El dueño debe poder explicar y defender cada línea. Modos por ID: AGY (escribe y explica), GUIADO (concepto, esqueleto con TODOs, revisa código) o MÍO (solo revisa y señala errores). Sin modo asignado: GUIADO.
+Aprendizaje: Cada lote deja docs/aprendizaje/<ID>.md: qué hace, por qué así, cómo probarlo y 3 preguntas de defensa con respuesta.
+Reglas de cambio: antes de cada cambio escribir POR QUÉ · QUÉ · ARCHIVOS · cómo verificaré. Commits humanizados en español, push solo a migracion-fastapi, nunca a main.
+Comunicación: Chat <= 10 líneas, detalle a docs/. Precedencia: documentos oficiales > AGENTS.md > docs/audit/ anteriores.
