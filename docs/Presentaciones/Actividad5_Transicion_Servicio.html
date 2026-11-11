@@ -1575,8 +1575,8 @@
     <!-- Capa 3: Backend Núcleo API REST -->
     <g transform="translate(260, 355)">
       <rect x="0" y="0" width="1080" height="110" rx="14" fill="#3c2f29" stroke="#d4a373" stroke-width="2.5"/>
-      <text x="540" y="45" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="26" font-weight="900" fill="#ffffff">Backend API REST: FastAPI sobre Python 3.12 (ASGI)</text>
-      <text x="540" y="80" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="500" fill="#f5dfc6">Monolito modular · Capa transaccional ACID · Seguridad y Auditoría</text>
+      <text x="540" y="45" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="26" font-weight="900" fill="#ffffff">Cerebro del Sistema: API Unificada en FastAPI</text>
+      <text x="540" y="80" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="500" fill="#f5dfc6">Lógica central de reservas y cobros · Seguridad y Auditoría · Respuestas inmediatas</text>
     </g>
 
     <!-- Conectores hacia Persistencia -->
@@ -1586,12 +1586,12 @@
     <!-- Capa 4: Persistencia y Candado Relacional -->
     <g transform="translate(60, 545)">
       <rect x="0" y="0" width="680" height="95" rx="12" fill="#322621" stroke="#e57373" stroke-width="2"/>
-      <text x="340" y="42" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="800" fill="#ffffff">Gestor de Bloqueo: Expiración Nativa</text>
-      <text x="340" y="70" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#ffcdd2">Expiración inline (15 min) + APScheduler en proceso para limpieza</text>
+      <text x="340" y="42" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="800" fill="#ffffff">Gestión Temporal: Bloqueo de 15 Minutos</text>
+      <text x="340" y="70" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#ffcdd2">Aparta el cuarto mientras el cliente paga; si no paga, se libera solo</text>
 
       <rect x="800" y="0" width="680" height="95" rx="12" fill="#322621" stroke="#81c784" stroke-width="2"/>
-      <text x="1140" y="42" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="800" fill="#ffffff">Candado Relacional: PostgreSQL 16 Alpine</text>
-      <text x="1140" y="70" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c8e6c9">Migraciones Alembic + Restricción EXCLUDE GiST (0% Sobreventas)</text>
+      <text x="1140" y="42" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="800" fill="#ffffff">Base de Datos Central: PostgreSQL 16</text>
+      <text x="1140" y="70" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c8e6c9">Regla matemática de no-sobreventa · Información 100% protegida y auditable</text>
     </g>
   </g>
   </g>
@@ -1807,8 +1807,8 @@
       <g transform="translate(0, 85)">
         <rect x="0" y="0" width="70" height="45" rx="8" fill="#64b5f626" stroke="#64b5f6" stroke-width="1.5"/>
         <text x="35" y="30" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="900" fill="#64b5f6">V2</text>
-        <text x="95" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Extensión GiST y RN-02</text>
-        <text x="420" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c9bfb5">btree_gist y EXCLUDE para estados activos</text>
+        <text x="95" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Regla Anti-Sobreventa</text>
+        <text x="420" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c9bfb5">Protección nativa que impide cruzar fechas en una misma habitación</text>
         <circle cx="980" cy="22" r="18" fill="#81c78426" stroke="#81c784" stroke-width="1.2"/>
         <text x="980" y="27" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="900" fill="#81c784">OK</text>
         <line x1="0" y1="65" x2="1020" y2="65" stroke="rgba(212, 163, 115, 0.1)" stroke-width="1"/>
@@ -1825,8 +1825,8 @@
       <g transform="translate(0, 255)">
         <rect x="0" y="0" width="70" height="45" rx="8" fill="#ba68c826" stroke="#ba68c8" stroke-width="1.5"/>
         <text x="35" y="30" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="900" fill="#ba68c8">V5</text>
-        <text x="95" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Montos y Reseñas</text>
-        <text x="420" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c9bfb5">paid_amount acumulado y feedback huésped</text>
+        <text x="95" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Abonos y Opiniones</text>
+        <text x="420" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c9bfb5">Control de pagos parciales y retroalimentación del huésped</text>
         <circle cx="980" cy="22" r="18" fill="#81c78426" stroke="#81c784" stroke-width="1.2"/>
         <text x="980" y="27" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="900" fill="#81c784">OK</text>
         <line x1="0" y1="65" x2="1020" y2="65" stroke="rgba(212, 163, 115, 0.1)" stroke-width="1"/>
@@ -1834,8 +1834,8 @@
       <g transform="translate(0, 340)">
         <rect x="0" y="0" width="70" height="45" rx="8" fill="#e6a15c26" stroke="#e6a15c" stroke-width="1.5"/>
         <text x="35" y="30" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="900" fill="#e6a15c">V6</text>
-        <text x="95" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Eventos Especiales</text>
-        <text x="420" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c9bfb5">special_events para tarifas dinámicas</text>
+        <text x="95" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Tarifas Dinámicas</text>
+        <text x="420" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c9bfb5">Precios automáticos para puentes festivos y temporada alta</text>
         <circle cx="980" cy="22" r="18" fill="#81c78426" stroke="#81c784" stroke-width="1.2"/>
         <text x="980" y="27" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="900" fill="#81c784">OK</text>
         <line x1="0" y1="65" x2="1020" y2="65" stroke="rgba(212, 163, 115, 0.1)" stroke-width="1"/>
@@ -1872,8 +1872,8 @@
       <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" fill="#d4a373">MIGRACIÓN AUTOMÁTICA</text>
       <text x="0" y="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="800" fill="#ffffff">Al Arrancar Contenedor</text>
       <text x="0" y="90" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c9bfb5">
-        <tspan x="0" dy="0">Alembic aplica migraciones inmutables;</tspan>
-        <tspan x="0" dy="26">ejecuta alembic upgrade head al iniciar.</tspan>
+        <tspan x="0" dy="0">El sistema revisa su historial de versiones</tspan>
+        <tspan x="0" dy="26">y actualiza los datos automáticamente en segundos.</tspan>
       </text>
     </g>
 
@@ -1954,23 +1954,23 @@
     <g transform="translate(40, 115)">
 
       <g transform="translate(0, 0)">
-        <text x="0" y="24" font-family="monospace" font-size="18" font-weight="800" fill="#64b5f6">DATABASE_URL / POSTGRES_USER</text>
+        <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="800" fill="#64b5f6">Acceso a la Base de Datos</text>
         <rect x="850" y="5" width="170" height="26" rx="4" fill="rgba(100, 181, 246, 0.2)" stroke="#64b5f6" stroke-width="1"/>
-        <text x="935" y="23" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#ffffff">PostgreSQL</text>
-        <text x="0" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#f3ece4">Conexión SQLAlchemy y credenciales de base de datos relacional</text>
-        <text x="0" y="80" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#d4a373">Inyección: Inyección vía .env host</text>
+        <text x="935" y="23" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#ffffff">Datos Seguros</text>
+        <text x="0" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#f3ece4">Contraseñas maestras cifradas; ninguna clave visible en texto plano</text>
+        <text x="0" y="80" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#d4a373">Protección: Inyección mediante variables seguras en el servidor</text>
         <line x1="0" y1="95" x2="1020" y2="95" stroke="rgba(212, 163, 115, 0.1)" stroke-width="1"/>
       </g>
       <g transform="translate(0, 105)">
-        <text x="0" y="24" font-family="monospace" font-size="18" font-weight="800" fill="#64b5f6">JWT_SECRET / JWT_ALGORITHM</text>
+        <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="800" fill="#64b5f6">Sesiones de Recepción</text>
         <rect x="850" y="5" width="170" height="26" rx="4" fill="rgba(100, 181, 246, 0.2)" stroke="#64b5f6" stroke-width="1"/>
-        <text x="935" y="23" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#ffffff">Seguridad</text>
-        <text x="0" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#f3ece4">Firma criptográfica de tokens para Administrador y Recepcionista</text>
+        <text x="935" y="23" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#ffffff">Identidad</text>
+        <text x="0" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#f3ece4">Tokens digitales para ingreso seguro de administradores y recepcionistas</text>
         <text x="0" y="80" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#d4a373">Inyección: Variable cifrada .env</text>
         <line x1="0" y1="95" x2="1020" y2="95" stroke="rgba(212, 163, 115, 0.1)" stroke-width="1"/>
       </g>
       <g transform="translate(0, 210)">
-        <text x="0" y="24" font-family="monospace" font-size="18" font-weight="800" fill="#64b5f6">WHATSAPP_TOKEN / PHONE_NUMBER_ID</text>
+        <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="800" fill="#64b5f6">Línea Oficial WhatsApp</text>
         <rect x="850" y="5" width="170" height="26" rx="4" fill="rgba(100, 181, 246, 0.2)" stroke="#64b5f6" stroke-width="1"/>
         <text x="935" y="23" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#ffffff">n8n Webhook</text>
         <text x="0" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#f3ece4">Autenticación OAuth 2.0 y canal oficial de Meta Cloud API</text>
@@ -1978,7 +1978,7 @@
         <line x1="0" y1="95" x2="1020" y2="95" stroke="rgba(212, 163, 115, 0.1)" stroke-width="1"/>
       </g>
       <g transform="translate(0, 315)">
-        <text x="0" y="24" font-family="monospace" font-size="18" font-weight="800" fill="#64b5f6">GEMINI_API_KEY</text>
+        <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="800" fill="#64b5f6">Asistente Turístico con IA</text>
         <rect x="850" y="5" width="170" height="26" rx="4" fill="rgba(100, 181, 246, 0.2)" stroke="#64b5f6" stroke-width="1"/>
         <text x="935" y="23" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#ffffff">n8n IA Node</text>
         <text x="0" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#f3ece4">Llave criptográfica de acceso a modelos LLM de Google</text>
@@ -1986,7 +1986,7 @@
         <line x1="0" y1="95" x2="1020" y2="95" stroke="rgba(212, 163, 115, 0.1)" stroke-width="1"/>
       </g>
       <g transform="translate(0, 420)">
-        <text x="0" y="24" font-family="monospace" font-size="18" font-weight="800" fill="#64b5f6">ENVIRONMENT / WEBHOOK_SECRET</text>
+        <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="800" fill="#64b5f6">Validación de Pagos y Webhooks</text>
         <rect x="850" y="5" width="170" height="26" rx="4" fill="rgba(100, 181, 246, 0.2)" stroke="#64b5f6" stroke-width="1"/>
         <text x="935" y="23" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#ffffff">FastAPI</text>
         <text x="0" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#f3ece4">Modo 'production' y validación HMAC de webhooks de pago y WhatsApp</text>
@@ -2156,8 +2156,8 @@
     <line x1="25" y1="120" x2="365" y2="120" stroke="rgba(212, 163, 115, 0.2)" stroke-width="1"/>
     
     <text x="25" y="160" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c9bfb5">
-      <tspan x="25" dy="0">Espera activa de puerto 5432</tspan>
-      <tspan x="25" dy="26">y pg_isready saludable</tspan>
+      <tspan x="25" dy="0">Comprobación de salud</tspan>
+      <tspan x="25" dy="26">y arranque de la base de datos</tspan>
     </text>
 
     <circle cx="345" cy="255" r="18" fill="#81c78426" stroke="#81c784" stroke-width="1.2"/>
@@ -2175,8 +2175,8 @@
     <line x1="25" y1="120" x2="365" y2="120" stroke="rgba(212, 163, 115, 0.2)" stroke-width="1"/>
     
     <text x="25" y="160" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400" fill="#c9bfb5">
-      <tspan x="25" dy="0">Ejecución secuencial de</tspan>
-      <tspan x="25" dy="26">alembic upgrade head</tspan>
+      <tspan x="25" dy="0">Actualización ordenada a la</tspan>
+      <tspan x="25" dy="26">última versión del sistema</tspan>
     </text>
 
     <circle cx="345" cy="255" r="18" fill="#81c78426" stroke="#81c784" stroke-width="1.2"/>
@@ -2434,7 +2434,7 @@
     <g transform="translate(40, 175)">
       <circle cx="15" cy="18" r="8" fill="#d97757"/>
       <text x="40" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" fill="#f5dfc6">Incompatibilidad de Esquema</text>
-      <text x="40" y="60" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="400" fill="#c9bfb5">Falla crítica en migraciones Alembic que impida la consistencia relacional.</text>
+      <text x="40" y="60" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="400" fill="#c9bfb5">Falla crítica en la actualización de datos que impida la operación del hotel.</text>
     </g>
 
     <g transform="translate(40, 310)">
@@ -2572,7 +2572,7 @@
       <g transform="translate(0, 225)">
         <rect x="0" y="5" width="160" height="30" rx="6" fill="#81c78426" stroke="#81c784" stroke-width="1"/>
         <text x="80" y="25" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#81c784">Post-Despliegue</text>
-        <text x="190" y="27" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="600" fill="#ffffff">Migraciones de base de datos aplicadas (alembic current)</text>
+        <text x="190" y="27" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="600" fill="#ffffff">Estructura de datos y tarifas verificadas al 100%</text>
         <rect x="1440" y="5" width="140" height="30" rx="6" fill="#81c78426" stroke="#81c784" stroke-width="1"/>
         <text x="1510" y="25" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="900" fill="#81c784">[✓] Aprobado</text>
         <line x1="0" y1="50" x2="1600" y2="50" stroke="rgba(212, 163, 115, 0.1)" stroke-width="1"/>
@@ -3194,7 +3194,7 @@
         <text x="60" y="24" text-anchor="middle" font-family="monospace" font-size="16" font-weight="800" fill="#81c784">TC-02</text>
         <text x="150" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" fill="#ffffff">CRUD Dinámico de Habitaciones</text>
         <text x="580" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="400" fill="#c9bfb5">Actualizar precio base y validar candado de borrado</text>
-        <text x="1080" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="500" fill="#f5dfc6">HTTP 200 en update y HTTP 409 en delete activo</text>
+        <text x="1080" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="500" fill="#f5dfc6">Respuesta exitosa al guardar y bloqueo automático si la reserva está activa</text>
         <rect x="1460" y="5" width="115" height="28" rx="6" fill="#81c78426" stroke="#81c784" stroke-width="1.2"/>
         <text x="1517" y="24" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="900" fill="#81c784">[✓] Aprobado</text>
         <line x1="0" y1="50" x2="1600" y2="50" stroke="rgba(212, 163, 115, 0.1)" stroke-width="1"/>
@@ -3274,7 +3274,7 @@
     <text x="0" y="48" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="50" font-weight="900" letter-spacing="-0.5" fill="#ffffff">4.3 Pruebas de Seguridad: El Candado Atómico Relacional</text>
 
     <!-- Subtítulo H2 (24px) -->
-    <text x="0" y="90" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="400" fill="#c9bfb5">Blindaje concurrente nativo: PostgreSQL 16 con EXCLUDE USING gist y expiración inline.</text>
+    <text x="0" y="90" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="400" fill="#c9bfb5">Blindaje automático: La base de datos impide duplicar reservas en las mismas fechas.</text>
 
     <!-- Logo Unificado de Esquina (Anti-Solape Estricto: un solo nodo de texto) -->
     <g transform="translate(1680, 5)">
@@ -3327,7 +3327,7 @@
       <path d="M 970 135 L 1400 135" stroke="#81c784" stroke-width="2"/>
       <polygon points="1400,130 1415,135 1400,140" fill="#81c784"/>
       <rect x="1090" y="115" width="200" height="30" rx="4" fill="#81c78426" stroke="#81c784" stroke-width="1"/>
-      <text x="1190" y="135" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#81c784">INSERT BLOQUEADA_TEMP (15m)</text>
+      <text x="1190" y="135" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#81c784">Apartado 15 minutos OK</text>
 
       <!-- Paso 2: Cliente B solicita mismo cuarto en ms 2 -->
       <path d="M 530 190 L 970 190" stroke="#ff9800" stroke-width="2"/>
@@ -3337,16 +3337,16 @@
       <!-- Conflicto en PostgreSQL GiST rechaza a Cliente B -->
       <path d="M 970 230 L 530 230" stroke="#e57373" stroke-width="2" stroke-dasharray="6 4"/>
       <polygon points="530,225 515,230 530,235" fill="#e57373"/>
-      <text x="750" y="220" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#e57373">ms 3: Rechazo HTTP 409 (Conflicto GiST)</text>
+      <text x="750" y="220" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#e57373">ms 3: Rechazo Automático (Habitación Ocupada)</text>
 
       <!-- Paso 3: Webhook de pago confirma reserva -->
       <path d="M 970 290 L 1400 290" stroke="#81c784" stroke-width="2"/>
       <polygon points="1400,285 1415,290 1400,295" fill="#81c784"/>
-      <text x="1185" y="280" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#ffffff">Webhook Validado -> UPDATE CONFIRMADA</text>
+      <text x="1185" y="280" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#ffffff">Comprobante de Pago Validado -> Reserva Asegurada</text>
 
       <!-- Postgres valida restricción temporal GIST -->
       <rect x="1330" y="315" width="140" height="32" rx="4" fill="#81c78426" stroke="#81c784" stroke-width="1"/>
-      <text x="1400" y="337" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#81c784">EXCLUDE GIST OK</text>
+      <text x="1400" y="337" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#81c784">Habitación Garantizada</text>
 
       <!-- Caja de conclusión -->
       <g transform="translate(240, 390)">
@@ -5183,7 +5183,7 @@
         </div>
         <div class="card-info">
           <div class="card-title">4.3 Pruebas de Seguridad: El Candado Atómico Relacional</div>
-          <div class="card-sub">Blindaje concurrente nativo: PostgreSQL 16 con EXCLUDE USING gist y expiración inline.</div>
+          <div class="card-sub">Blindaje automático: La base de datos impide duplicar reservas en las mismas fechas.</div>
         </div>
       </div>
       <div class="grid-card " onclick="goToSlide(23)">
