@@ -58,6 +58,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# ── Agente Privado Gemini ────────────────────────────────
+# ── Agente Privado Antigravity ───────────────────────────
+.antigravity/
 .gemini/
+
 
