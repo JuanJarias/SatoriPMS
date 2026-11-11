@@ -13,7 +13,7 @@ Decisiones:
 1. Estados en español en DB (BLOQUEADA_TEMPORAL, CONFIRMADA, EN_CURSO, EXPIRADA, CANCELADA); React usa una única capa de traducción.
 2. Candado es fila en tabla reservas con expires_at y EXCLUDE gist. Antes de insertar, expira en la misma transacción bloqueos vencidos de esa habitación.
 3. Recepción confirma manualmente con auditoría; chatbot solo con webhook de pago validado. Pasarela tras puerto con mock sandbox; proveedor por definir.
-4. Tablero: no reabrir tarjetas "Done" antiguas; crear M0..Mn y marcar viejas como legacy-java.
+4. Tablero: se REUTILIZAN y reubican las tarjetas existentes con etiqueta portar-python, no se duplican.
 5. Tiempo real con SSE (si el tiempo aprieta, polling TanStack Query primero). No-Show 12:00 queda fuera de alcance. Frontend TypeScript se conserva (9 habitaciones).
 Modos de trabajo: El dueño debe poder explicar y defender cada línea. Modos por ID: AGY (escribe y explica), GUIADO (concepto, esqueleto con TODOs, revisa código) o MÍO (solo revisa y señala errores). Sin modo asignado: GUIADO. MÍO por defecto para: EXCLUDE/Alembic, bloqueo con expiración, JWT con roles y validación de webhook.
 Aprendizaje: Cada lote deja docs/aprendizaje/<ID>.md: qué hace, por qué así, cómo probarlo y 3 preguntas de defensa con respuesta.
