@@ -28,8 +28,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query("""
         SELECT b FROM Booking b 
-        WHERE LOWER(CAST(b.reservationGroupId AS string)) LIKE LOWER(CONCAT(:code, '%'))
+        WHERE LOWER(CAST(b.reservationGroupId AS string)) LIKE LOWER(CONCAT('%', :code, '%'))
+           OR LOWER(b.companions) LIKE LOWER(CONCAT('%', :code, '%'))
+           OR CAST(b.id AS string) = :code
         ORDER BY b.createdAt DESC
     """)
     List<Booking> findByReservationGroupCodePrefix(@Param("code") String code);
+
+    @Query("""
+        SELECT COUNT(b) FROM Booking b 
+        WHERE b.roomId = :roomId 
+          AND b.status IN ('pending_payment', 'confirmed')
+    """)
+    long countActiveBookingsByRoomId(@Param("roomId") Long roomId);
 }

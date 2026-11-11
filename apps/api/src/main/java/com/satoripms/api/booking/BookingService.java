@@ -4,6 +4,9 @@ import com.satoripms.api.room.Room;
 import com.satoripms.api.room.RoomRepository;
 import com.satoripms.api.guest.Guest;
 import com.satoripms.api.guest.GuestRepository;
+import com.satoripms.api.event.SpecialEvent;
+import com.satoripms.api.event.SpecialEventRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +39,9 @@ public class BookingService {
     private final GuestRepository guestRepository;
     private final RedisLockService redisLockService;
 
+    @Autowired(required = false)
+    private SpecialEventRepository specialEventRepository;
+
     /**
      * Constructor con inyección de dependencias.
      *
@@ -52,6 +58,10 @@ public class BookingService {
         this.roomRepository = roomRepository;
         this.guestRepository = guestRepository;
         this.redisLockService = redisLockService;
+    }
+
+    public void setSpecialEventRepository(SpecialEventRepository specialEventRepository) {
+        this.specialEventRepository = specialEventRepository;
     }
 
     /**
@@ -259,7 +269,25 @@ public class BookingService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .divide(BigDecimal.valueOf(selectedRooms.size()), 2, java.math.RoundingMode.HALF_UP);
         BigDecimal extraTotal = averageExtraPrice.multiply(BigDecimal.valueOf(extraGuests));
-        BigDecimal totalPrice = baseTotal.add(extraTotal);
+        BigDecimal rawTotal = baseTotal.add(extraTotal);
+
+        // Aplicación de eventos especiales (descuento o recargo estacional)
+        BigDecimal eventMultiplier = BigDecimal.ONE;
+        if (specialEventRepository != null) {
+            List<SpecialEvent> activeEvents = specialEventRepository.findActiveEventsInDateRange(request.getCheckIn(), request.getCheckOut());
+            if (!activeEvents.isEmpty()) {
+                SpecialEvent event = activeEvents.get(0);
+                if (event.getDiscountPercentage() != null && event.getDiscountPercentage().compareTo(BigDecimal.ZERO) != 0) {
+                    BigDecimal pctFraction = event.getDiscountPercentage()
+                            .divide(BigDecimal.valueOf(100), 4, java.math.RoundingMode.HALF_UP);
+                    eventMultiplier = BigDecimal.ONE.subtract(pctFraction);
+                    if (eventMultiplier.compareTo(BigDecimal.ZERO) < 0) {
+                        eventMultiplier = BigDecimal.ZERO;
+                    }
+                }
+            }
+        }
+        BigDecimal totalPrice = rawTotal.multiply(eventMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
 
         // Determinación de importes de pago según opción elegida (abono 50% vs total 100%)
         BigDecimal paidAmount;
@@ -296,6 +324,7 @@ public class BookingService {
             booking.setWithPet(request.getHasPet());
             BigDecimal roomTotal = room.getPricePerNight().multiply(BigDecimal.valueOf(nights));
             if (index == 0) roomTotal = roomTotal.add(extraTotal);
+            roomTotal = roomTotal.multiply(eventMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
             booking.setTotalPrice(roomTotal);
 
             // Asignar importe pagado proporcional a cada habitación
@@ -313,7 +342,13 @@ public class BookingService {
             booking.setSource(resolvedSource);
             booking.setLockId(request.getRooms().get(index).getLockToken());
             booking.setReservationGroupId(reservationGroupId);
-            booking.setCompanions(request.getCompanions());
+
+            String resolvedCode = request.getCompanions();
+            if (resolvedCode == null || (!resolvedCode.startsWith("TS-") && !resolvedCode.startsWith("BL-"))) {
+                String sub = reservationGroupId.toString().replace("-", "");
+                resolvedCode = "TS-" + sub.substring(Math.max(0, sub.length() - 4)).toUpperCase();
+            }
+            booking.setCompanions(resolvedCode);
             bookings.add(booking);
         }
 
@@ -377,9 +412,15 @@ public class BookingService {
         }
 
         long nights = ChronoUnit.DAYS.between(first.getCheckIn(), first.getCheckOut());
-        String codePrefix = first.getReservationGroupId() != null
-                ? first.getReservationGroupId().toString().substring(0, 8).toUpperCase()
-                : "RES-" + first.getId();
+        String codePrefix;
+        if (first.getCompanions() != null && (first.getCompanions().startsWith("TS-") || first.getCompanions().startsWith("BL-"))) {
+            codePrefix = first.getCompanions().trim();
+        } else if (first.getReservationGroupId() != null) {
+            String sub = first.getReservationGroupId().toString().replace("-", "");
+            codePrefix = "TS-" + sub.substring(Math.max(0, sub.length() - 4)).toUpperCase();
+        } else {
+            codePrefix = "TS-" + first.getId();
+        }
 
         BigDecimal totalPaidAmount = bookings.stream()
                 .map(b -> b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO)

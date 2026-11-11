@@ -265,6 +265,18 @@ public class BookingController {
             Map<String, Object> row = new HashMap<>();
             row.put("id", booking.getId());
             row.put("reservationGroupId", booking.getReservationGroupId());
+
+            String bookingCode;
+            if (booking.getCompanions() != null && (booking.getCompanions().startsWith("TS-") || booking.getCompanions().startsWith("BL-"))) {
+                bookingCode = booking.getCompanions().trim();
+            } else if (booking.getReservationGroupId() != null) {
+                String sub = booking.getReservationGroupId().toString().replace("-", "");
+                bookingCode = "TS-" + sub.substring(Math.max(0, sub.length() - 4)).toUpperCase();
+            } else {
+                bookingCode = "TS-" + booking.getId();
+            }
+            row.put("bookingCode", bookingCode);
+
             row.put("status", booking.getStatus());
             row.put("paymentStatus", booking.getPaymentStatus());
             row.put("paidAmount", booking.getPaidAmount());
