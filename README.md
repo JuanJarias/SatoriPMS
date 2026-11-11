@@ -2,6 +2,9 @@
 
 **SatoriPMS** es la plataforma integral de administración hotelera y atención automatizada diseñada para **Torre Satori** (Sevilla, Valle del Cauca). Su objetivo es modernizar la operación diaria del hotel, ofreciendo atención continua a los huéspedes a través de WhatsApp y centralizando el control administrativo, financiero y de recepción en una aplicación web intuitiva.
 
+> [!NOTE]
+> **Backend en migración a FastAPI; legado en el tag `legacy-java-backup`**.
+
 ---
 
 ## Contextualización y Propósito
@@ -27,12 +30,11 @@ En la operación hotelera tradicional, la atención manual de mensajes por Whats
 
 ## Tecnologías Utilizadas
 
-- **Servidor Central (Backend):** Java 21 con Spring Boot 3.3, encargado de las reglas de negocio, el cálculo de tarifas y la seguridad.
-- **Base de Datos Principal:** PostgreSQL 16 con control automático de versiones mediante Flyway, donde se resguardan habitaciones, huéspedes, reservas, inventario, finanzas y reseñas.
-- **Memoria de Alta Velocidad:** Redis 7, utilizada para el bloqueo temporal de habitaciones durante 15 minutos y el control de sesiones conversacionales activas.
-- **Orquestación del Chatbot e Inteligencia Artificial:** n8n conectado con la plataforma oficial de WhatsApp (Meta Cloud API) y el modelo de lenguaje Google Gemini Flash Lite.
+- **Servidor Central (Backend):** Python 3.12 con FastAPI (monolito modular), encargado de las reglas de negocio, concurrencia en base de datos y autenticación RBAC.
+- **Base de Datos Principal:** PostgreSQL 16 con extensión `btree_gist` y control de versiones mediante Alembic.
+- **Orquestación del Chatbot e Inteligencia Artificial:** n8n conectado con la plataforma oficial de WhatsApp (Meta Cloud API) y Google Gemini 2.0 Flash.
 - **Aplicación Web de Recepción y Administración:** React 18 con TypeScript y Vite.
-- **Infraestructura Local:** Contenedores Docker y Docker Compose para ejecutar todos los servicios de forma aislada y reproducible.
+- **Infraestructura Local:** Contenedores Docker y Docker Compose para ejecutar los servicios de forma aislada y reproducible.
 
 ---
 

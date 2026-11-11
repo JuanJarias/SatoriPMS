@@ -1,6 +1,6 @@
 # Torre Satori PMS
 Monolito modular (hotel, Sevilla, Valle del Cauca) + chatbot WhatsApp.
-Stack único: Python 3.12 + FastAPI · PostgreSQL 16 (btree_gist) · SQLAlchemy + Alembic · React 18 (Vite, JS) · n8n + Gemini 2.0 Flash · Cloudflare R2.
+Stack único: Python 3.12 + FastAPI · PostgreSQL 16 (btree_gist) · SQLAlchemy + Alembic · React 18 (Vite, TS) · n8n + Gemini 2.0 Flash · Cloudflare R2.
 Prohibido: Java, Spring, JPA/Hibernate, Maven, Flyway, Redis.
 Épicas: Autenticación, Reservas, Calendario, Finanzas, Tienda, Reseñas.
 RN-02 sin solapamiento (EXCLUDE USING gist) · RN-10 RBAC Recepcionista/Admin · RN-11 sueldo mensual (fijo/comisión/mixto) · RN-12 autorización datos Ley 1581 · RN-13 No-Show libera a las 12:00.
