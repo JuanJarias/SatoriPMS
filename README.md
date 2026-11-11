@@ -86,10 +86,9 @@ Para inicializar el proyecto en un entorno local se requiere contar con:
    ```
 
 3. **Servicios disponibles en el entorno local:**
-   - **Servidor Principal (API):** `http://localhost:8080`
+   - **Servidor Principal (API FastAPI):** `http://localhost:8080`
    - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (en la primera ejecución, importa y activa el flujo [V8_ChatbotReservas.json](file:///home/guarinve/Documentos/SatoriPMS/flows/n8n/V8_ChatbotReservas.json)).
-   - **Base de Datos (PostgreSQL):** Puerto local `5433`.
-   - **Gestor de Bloqueos y Sesiones (Redis):** Puerto local `6379`.
+   - **Base de Datos (PostgreSQL):** Puerto local `5432`.
 
 4. **Iniciar la aplicación web (opcional para desarrollo visual):**
    ```bash
