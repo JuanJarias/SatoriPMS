@@ -1,47 +1,120 @@
 # SatoriPMS — Sistema de Gestión Hotelera y Reservas Automatizadas
 
-**SatoriPMS** es la plataforma integral de administración hotelera y atención automatizada diseñada para **Torre Satori** (Sevilla, Valle del Cauca). Su objetivo es modernizar la operación diaria del hotel, ofreciendo atención continua a los huéspedes a través de WhatsApp y centralizando el control administrativo, financiero y de recepción en una aplicación web intuitiva.
+[![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://www.oracle.com/java/) [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot) [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/) [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/) [![n8n](https://img.shields.io/badge/n8n-1.81.4-EA4B71?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io/) [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/) [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+
+**SatoriPMS** es la plataforma integral de administración hotelera y atención automatizada diseñada para **Torre Satori** (Sevilla, Valle del Cauca). Su propósito es modernizar la operación diaria del hotel, ofreciendo atención continua a los huéspedes a través de WhatsApp y centralizando el control administrativo, financiero y de recepción en una aplicación web intuitiva.
+
+El sistema resuelve la pérdida de reservas fuera del horario laboral y el riesgo de sobreventa mediante un flujo conversacional inteligente conectado a WhatsApp y un mecanismo de doble candado de concurrencia (bloqueo temporal en memoria rápida y validación estricta de solapamiento en base de datos).
+
+---
+
+## Tabla de Contenidos
+
+- [Contextualización y Propósito](#contextualización-y-propósito)
+- [Estructura del Proyecto](#estructura-del-proyecto)
+- [Tecnologías Utilizadas](#tecnologías-utilizadas)
+- [Arquitectura del Sistema](#arquitectura-del-sistema)
+- [Requisitos Previos](#requisitos-previos)
+- [Configuración Necesaria](#configuración-necesaria)
+- [Instrucciones de Instalación e Inicialización](#instrucciones-de-instalación-e-inicialización)
+- [Validación y Pruebas Automatizadas](#validación-y-pruebas-automatizadas)
+- [Documentación Detallada](#documentación-detallada)
+- [Cómo Contribuir](#cómo-contribuir)
+- [Equipo de Desarrollo](#equipo-de-desarrollo)
 
 ---
 
 ## Contextualización y Propósito
 
-En la operación hotelera tradicional, la atención manual de mensajes por WhatsApp, el control de disponibilidad en hojas de cálculo y la falta de sincronización entre recepción y ventas generan demoras de respuesta, pérdida de clientes fuera del horario laboral y riesgo de sobreventa de habitaciones.
+En la operación hotelera tradicional, la atención manual de mensajes por WhatsApp, el control de disponibilidad en hojas de cálculo y la falta de sincronización entre recepción y ventas generan demoras de respuesta, pérdida de clientes y riesgo de sobreventa de habitaciones.
 
-**SatoriPMS** resuelve esta necesidad mediante un sistema unificado que:
-- Atiende a los viajeros las 24 horas del día por WhatsApp, tanto mediante un menú guiado paso a paso como mediante un asistente con inteligencia artificial capaz de comprender solicitudes en lenguaje natural.
-- Garantiza que dos personas no puedan reservar la misma habitación en las mismas fechas mediante un bloqueo temporal de 15 minutos mientras el huésped completa sus datos y realiza su pago.
-- Permite abonar el 50% de anticipo o el 100% del valor de la estadía, liquidar saldos pendientes, cancelar reservas aplicando las políticas de reembolso del hotel y recopilar reseñas de los huéspedes con enlace directo a Google Maps.
+**SatoriPMS** resuelve esta problemática mediante un sistema unificado que:
+- Atiende a los viajeros las 24 horas del día por WhatsApp, tanto mediante un menú guiado paso a paso como mediante un asistente con inteligencia artificial capaz de procesar solicitudes en lenguaje natural.
+- Garantiza que dos personas no puedan reservar la misma habitación en las mismas fechas mediante un bloqueo temporal de 15 minutos en Redis mientras el huésped completa sus datos y realiza su pago.
+- Permite abonar el 50% de anticipo o el 100% del valor de la estadía, liquidar saldos pendientes, cancelar reservas aplicando las políticas de reembolso del hotel sobre el dinero efectivamente pagado y recopilar reseñas con enlace a Google Maps.
 - Brinda al personal de recepción y a la administración un panel web para gestionar el catálogo de habitaciones (referencia actual de 9 habitaciones configurables), tarifas por temporada o eventos especiales, llegadas y salidas de huéspedes, ventas de productos de vitrina, control de inventario y reportes financieros.
 
 ---
 
-## Cómo Funciona
+## Estructura del Proyecto
 
-1. **Canal de Atención por WhatsApp:** El viajero escribe al número del hotel y el asistente virtual le muestra la disponibilidad real según las fechas, la cantidad de adultos y niños, y si viaja con mascota.
-2. **Reserva Protegida y Pagos:** Al elegir una habitación, el sistema la reserva temporalmente durante 15 minutos para ese huésped, solicita los datos del titular y acompañantes (previa aceptación del aviso de privacidad) y registra el pago del anticipo (50%) o del total (100%), entregando un código único de reserva.
-3. **Gestión en el Hotel (Aplicación Web):** El recepcionista visualiza la ocupación en tiempo real, atiende conversaciones escaladas a un operador humano, registra el ingreso y la salida de los huéspedes, y anota consumos adicionales de la tienda interna a la cuenta de la habitación.
-4. **Administración y Finanzas:** El administrador gestiona la creación, edición y eliminación segura de habitaciones, define eventos especiales o descuentos por fechas, supervisa el inventario y descarga el balance contable mensual.
+```text
+SatoriPMS/
+├── apps/
+│   ├── api/                 # Servidor central (Java 21, Spring Boot, reglas de negocio y seguridad)
+│   └── web/                 # Aplicación web de recepción y administración (React 18, Vite)
+├── db/
+│   └── seed/                # Scripts de desarrollo y datos iniciales auxiliares
+├── docs/                    # Documentación técnica, manuales, diagramas y presupuestos
+│   ├── Diagramas/           # Diagramas de arquitectura, concurrencia, secuencia y procesos
+│   ├── Presupuesto/         # Modelo financiero, costos de operación y análisis de crisis
+│   └── modulos/             # Especificaciones funcionales y arquitectura por módulo
+├── flows/
+│   └── n8n/                 # Flujos conversacionales del chatbot en formato JSON (V8 activo)
+├── scripts/                 # Utilidades de desarrollo, scripts de arranque (start-dev.sh)
+└── tests/
+    └── chatbot/             # Suite integral de pruebas automatizadas y scripts de validación
+```
 
 ---
 
 ## Tecnologías Utilizadas
 
-- **Servidor Central (Backend):** Java 21 con Spring Boot 3.3, encargado de las reglas de negocio, el cálculo de tarifas y la seguridad.
-- **Base de Datos Principal:** PostgreSQL 16 con control automático de versiones mediante Flyway, donde se resguardan habitaciones, huéspedes, reservas, inventario, finanzas y reseñas.
-- **Memoria de Alta Velocidad:** Redis 7, utilizada para el bloqueo temporal de habitaciones durante 15 minutos y el control de sesiones conversacionales activas.
-- **Orquestación del Chatbot e Inteligencia Artificial:** n8n conectado con la plataforma oficial de WhatsApp (Meta Cloud API) y el modelo de lenguaje Google Gemini Flash Lite.
-- **Aplicación Web de Recepción y Administración:** React 18 con TypeScript y Vite.
-- **Infraestructura Local:** Contenedores Docker y Docker Compose para ejecutar todos los servicios de forma aislada y reproducible.
+| Tecnología / Herramienta | Tipo / Rol | Versión / Estándar |
+| :--- | :--- | :--- |
+| **Java** | Lenguaje Backend | 21 (LTS) |
+| **Spring Boot** | Framework Backend | 3.3.5 |
+| **PostgreSQL** | Base de Datos Relacional | 16-alpine (extensión `btree_gist`) |
+| **Flyway** | Control de Versiones de BD | Integrado con Spring Boot |
+| **Redis** | Memoria Rápida y Bloqueos | 7-alpine (Scripts Lua) |
+| **n8n** | Orquestador Conversacional | 1.81.4 |
+| **Google Gemini** | Inteligencia Artificial | Gemini Flash Lite |
+| **React** | Biblioteca de Frontend | 18 |
+| **TypeScript** | Lenguaje de Frontend | 5 |
+| **Vite** | Empaquetador y Servidor Web | 5 |
+| **Tailwind CSS** | Framework de Estilos | 3.4 |
+| **Docker & Compose** | Contenedores e Infraestructura | Docker 24+ / Compose 2.20+ |
+
+---
+
+## Arquitectura del Sistema
+
+```mermaid
+flowchart TB
+    subgraph Canales["Canales de Atención y Operación"]
+        WA["Huésped (WhatsApp Cloud API)"]
+        WEB["Personal del Hotel (React 18 / Vite)"]
+    end
+
+    subgraph Orquestacion["Capa de Orquestación e Inteligencia"]
+        N8N["n8n 1.81.4 (Flujo V8)"]
+        AI["Google Gemini (Flash Lite)"]
+        N8N <--> AI
+    end
+
+    subgraph Backend["Capa de Negocio y Persistencia"]
+        API["Backend Central (Spring Boot 3.3.5 / Java 21)"]
+        REDIS["Redis 7 (Bloqueo 15 min / TTL)"]
+        DB[("PostgreSQL 16 (Doble Candado / Flyway)")]
+    end
+
+    WA <--> N8N
+    N8N <--> API
+    WEB <--> API
+    API <--> REDIS
+    API <--> DB
+```
 
 ---
 
 ## Requisitos Previos
 
-Para inicializar el proyecto en un entorno local se requiere contar con:
-- **Docker** (versión 24 o superior) y **Docker Compose** (versión 2.20 o superior).
-- **Node.js** (versión 20 o superior) y **npm** (para ejecutar la interfaz web en modo de desarrollo).
-- **Git** para clonar el repositorio y gestionar versiones.
+| Componente / Herramienta | Versión Mínima | Configuración Mínima Requerida |
+| :--- | :--- | :--- |
+| **Docker Engine** | 24.0+ | Daemon en ejecución con soporte para contenedores |
+| **Docker Compose** | 2.20+ | Plugin `docker compose` o binario `docker-compose` |
+| **Node.js** | 20.0+ LTS | Gestor de paquetes npm configurado |
+| **Git** | 2.30+ | Cliente Git con soporte para clonado de repositorios |
 
 ---
 
@@ -65,7 +138,7 @@ Para inicializar el proyecto en un entorno local se requiere contar con:
 
 ---
 
-## Instrucciones de Instalación e Inicialización (Infraestructura Local)
+## Instrucciones de Instalación e Inicialización
 
 1. **Clonar el repositorio:**
    ```bash
@@ -131,3 +204,11 @@ Toda la documentación funcional, de diseño, diagramas y presupuesto del proyec
 2. Realiza tus cambios verificando que los contenedores levanten sin errores y que las pruebas en `tests/chatbot/` se ejecuten satisfactoriamente (`node tests/chatbot/suite_pruebas_chatbot_v8.js`).
 3. Actualiza la documentación técnica correspondiente en [docs/](docs/README.md).
 4. Abre una solicitud de integración (Pull Request) describiendo el propósito y alcance de los cambios realizados.
+
+---
+
+## Equipo de Desarrollo
+
+- **Juan José Arias Gallego** — Product Owner
+- **Esteban Guarín Valencia** — Scrum Master
+- **Juan Felipe Garzón Trejos** — Desarrollador
