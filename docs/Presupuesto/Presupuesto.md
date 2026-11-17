@@ -1,6 +1,6 @@
 # Presupuesto y Modelo Financiero — Torre Satori PMS
 
-Documento ejecutivo de presupuesto, estructura de costos, análisis de retorno de inversión y proyección a tres años para la implementación y operación del sistema de gestión hotelera **Torre Satori PMS**, alineado con el libro financiero oficial [`Presupuesto_SatoriPMS.xlsx`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Presupuesto_SatoriPMS.xlsx).
+Documento ejecutivo de presupuesto, estructura de costos, análisis de retorno de inversión y proyección a tres años para la implementación y operación del sistema de gestión hotelera **Torre Satori PMS**, alineado con el libro financiero oficial [`Presupuesto_SatoriPMS.xlsx`](Presupuesto_SatoriPMS.xlsx).
 
 ---
 

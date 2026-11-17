@@ -72,7 +72,7 @@ En consonancia con las necesidades expresadas por el propietario del hotel, el *
 
 ### C. Tienda, Finanzas, Reseñas y Seguridad
 Desde el menú administrativo, el administrador accede igualmente a:
-- El control de productos, existencias y alertas de inventario (detallado en [TiendaInventario.md](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/TiendaInventario.md)).
-- El balance financiero de ingresos, gastos, liquidación de turnos de recepción y exportación contable en Excel (detallado en [FacturacionFinanzas.md](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/FacturacionFinanzas.md)).
-- La moderación de reseñas y el listado de clientes frecuentes para campañas de fidelización (detallado en [ResenasFidelizacion.md](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/ResenasFidelizacion.md)).
-- La gestión de cuentas de usuario del personal y el historial de auditoría (detallado en [Seguridad.md](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/Seguridad.md)).
+- El control de productos, existencias y alertas de inventario (detallado en [TiendaInventario.md](TiendaInventario.md)).
+- El balance financiero de ingresos, gastos, liquidación de turnos de recepción y exportación contable en Excel (detallado en [FacturacionFinanzas.md](FacturacionFinanzas.md)).
+- La moderación de reseñas y el listado de clientes frecuentes para campañas de fidelización (detallado en [ResenasFidelizacion.md](ResenasFidelizacion.md)).
+- La gestión de cuentas de usuario del personal y el historial de auditoría (detallado en [Seguridad.md](Seguridad.md)).

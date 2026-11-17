@@ -1,6 +1,6 @@
 # Análisis de Escenarios de Contingencia y Optimización Presupuestal — Torre Satori PMS
 
-Documento de evaluación financiera y operativa ante escenarios de restricción presupuestal, variación de costos de servicios en la nube y cambios de alcance para el proyecto **Torre Satori PMS**, fundamentado en las cifras oficiales del modelo financiero [`Presupuesto_SatoriPMS.xlsx`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Presupuesto_SatoriPMS.xlsx) y el documento [`Presupuesto.md`](file:///home/guarinve/Documentos/SatoriPMS/docs/Presupuesto/Presupuesto.md).
+Documento de evaluación financiera y operativa ante escenarios de restricción presupuestal, variación de costos de servicios en la nube y cambios de alcance para el proyecto **Torre Satori PMS**, fundamentado en las cifras oficiales del modelo financiero [`Presupuesto_SatoriPMS.xlsx`](Presupuesto_SatoriPMS.xlsx) y el documento [`Presupuesto.md`](Presupuesto.md).
 
 ---
 

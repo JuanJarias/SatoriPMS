@@ -48,7 +48,7 @@ Para inicializar el proyecto en un entorno local se requiere contar con:
 ## Configuración Necesaria
 
 1. **Variables de Entorno:**
-   En la raíz del proyecto se incluye la plantilla [.env.example](file:///home/guarinve/Documentos/SatoriPMS/.env.example). Cópiala con el nombre `.env` y completa las contraseñas locales y las claves de conexión:
+   En la raíz del proyecto se incluye la plantilla [.env.example](.env.example). Cópiala con el nombre `.env` y completa las contraseñas locales y las claves de conexión:
    ```bash
    cp .env.example .env
    ```
@@ -85,7 +85,7 @@ Para inicializar el proyecto en un entorno local se requiere contar con:
 
 3. **Servicios disponibles en el entorno local:**
    - **Servidor Principal (API):** `http://localhost:8080`
-   - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (en la primera ejecución, importa y activa el flujo [V8_ChatbotReservas.json](file:///home/guarinve/Documentos/SatoriPMS/flows/n8n/V8_ChatbotReservas.json)).
+   - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (en la primera ejecución, importa y activa el flujo [V8_ChatbotReservas.json](flows/n8n/V8_ChatbotReservas.json)).
    - **Base de Datos (PostgreSQL):** Puerto local `5433`.
    - **Gestor de Bloqueos y Sesiones (Redis):** Puerto local `6379`.
 
@@ -101,13 +101,13 @@ Para inicializar el proyecto en un entorno local se requiere contar con:
 
 ## Documentación Detallada
 
-Toda la documentación funcional, de diseño, diagramas y presupuesto del proyecto se encuentra organizada en la carpeta [docs/](file:///home/guarinve/Documentos/SatoriPMS/docs/README.md). Consulta el [índice de documentación](file:///home/guarinve/Documentos/SatoriPMS/docs/README.md) para explorar cada módulo.
+Toda la documentación funcional, de diseño, diagramas y presupuesto del proyecto se encuentra organizada en la carpeta [docs/](docs/README.md). Consulta el [índice de documentación](docs/README.md) para explorar cada módulo.
 
 ---
 
 ## Cómo Contribuir
 
 1. Crea una rama descriptiva a partir de la rama de trabajo vigente (`feat/nombre-funcionalidad` o `fix/nombre-correccion`).
-2. Realiza tus cambios verificando que los contenedores levanten sin errores y que las pruebas del flujo conversacional en [tests/chatbot/](file:///home/guarinve/Documentos/SatoriPMS/tests/chatbot) se ejecuten satisfactoriamente.
-3. Actualiza la documentación correspondiente en [docs/](file:///home/guarinve/Documentos/SatoriPMS/docs/README.md) manteniendo el registro de avance en [EstadoActual.md](file:///home/guarinve/Documentos/SatoriPMS/docs/modulos/EstadoActual.md) y el detalle de commits pendientes en [CambiosPendientes.md](file:///home/guarinve/Documentos/SatoriPMS/docs/CambiosPendientes.md).
+2. Realiza tus cambios verificando que los contenedores levanten sin errores y que las pruebas del flujo conversacional en [tests/chatbot/](tests/chatbot) se ejecuten satisfactoriamente.
+3. Actualiza la documentación correspondiente en [docs/](docs/README.md) manteniendo el registro de avance en [EstadoActual.md](docs/modulos/EstadoActual.md) y el detalle de commits pendientes en [CambiosPendientes.md](docs/CambiosPendientes.md).
 4. Abre una solicitud de integración (Pull Request) describiendo el propósito y alcance de los cambios realizados.

@@ -36,7 +36,7 @@ El sistema distingue estrictamente dos perfiles de usuario:
 1. **Aislamiento de servicios internos:** La base de datos principal y el motor de memoria rápida se ejecutan dentro de una red interna privada de contenedores y no están expuestos a internet público. Únicamente el servidor de aplicaciones y el canal de recepción de mensajes de WhatsApp reciben tráfico externo autorizado.
 2. **Verificación de autenticidad de mensajes de WhatsApp:** Las notificaciones entrantes desde la plataforma oficial de Meta incluyen una firma criptográfica en su encabezado (`Firma de seguridad de Meta : "X-Hub-Signature-256"`), la cual permite validar que el mensaje proviene genuinamente de WhatsApp y no de un tercero no autorizado.
 3. **Control de mensajes duplicados:** En caso de que la red telefónica o Meta reenvíe un mismo mensaje por intermitencia de conexión, el sistema identifica el código único del mensaje (`Identificador de mensaje : "message_id"`) para evitar procesarlo dos veces.
-4. **Protección de claves y credenciales:** Todas las contraseñas de base de datos, llaves de inteligencia artificial (`Clave de Google Gemini : "GEMINI_API_KEY"`) y tokens de conexión a WhatsApp (`Token de WhatsApp : "WHATSAPP_API_TOKEN"`) se cargan desde variables de entorno locales ([.env.example](file:///home/guarinve/Documentos/SatoriPMS/.env.example)) excluidas del repositorio de código.
+4. **Protección de claves y credenciales:** Todas las contraseñas de base de datos, llaves de inteligencia artificial (`Clave de Google Gemini : "GEMINI_API_KEY"`) y tokens de conexión a WhatsApp (`Token de WhatsApp : "WHATSAPP_API_TOKEN"`) se cargan desde variables de entorno locales ([.env.example](../../.env.example)) excluidas del repositorio de código.
 
 ---
 

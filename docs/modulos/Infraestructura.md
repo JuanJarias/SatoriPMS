@@ -8,13 +8,13 @@ El documento de **Infraestructura y Despliegue** describe cómo se organizan, co
 
 ## 2. Componentes de la Infraestructura
 
-La plataforma está diseñada bajo un esquema modular de contenedores mediante **Docker Compose** ([docker-compose.yml](file:///home/guarinve/Documentos/SatoriPMS/docker-compose.yml)), lo que garantiza que el sistema funcione de manera idéntica en cualquier servidor Linux sin configuraciones manuales complejas:
+La plataforma está diseñada bajo un esquema modular de contenedores mediante **Docker Compose** ([docker-compose.yml](../../docker-compose.yml)), lo que garantiza que el sistema funcione de manera idéntica en cualquier servidor Linux sin configuraciones manuales complejas:
 
 | Servicio | Nombre del Contenedor | Tecnología | Puerto Local | Función en el Sistema |
 |---|---|---|---|---|
 | **Base de Datos Principal** | `satori-postgres` | PostgreSQL 16 | `5433` (hacia `5432` interno) | Almacenamiento permanente de habitaciones, huéspedes, reservas, pagos, tienda, finanzas y reseñas. |
 | **Memoria de Bloqueos y Sesiones** | `satori-redis` | Redis 7 | `6379` | Gestión de bloqueos temporales de habitaciones por 15 minutos y estado de las conversaciones activas de WhatsApp. |
-| **Orquestador del Chatbot** | `satori-n8n` | n8n | `5678` | Ejecución del flujo conversacional de WhatsApp ([V8_ChatbotReservas.json](file:///home/guarinve/Documentos/SatoriPMS/flows/n8n/V8_ChatbotReservas.json)) y conexión con inteligencia artificial. |
+| **Orquestador del Chatbot** | `satori-n8n` | n8n | `5678` | Ejecución del flujo conversacional de WhatsApp ([V8_ChatbotReservas.json](../../flows/n8n/V8_ChatbotReservas.json)) y conexión con inteligencia artificial. |
 | **Servidor Central (API)** | `satori-api` | Java 21 / Spring Boot 3.3 | `8080` | Lógica de negocio, reglas de tarifas, control de concurrencia y servicios para el chatbot y la web. |
 | **Aplicación Web** | Ejecución en navegador / Servidor web | React 18 / TypeScript / Vite | `5173` (desarrollo) | Panel visual para recepción y administración del hotel. |
 
@@ -34,7 +34,7 @@ Para asegurar que ninguna información del hotel se pierda al reiniciar o actual
 
 ## 4. Parámetros de Configuración (`.env`)
 
-El sistema se configura a través de un archivo `.env` en la raíz del proyecto (generado a partir de la plantilla [.env.example](file:///home/guarinve/Documentos/SatoriPMS/.env.example)):
+El sistema se configura a través de un archivo `.env` en la raíz del proyecto (generado a partir de la plantilla [.env.example](../../.env.example)):
 
 - **Base de datos:** `Usuario de base de datos : "POSTGRES_USER"`, `Contraseña de base de datos : "POSTGRES_PASSWORD"`, `Nombre de base de datos : "POSTGRES_DB"` y `Puerto local de base de datos : "POSTGRES_PORT"`.
 - **Memoria rápida:** `Contraseña de Redis : "REDIS_PASSWORD"`, `Puerto de Redis : "REDIS_PORT"` y `Tiempo de bloqueo en segundos : "REDIS_LOCK_TTL"` (por defecto `900`, equivalente a 15 minutos).
@@ -45,11 +45,11 @@ El sistema se configura a través de un archivo `.env` en la raíz del proyecto 
 
 ## 5. Puesta en Marcha Automatizada
 
-El repositorio incluye el asistente de inicio [start-dev.sh](file:///home/guarinve/Documentos/SatoriPMS/start-dev.sh), el cual automatiza la puesta a punto del entorno:
+El repositorio incluye el asistente de inicio [start-dev.sh](../../start-dev.sh), el cual automatiza la puesta a punto del entorno:
 1. Verifica que exista el archivo `.env` (creándolo desde `.env.example` si aún no existe).
 2. Construye y levanta los contenedores en segundo plano.
 3. Espera a que la base de datos y el servidor central respondan satisfactoriamente.
-4. Importa y activa el flujo conversacional [V8_ChatbotReservas.json](file:///home/guarinve/Documentos/SatoriPMS/flows/n8n/V8_ChatbotReservas.json) dentro del contenedor de n8n, dejando el webhook listo para recibir mensajes.
+4. Importa y activa el flujo conversacional [V8_ChatbotReservas.json](../../flows/n8n/V8_ChatbotReservas.json) dentro del contenedor de n8n, dejando el webhook listo para recibir mensajes.
 
 ---
 
