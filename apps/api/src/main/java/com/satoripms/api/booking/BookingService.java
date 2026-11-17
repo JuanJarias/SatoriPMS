@@ -583,9 +583,15 @@ public class BookingService {
         BigDecimal refundAmount = totalPaidForGroup.multiply(BigDecimal.valueOf(refundPct))
                 .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
 
-        String codePrefix = first.getReservationGroupId() != null
-                ? first.getReservationGroupId().toString().substring(0, 8).toUpperCase()
-                : "RES-" + first.getId();
+        String codePrefix;
+        if (first.getCompanions() != null && (first.getCompanions().startsWith("TS-") || first.getCompanions().startsWith("BL-"))) {
+            codePrefix = first.getCompanions().trim();
+        } else if (first.getReservationGroupId() != null) {
+            String sub = first.getReservationGroupId().toString().replace("-", "");
+            codePrefix = "TS-" + sub.substring(Math.max(0, sub.length() - 4)).toUpperCase();
+        } else {
+            codePrefix = "TS-" + first.getId();
+        }
 
         return CancellationResponseDto.builder()
                 .code(codePrefix)

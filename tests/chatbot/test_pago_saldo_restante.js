@@ -121,9 +121,11 @@ async function run() {
       throw new Error('No se encontró ninguna reserva activa con estado de pago "partial" para liquidar saldo.');
     }
 
-    const codePrefix = partialBooking.reservationGroupId
-      ? partialBooking.reservationGroupId.substring(0, 8)
-      : 'RES-' + partialBooking.id;
+    const codePrefix = partialBooking.companions && partialBooking.companions.startsWith('TS-')
+      ? partialBooking.companions
+      : (partialBooking.reservationGroupId
+          ? 'TS-' + partialBooking.reservationGroupId.replace(/-/g, '').slice(-4).toUpperCase()
+          : 'TS-' + partialBooking.id);
 
     console.log(`  • Reserva encontrada: ID ${partialBooking.id}, Código: ${codePrefix}`);
     console.log(`  • Total: $${partialBooking.totalPrice}, Pagado actualmente: $${partialBooking.paidAmount}`);

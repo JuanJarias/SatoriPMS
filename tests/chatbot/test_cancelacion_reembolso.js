@@ -121,9 +121,11 @@ async function run() {
       throw new Error('No se encontró ninguna reserva en estado "confirmed" para cancelar.');
     }
 
-    const codePrefix = activeBooking.reservationGroupId
-      ? activeBooking.reservationGroupId.substring(0, 8)
-      : 'RES-' + activeBooking.id;
+    const codePrefix = activeBooking.companions && activeBooking.companions.startsWith('TS-')
+      ? activeBooking.companions
+      : (activeBooking.reservationGroupId
+          ? 'TS-' + activeBooking.reservationGroupId.replace(/-/g, '').slice(-4).toUpperCase()
+          : 'TS-' + activeBooking.id);
 
     console.log(`  • Reserva a cancelar: ID ${activeBooking.id}, Código: ${codePrefix}`);
     console.log(`  • Habitación: ${activeBooking.roomNumber}, Fechas: ${activeBooking.checkIn} a ${activeBooking.checkOut}`);
