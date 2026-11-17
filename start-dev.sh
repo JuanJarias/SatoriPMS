@@ -7,7 +7,12 @@ set -e # Salir inmediatamente si un comando falla
 # ------------------------------------------------------------------------------
 # Variables y Colores
 # ------------------------------------------------------------------------------
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
+    ROOT_DIR="$SCRIPT_DIR"
+else
+    ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
 cd "$ROOT_DIR"
 
 RED='\033[0;31m'
@@ -64,9 +69,9 @@ show_help() {
     echo "  -D, --destroy         ¡PELIGRO! Detiene y BORRA completamente todos los contenedores y volúmenes."
     echo
     echo "Ejemplos:"
-    echo "  ./scripts/start-dev.sh                 (Inicia todo el stack)"
-    echo "  ./scripts/start-dev.sh --frontend-only (Inicia interfaz web React en Vite)"
-    echo "  ./scripts/start-dev.sh -u              (Reconstruye contenedores e inicia)"
+    echo "  ./start-dev.sh                 (Inicia todo el stack)"
+    echo "  ./start-dev.sh --frontend-only (Inicia interfaz web React en Vite)"
+    echo "  ./start-dev.sh -u              (Reconstruye contenedores e inicia)"
 }
 
 # ------------------------------------------------------------------------------
@@ -175,7 +180,7 @@ check_dependencies() {
             log_info "En EndeavourOS / Arch Linux puedes instalarlo ejecutando:"
             log_info "  sudo pacman -S docker-compose"
             log_info "O puedes arrancar únicamente la interfaz React ejecutando:"
-            log_info "  ./scripts/start-dev.sh --frontend-only"
+            log_info "  ./start-dev.sh --frontend-only"
             missing=1
         else
             log_success "Docker Compose está listo ('$compose_cmd')."
