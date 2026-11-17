@@ -56,7 +56,7 @@ get_compose_cmd() {
 # Función de Ayuda
 # ------------------------------------------------------------------------------
 show_help() {
-    echo -e "${BOLD}Uso: ./start-dev.sh [opciones]${NC}"
+    echo -e "${BOLD}Uso: ./scripts/start-dev.sh [opciones]${NC}"
     echo
     echo "Opciones de Arranque:"
     echo "  -h, --help            Muestra esta ayuda y sale."
@@ -69,9 +69,9 @@ show_help() {
     echo "  -D, --destroy         ¡PELIGRO! Detiene y BORRA completamente todos los contenedores y volúmenes."
     echo
     echo "Ejemplos:"
-    echo "  ./start-dev.sh                 (Inicia todo el stack)"
-    echo "  ./start-dev.sh --frontend-only (Inicia interfaz web React en Vite)"
-    echo "  ./start-dev.sh -u              (Reconstruye contenedores e inicia)"
+    echo "  ./scripts/start-dev.sh                 (Inicia todo el stack)"
+    echo "  ./scripts/start-dev.sh --frontend-only (Inicia interfaz web React en Vite)"
+    echo "  ./scripts/start-dev.sh -u              (Reconstruye contenedores e inicia)"
 }
 
 # ------------------------------------------------------------------------------
@@ -180,7 +180,7 @@ check_dependencies() {
             log_info "En EndeavourOS / Arch Linux puedes instalarlo ejecutando:"
             log_info "  sudo pacman -S docker-compose"
             log_info "O puedes arrancar únicamente la interfaz React ejecutando:"
-            log_info "  ./start-dev.sh --frontend-only"
+            log_info "  ./scripts/start-dev.sh --frontend-only"
             missing=1
         else
             log_success "Docker Compose está listo ('$compose_cmd')."

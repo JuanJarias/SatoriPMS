@@ -48,7 +48,7 @@ Para inicializar el proyecto en un entorno local se requiere contar con:
 ## Configuración Necesaria
 
 1. **Variables de Entorno:**
-   En la raíz del proyecto se incluye la plantilla [.env.example](.env.example). Cópiala con el nombre `.env` y completa las contraseñas locales y las claves de conexión:
+   En la raíz del proyecto se incluye la plantilla [.env.example](.env.example). Cópiala con el nombre `.env` y completa las contraseñas locales y las claves de conexión. Para obtener un paso a paso detallado de cada clave (WhatsApp Meta Cloud API, Gemini, Mercado Pago, PostgreSQL, Redis), consulta la [Guía de Configuración del Entorno](docs/Guia_Configuracion_Entorno.md):
    ```bash
    cp .env.example .env
    ```
@@ -74,28 +74,48 @@ Para inicializar el proyecto en un entorno local se requiere contar con:
    ```
 
 2. **Levantar la infraestructura local:**
-   Puedes utilizar el asistente automático de inicio o ejecutar Docker Compose directamente:
+   Puedes utilizar el asistente automático ubicado en `scripts/` o ejecutar Docker Compose directamente:
    ```bash
-   ./start-dev.sh
+   ./scripts/start-dev.sh
    ```
-   O de forma manual:
+   *Opciones útiles del script:*
+   - `./scripts/start-dev.sh --no-frontend` (levanta la infraestructura Docker sin iniciar Vite).
+   - `./scripts/start-dev.sh --frontend-only` (inicia únicamente la interfaz web React).
+   - `./scripts/start-dev.sh -u` (reconstruye imágenes vía multi-stage build).
+   - `./scripts/start-dev.sh -d` (detiene los contenedores preservando datos).
+
+   O de forma manual con Docker Compose:
    ```bash
    docker compose up -d --build
    ```
 
 3. **Servicios disponibles en el entorno local:**
-   - **Servidor Principal (API):** `http://localhost:8080`
-   - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (en la primera ejecución, importa y activa el flujo [V8_ChatbotReservas.json](flows/n8n/V8_ChatbotReservas.json)).
-   - **Base de Datos (PostgreSQL):** Puerto local `5433`.
-   - **Gestor de Bloqueos y Sesiones (Redis):** Puerto local `6379`.
+   - **Servidor Principal (API):** `http://localhost:8080` (Documentación Swagger / OpenAPI: `http://localhost:8080/swagger-ui/index.html`)
+   - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (flujo conversacional activo: [V8_ChatbotReservas.json](flows/n8n/V8_ChatbotReservas.json)).
+   - **Base de Datos (PostgreSQL 16):** Puerto local `5432`.
+   - **Gestor de Bloqueos y Sesiones (Redis 7):** Puerto local `6379`.
 
-4. **Iniciar la aplicación web (opcional para desarrollo visual):**
+4. **Iniciar la aplicación web (opcional si no se usó el script):**
    ```bash
    cd apps/web
    npm install
    npm run dev
    ```
    La interfaz estará disponible en `http://localhost:5173`.
+
+---
+
+## Validación y Pruebas Automatizadas
+
+El proyecto cuenta con una suite integral de 55 pruebas automatizadas que validan los 5 flujos conversacionales de WhatsApp y los requisitos no funcionales de ITIL 4 (doble candado de concurrencia milisegundo 0, sobrecarga de 50 peticiones simultáneas y tarifas dinámicas):
+
+```bash
+# Ejecutar la suite completa de pruebas del chatbot y API
+node tests/chatbot/suite_pruebas_chatbot_v8.js
+
+# Ejecutar únicamente un flujo específico (ejemplo: Flujo 1 Reserva Guiada)
+node tests/chatbot/suite_pruebas_chatbot_v8.js --flow 1
+```
 
 ---
 
@@ -108,6 +128,6 @@ Toda la documentación funcional, de diseño, diagramas y presupuesto del proyec
 ## Cómo Contribuir
 
 1. Crea una rama descriptiva a partir de la rama de trabajo vigente (`feat/nombre-funcionalidad` o `fix/nombre-correccion`).
-2. Realiza tus cambios verificando que los contenedores levanten sin errores y que las pruebas del flujo conversacional en [tests/chatbot/](tests/chatbot) se ejecuten satisfactoriamente.
-3. Actualiza la documentación correspondiente en [docs/](docs/README.md) manteniendo el registro de avance en [EstadoActual.md](docs/modulos/EstadoActual.md) y el detalle de commits pendientes en [CambiosPendientes.md](docs/CambiosPendientes.md).
+2. Realiza tus cambios verificando que los contenedores levanten sin errores y que las pruebas en `tests/chatbot/` se ejecuten satisfactoriamente (`node tests/chatbot/suite_pruebas_chatbot_v8.js`).
+3. Actualiza la documentación técnica correspondiente en [docs/](docs/README.md).
 4. Abre una solicitud de integración (Pull Request) describiendo el propósito y alcance de los cambios realizados.

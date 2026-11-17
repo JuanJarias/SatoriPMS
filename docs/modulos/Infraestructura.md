@@ -45,7 +45,7 @@ El sistema se configura a través de un archivo `.env` en la raíz del proyecto 
 
 ## 5. Puesta en Marcha Automatizada
 
-El repositorio incluye el asistente de inicio [start-dev.sh](../../start-dev.sh), el cual automatiza la puesta a punto del entorno:
+El repositorio incluye el asistente de inicio [start-dev.sh](../../scripts/start-dev.sh), el cual automatiza la puesta a punto del entorno:
 1. Verifica que exista el archivo `.env` (creándolo desde `.env.example` si aún no existe).
 2. Construye y levanta los contenedores en segundo plano.
 3. Espera a que la base de datos y el servidor central respondan satisfactoriamente.
