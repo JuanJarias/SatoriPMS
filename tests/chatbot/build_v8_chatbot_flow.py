@@ -8,6 +8,7 @@ def generate_v8():
         flow = json.load(f)
 
     flow['name'] = 'V8_ChatbotReservas'
+    flow['id'] = '0VPSyVQrnMgmVMfv'
     flow['versionId'] = str(uuid.uuid4())
 
     nodes = flow['nodes']
@@ -29,6 +30,9 @@ def generate_v8():
     for n in nodes:
         if 'httpRequest' in n['type']:
             n['onError'] = 'continueRegularOutput'
+
+    if 'API Habitaciones Disponibles' in nodes_dict:
+        nodes_dict['API Habitaciones Disponibles']['alwaysOutputData'] = True
 
     # Update Cargar Sesión y Detectar Ruta
     nodes_dict['Cargar Sesión y Detectar Ruta']['parameters']['jsCode'] = """const p = $('Parsear Mensaje Meta').first().json;
@@ -124,14 +128,14 @@ return [{ json: Object.assign({}, J, { opcion: m ? m[1] : 'invalido' }) }];"""
     nodes_dict['H Menú Principal']['parameters']['jsCode'] = """const J = $input.first().json;
 const wa_id = J.wa_id;
 const sender_name = J.sender_name || 'Huésped';
-const msg = '¡Hola, ' + sender_name + '! ☕\\nBienvenido al asistente de *Satori Hotel*\\n\\nSelecciona una opción para continuar:';
+const msg = '¡Hola, ' + sender_name + '! \\nBienvenido al asistente de *Satori Hotel*\\n\\nSelecciona una opción para continuar:';
 
 const rows = [
   { id: 'menu_reserva', title: 'Hacer una reserva', description: 'Reserva guiada paso a paso' },
   { id: 'menu_ia', title: 'Asistente IA', description: 'Describe tu viaje libremente' },
   { id: 'menu_resenas', title: 'Ver reseñas', description: 'Opiniones reales de huéspedes' },
   { id: 'menu_escribir_resena', title: 'Escribir reseña', description: 'Comparte tu experiencia' },
-  { id: 'menu_cancelar', title: 'Revisar o Cancelar', description: 'Consulta tu reserva o saldo' },
+  { id: 'menu_cancelar', title: 'Consultar o Pagar', description: 'Consulta saldo, abona o cancela' },
   { id: 'menu_agente', title: 'Hablar con agente', description: 'Atención con recepción humana' }
 ];
 
@@ -189,6 +193,58 @@ return [{
         for (rid, lval, rval, out_key) in rules
     ]
 
+    # Update H Mostrar Habitaciones
+    nodes_dict['H Mostrar Habitaciones']['parameters']['jsCode'] = """const source = $('H F1 CheckOut').first().json;
+const raw = $input.all().map((item) => item.json);
+const rooms = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;
+const wa_id = source.wa_id;
+const sender_name = source.sender_name;
+
+const validRooms = rooms.filter(r => r && (r.number || r.id));
+const choices = validRooms.slice(0, 10);
+const draft = Object.assign({}, source.session.reservation_draft, { availableRooms: choices });
+
+if (!choices.length) {
+  return [{
+    json: {
+      wa_id,
+      sender_name,
+      response_text: '😔 No encontré habitaciones disponibles para esas fechas. Escribe *menú* para iniciar otra búsqueda.',
+      session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }
+    }
+  }];
+}
+
+const lines = choices.map((room, index) => {
+  const base = room.baseAdultsCapacity || 0;
+  const max = Number(room.maxAdultsCapacity || 0) + Number(room.childrenCapacity || 0);
+  const price = Number(room.pricePerNight || 0).toLocaleString('es-CO');
+  const num = room.number || room.id;
+  return `${index + 1}. Habitación #${num}\\n   💵 $${price}/noche | 👥 Base: ${base}, Máx: ${max} pers.`;
+});
+
+const text = `🏨 *Habitaciones Disponibles en Torre Satori*\\n\\n` +
+             `📅 Fechas: del *${draft.checkIn}* al *${draft.checkOut}*\\n\\n` +
+             lines.join('\\n\\n') + `\\n\\n` +
+             `Por favor, escribe el número de una o varias habitaciones separadas por coma (ejemplo: *1* o *1, 3* si deseas más de una).\\n\\n` +
+             `💡 _Cada habitación seleccionada se bloqueará por 15 minutos para que completes tu reserva._`;
+
+return [{
+  json: {
+    wa_id,
+    sender_name,
+    response_text: text,
+    session: {
+      state: 'reserva',
+      step: 'seleccion_habitacion',
+      agent_active: false,
+      wa_id,
+      sender_name,
+      reservation_draft: draft
+    }
+  }
+}];"""
+
     # Update H Validar y Seleccionar Habitaciones
     nodes_dict['H Validar y Seleccionar Habitaciones']['parameters']['jsCode'] = """const J = $input.first().json;
 const D = J.session?.reservation_draft || {};
@@ -198,13 +254,50 @@ const reply = (message, session) => [{ json: { wa_id: J.wa_id, sender_name: J.se
 
 if (J.route === 'reserva:seleccion_habitacion' || step === 'seleccion_habitacion') {
   const rooms = Array.isArray(D.availableRooms) ? D.availableRooms : [];
-  const input = String(J.message_text || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
-  const words = { uno: '1', un: '1', una: '1', dos: '2', tres: '3', cuatro: '4', cinco: '5', seis: '6', siete: '7', ocho: '8', nueve: '9', diez: '10' };
-  const digits = input.replace(/\\b(uno|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\\b/g, (word) => words[word]).match(/\\d+/g) || [];
-  const indices = [...new Set(digits.map(Number).filter((number) => number >= 1 && number <= rooms.length))];
-  const selected = indices.map((number) => rooms[number - 1]);
-  if (!selected.length) return reply('⚠️ No reconocí la selección. Responde con los números de la lista, separados por coma; por ejemplo: *1, 3*.', keep(D, 'seleccion_habitacion'));
-  return selected.map((room) => ({ json: Object.assign({}, J, { api_action: 'lock', roomId: room.id, checkIn: D.checkIn, checkOut: D.checkOut, selectedRooms: selected, lockRoom: room }) }));
+  const text = String(J.message_text || '').trim();
+  const input = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+
+  let matchedRooms = [];
+
+  // 1. Selección desde lista interactiva de WhatsApp (id: hab_101)
+  const habMatch = text.match(/hab_(\\w+)/i);
+  if (habMatch) {
+    const rNum = habMatch[1];
+    const found = rooms.find(r => String(r.number) === rNum || String(r.id) === rNum);
+    if (found) matchedRooms.push(found);
+  }
+
+  // 2. Selección numérica o por palabras (1, 3 o 101, 102...)
+  if (!matchedRooms.length) {
+    const words = { uno: '1', un: '1', una: '1', dos: '2', tres: '3', cuatro: '4', cinco: '5', seis: '6', siete: '7', ocho: '8', nueve: '9', diez: '10' };
+    const digits = input.replace(/\\b(uno|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\\b/g, (word) => words[word]).match(/\\d+/g) || [];
+
+    digits.forEach(d => {
+      const num = Number(d);
+      if (num >= 1 && num <= rooms.length) {
+        const r = rooms[num - 1];
+        if (!matchedRooms.some(mr => mr.id === r.id)) matchedRooms.push(r);
+      } else {
+        const r = rooms.find(rm => Number(rm.number) === num || Number(rm.id) === num);
+        if (r && !matchedRooms.some(mr => mr.id === r.id)) matchedRooms.push(r);
+      }
+    });
+  }
+
+  if (!matchedRooms.length) {
+    return reply('No reconocí la opción. Por favor escribe el número de la habitación que deseas reservar (por ejemplo: *1*, o varias como *1, 3* si deseas más de una).', keep(D, 'seleccion_habitacion'));
+  }
+
+  return matchedRooms.map((room) => ({
+    json: Object.assign({}, J, {
+      api_action: 'lock',
+      roomId: room.id,
+      checkIn: D.checkIn,
+      checkOut: D.checkOut,
+      selectedRooms: matchedRooms,
+      lockRoom: room
+    })
+  }));
 }
 
 if (step === 'pago') {
@@ -216,9 +309,9 @@ if (step === 'pago') {
     return [{ json: Object.assign({}, J, { payment_selection: 'deposit' }) }];
   }
   if (['3', 'cancelar', 'no', 'pago_cancelar', 'cancel'].some(k => answer.includes(k))) {
-    return reply('❌ Reserva cancelada. El bloqueo de la habitación ha sido liberado. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} });
+    return reply('Reserva cancelada. El bloqueo de la habitación ha sido liberado. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} });
   }
-  return reply('⚠️ Por favor selecciona una opción válida:\\n1️⃣ Pagar el 100%\\n2️⃣ Pagar el 50% de anticipo\\n3️⃣ Cancelar reserva', keep(D, 'pago'));
+  return reply('Por favor selecciona una opción válida:\\n1. Pagar el 100%\\n2. Pagar el 50% de anticipo\\n3. Cancelar reserva', keep(D, 'pago'));
 }
 
 if (step === 'acompanantes') {
@@ -234,7 +327,7 @@ if (step === 'acompanantes') {
   if (!none && expected > 0) {
     const names = text.split(/,| y | e |\\n|-/).map(n => n.trim()).filter(n => n.length > 2);
     if (names.length !== expected) {
-      return reply(`⚠️ Indicaste que serían ${expected + 1} huéspedes en total (tú y ${expected} acompañante(s)). Por favor, escribe los ${expected} nombres separados por coma. Si la cantidad de huéspedes es incorrecta, escribe *menú* para reiniciar.`, keep(D, 'acompanantes'));
+      return reply(`Indicaste que serían ${expected + 1} huéspedes en total (tú y ${expected} acompañante(s)). Por favor, escribe los ${expected} nombres separados por coma. Si la cantidad de huéspedes es incorrecta, escribe *menú* para reiniciar.`, keep(D, 'acompanantes'));
     }
   }
 }
@@ -253,7 +346,7 @@ if (step === 'huespedes') {
   if (adult && child) J.message_text = adult[1] + ' adultos y ' + child[1] + ' niños';
 }
 if (step === 'identificacion' && !/^\\d{6,10}$/.test(text.replace(/\\s+/g, ''))) {
-  return [{ json: { wa_id: J.wa_id, sender_name: J.sender_name, response_text: '⚠️ La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', session: { ...J.session, step: 'identificacion' } } }];
+  return [{ json: { wa_id: J.wa_id, sender_name: J.sender_name, response_text: 'La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', session: { ...J.session, step: 'identificacion' } } }];
 }
 return [{ json: J }];"""
 
@@ -286,24 +379,24 @@ if (step === 'huespedes') {
   if (adults == null && numberTokens.length) adults = numberTokens[0];
   if (children === 0 && numberTokens.length > 1 && !childMatches.length) children = numberTokens[1];
   const max = Number(D.room && D.room.maxAdultsCapacity || 0) + Number(D.room && D.room.childrenCapacity || 0);
-  if (!adults || adults < 1 || children < 0) return [output('⚠️ Indica las personas así: *2 adultos y 1 niño*.', keep(D, 'huespedes'))];
-  if (max && adults + children > max) return [output('⚠️ Esa habitación admite máximo *' + max + ' personas* según su capacidad. Regresa a la selección escribiendo *menú* o elige otra habitación.', keep(D, 'seleccion_habitacion'))];
+  if (!adults || adults < 1 || children < 0) return [output('Indica las personas así: *2 adultos y 1 niño*.', keep(D, 'huespedes'))];
+  if (max && adults + children > max) return [output('Esa habitación admite máximo *' + max + ' personas* según su capacidad. Regresa a la selección escribiendo *menú* o elige otra habitación.', keep(D, 'seleccion_habitacion'))];
   const base = Number(D.room && D.room.baseAdultsCapacity || 0);
   const extraPrice = Number(D.room && D.room.extraGuestPrice || 0);
   const extraGuests = Math.max(0, adults + children - base);
   const draft = Object.assign({}, D, { adults, children, extraGuests, extraGuestPrice: extraPrice, extraTotal: extraGuests * extraPrice });
 
-  return [output(`✅ Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\n🔒 *Aviso de Privacidad (Ley 1581 de 2012):* Al continuar y suministrar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva y estadía.\\n\\nIndica el nombre completo de la persona titular de la reserva:`, keep(draft, 'nombre'))];
+  return [output(`Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\n*Aviso de Privacidad (Ley 1581 de 2012):* Al continuar y suministrar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva y estadía.\\n\\nIndica el nombre completo de la persona titular de la reserva:`, keep(draft, 'nombre'))];
 }
 
 if (step === 'nombre') {
-  if (text.length < 3) return [output('⚠️ Indica un nombre completo válido.', keep(D, 'nombre'))];
+  if (text.length < 3) return [output('Indica un nombre completo válido.', keep(D, 'nombre'))];
   return [output('Gracias. Ahora indica el número de identificación (cédula o pasaporte) del titular.', keep(Object.assign({}, D, { guestName: text }), 'identificacion'))];
 }
 
 if (step === 'identificacion') {
   const document = text.replace(/\\s+/g, '').replace(/[^0-9]/g, '');
-  if (!/^\\d{6,10}$/.test(document)) return [output('⚠️ La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', keep(D, 'identificacion'))];
+  if (!/^\\d{6,10}$/.test(document)) return [output('La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', keep(D, 'identificacion'))];
   return [output('¿Viajas con mascota?', keep(Object.assign({}, D, { document }), 'mascota'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: '¿Viajas con mascota?' }, action: { buttons: [{ type: 'reply', reply: { id: 'pet_si', title: 'Sí' } }, { type: 'reply', reply: { id: 'pet_no', title: 'No' } }] } } } })];
 }
 
@@ -311,7 +404,7 @@ if (step === 'mascota') {
   const hasPet = ['si', 'sí', 'pet_si', 'yes'].includes(normalized);
   const noPet = ['no', 'pet_no'].includes(normalized);
   if (!hasPet && !noPet) return [output('Responde usando *Sí* o *No* para la mascota.', keep(D, 'mascota'))];
-  if (hasPet && D.room && D.room.allowsPets === false) return [output('⚠️ La habitación seleccionada no permite mascotas. Responde *No* o elige otra habitación.', keep(D, 'mascota'))];
+  if (hasPet && D.room && D.room.allowsPets === false) return [output('La habitación seleccionada no permite mascotas. Responde *No* o elige otra habitación.', keep(D, 'mascota'))];
   return [output('¿Cuáles son los nombres de tus acompañantes? Si viajas solo, responde *ninguno*.', keep(Object.assign({}, D, { hasPet }), 'acompanantes'))];
 }
 
@@ -330,7 +423,7 @@ if (step === 'acompanantes') {
   const draft = Object.assign({}, D, { companions, nights, baseStay, extraTotal, total });
   const extraDesc = extraGuests > 0 ? `(${extraGuests} adic. x $${extraGuestPrice.toFixed(2)})` : '(Sin recargo)';
 
-  const summary = `🧾 *Resumen de tu Reserva*\\n\\n` +
+  const summary = `*Resumen de tu Reserva*\\n\\n` +
     `• Habitación: *${D.room.name || D.room.type} #${D.room.number}*\\n` +
     `• Entrada: *${D.checkIn}*\\n` +
     `• Salida: *${D.checkOut}* (${nights} noche${nights > 1 ? 's' : ''})\\n` +
@@ -341,10 +434,10 @@ if (step === 'acompanantes') {
     `• Tarifa base (${nights} noche${nights > 1 ? 's' : ''}): *$${baseStay.toFixed(2)}*\\n` +
     `• Recargo persona adicional: *$${extraTotal.toFixed(2)}* _${extraDesc}_\\n` +
     `• Total estadía: *$${totalStr}*\\n\\n` +
-    `💳 *¿Cómo deseas realizar el pago?*\\n` +
-    `1️⃣ *Pagar el 100% ahora ($${totalStr})*\\n` +
-    `2️⃣ *Pagar el 50% de anticipo ($${half})* (saldo al check-in)\\n` +
-    `3️⃣ *Cancelar reserva*\\n\\n` +
+    `*¿Cómo deseas realizar el pago?*\\n` +
+    `1. *Pagar el 100% ahora ($${totalStr})*\\n` +
+    `2. *Pagar el 50% de anticipo ($${half})* (saldo al check-in)\\n` +
+    `3. *Cancelar reserva*\\n\\n` +
     `_Responde 1, 2 o 3._`;
 
   return [output(summary, keep(draft, 'pago'), {
@@ -388,10 +481,10 @@ if (step === 'pago') {
     };
 
     const optMsg = opt === 'deposit' ? 'el 50% de anticipo' : 'el 100% total';
-    return [output(`✅ Confirmando tu reserva con pago de ${optMsg}...`, { state: 'reserva', step: 'confirmando', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: Object.assign({}, D, { payload, paymentOption: opt }) }, { api_action: 'confirm', payload })];
+    return [output(`Confirmando tu reserva con pago de ${optMsg}...`, { state: 'reserva', step: 'confirmando', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: Object.assign({}, D, { payload, paymentOption: opt }) }, { api_action: 'confirm', payload })];
   }
 
-  return [output('❌ Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];
+  return [output('Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];
 }
 
 return [output('Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];"""
@@ -411,32 +504,32 @@ const sender_name = source.sender_name || (inputToApi.payload && inputToApi.payl
 let text = '';
 
 if (apiResponse.reservationGroupId) {
-    const code = String(apiResponse.reservationGroupId).split('-')[0].toUpperCase();
+    const code = apiResponse.code || ('TS-' + String(apiResponse.reservationGroupId).replace(/-/g, '').slice(-4).toUpperCase());
     const paid = apiResponse.paidAmount != null ? Number(apiResponse.paidAmount).toFixed(2) : '0.00';
     const pending = apiResponse.pendingBalance != null ? Number(apiResponse.pendingBalance).toFixed(2) : '0.00';
     const total = apiResponse.totalPrice != null ? Number(apiResponse.totalPrice).toFixed(2) : paid;
     const isPartial = apiResponse.paymentStatus === 'partial';
 
-    text = `🎉 *¡Tu reserva ha sido confirmada con éxito!*\\n\\n` +
+    text = `*¡Tu reserva ha sido confirmada con éxito!*\\n\\n` +
            `• Código de reserva: *${code}*\\n` +
            `• Total de la estadía: *$${total}*\\n` +
            `• Monto pagado: *$${paid}* ${isPartial ? '_(Anticipo del 50%)_' : '_(Pago total 100%)_'}\\n`;
 
     if (isPartial) {
         text += `• Saldo pendiente: *$${pending}*\\n` +
-                `💡 _Puedes pagar el saldo restante en cualquier momento desde la opción *Revisar o Cancelar* del menú, o al momento de tu check-in._\\n\\n`;
+                `_Puedes pagar el saldo restante en cualquier momento desde la opción *Revisar o Cancelar* del menú, o al momento de tu check-in._\\n\\n`;
     } else {
         text += `• Estado de pago: *Completamente pagado (100%)*\\n\\n`;
     }
 
     text += `Conserva tu código *${code}* para cualquier consulta.\\n` +
-            `¡Te esperamos con los brazos abiertos en *Satori Hotel*! 🌿\\n\\n` +
+            `¡Te esperamos con los brazos abiertos en *Satori Hotel*! \\n\\n` +
             `Escribe *menú* para volver al inicio.`;
 } else {
     let errorMsg = apiResponse.error || apiResponse.message || apiResponse.detail;
     if (errorMsg && typeof errorMsg === 'object') errorMsg = errorMsg.message || JSON.stringify(errorMsg);
     if (!errorMsg) errorMsg = JSON.stringify(apiResponse);
-    text = `⚠️ Lo sentimos, no pudimos completar tu reserva.\\nMotivo: ${errorMsg}.\\n\\nSi el tiempo de 15 minutos expiró, las habitaciones se liberaron automáticamente. Escribe *menú* para intentar de nuevo.`;
+    text = `Lo sentimos, no pudimos completar tu reserva.\\nMotivo: ${errorMsg}.\\n\\nSi el tiempo de 15 minutos expiró, las habitaciones se liberaron automáticamente. Escribe *menú* para intentar de nuevo.`;
 }
 
 return [{
@@ -448,6 +541,31 @@ return [{
         session: { state: 'menu', step: 'esperando_opcion', agent_active: false,
                    wa_id, sender_name, reservation_draft: {} }
     }
+}];"""
+
+    # Update H F1 Inicio Revisar Reserva
+    nodes_dict['H F1 Inicio Revisar Reserva']['parameters']['jsCode'] = """const J = $input.first().json;
+const wa_id = J.wa_id;
+const sender_name = J.sender_name || 'Huésped';
+const msg = `🔎 *Consulta, Pago y Cancelación de Reservas*\\n\\n` +
+            `Aquí podrás consultar el estado de tu reserva, abonar saldo pendiente o solicitar cancelación.\\n\\n` +
+            `Por favor, escribe el *código de tu reserva* (por ejemplo: *TS-4156*).\\n\\n` +
+            `💡 _Puedes escribir *menú* en cualquier momento para volver al inicio._`;
+
+return [{\\
+    json: {\\
+        wa_id,\\
+        sender_name,\\
+        response_text: msg,\\
+        session: {\\
+            state: 'revisar_reserva',\\
+            step: 'pedir_codigo',\\
+            agent_active: false,\\
+            wa_id,\\
+            sender_name,\\
+            review_draft: {}\\
+        }\\
+    }\\
 }];"""
 
     # Update H Normalizar Revisar Reserva
@@ -488,14 +606,26 @@ const reply = (msg, newSession, extra = {}) => [{
 // PASO 1: Ingreso de Código
 if (S.step === 'pedir_codigo') {
     const codeMatch = text.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase();
-    if (!codeMatch || codeMatch.length < 6) {
-        return reply('⚠️ El código debe tener al menos 6 caracteres alfanuméricos (ejemplo: *41560C98*). Inténtalo de nuevo o escribe *menú* para cancelar.', S);
+    if (!codeMatch || codeMatch.length < 4) {
+        return reply('El código debe tener al menos 4 caracteres (ejemplo: *TS-4156*). Inténtalo de nuevo o escribe *menú* para cancelar.', S);
+    }
+    const msg = `🔒 *Verificación de Identidad*\\n\\n` +
+                `Para consultar la reserva *${codeMatch}*, por favor escribe el *número de cédula o documento de identidad* del titular que realizó la reserva:\\n\\n` +
+                `💡 _Escribe *menú* para cancelar._`;
+    return reply(msg, keep(Object.assign({}, draft, { inputCode: codeMatch }), 'pedir_documento'));
+}
+
+// PASO 1.5: Ingreso de Documento / Cédula del Titular
+if (S.step === 'pedir_documento') {
+    const docMatch = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (!docMatch || docMatch.length < 4) {
+        return reply('⚠️ Por favor ingresa un número de documento válido (mínimo 4 caracteres). Inténtalo de nuevo o escribe *menú* para salir.', S);
     }
     return [{
         json: Object.assign({}, J, {
             api_action: 'get_booking',
-            search_code: codeMatch,
-            session: keep(Object.assign({}, draft, { inputCode: codeMatch }), 'buscando')
+            search_code: draft.inputCode,
+            session: keep(Object.assign({}, draft, { inputDocument: docMatch }), 'buscando')
         })
     }];
 }
@@ -527,16 +657,16 @@ if (S.step === 'opciones_reserva') {
         const refundAmt = policy.estimatedRefund != null ? Number(policy.estimatedRefund).toFixed(2) : '0.00';
         const paidAmt = res.paidAmount != null ? Number(res.paidAmount).toFixed(2) : '0.00';
 
-        const msg = `⚠️ *Políticas de Cancelación (Torre Satori)*\\n\\n` +
+        const msg = `*Políticas de Cancelación (Torre Satori)*\\n\\n` +
                     `• Más de 72h antes: Reembolso del 100% de lo abonado.\\n` +
                     `• Entre 24h y 72h antes: Reembolso del 50% de lo abonado.\\n` +
                     `• Menos de 24h o no-show: Sin reembolso (0%).\\n\\n` +
-                    `📊 *Detalle de tu reserva (${draft.code}):*\\n` +
+                    `*Detalle de tu reserva (${draft.code}):*\\n` +
                     `• Total abonado: *$${paidAmt}*\\n` +
                     `• Horas restantes: *${hours}h*\\n` +
                     `• Política aplicable: *${policyDesc}*\\n` +
                     `• Reembolso estimado: *$${refundAmt}*\\n\\n` +
-                    `🔴 *¿Confirmas la cancelación definitiva de tu reserva?*\\n` +
+                    `*¿Confirmas la cancelación definitiva de tu reserva?*\\n` +
                     `Esta acción liberará las habitaciones de inmediato y no se puede deshacer.\\n\\n` +
                     `Responde *Sí, confirmar* para cancelar o *No* para mantener tu reserva.`;
 
@@ -563,7 +693,7 @@ if (S.step === 'confirmar_cancelacion') {
     }
 
     if (isNegative) {
-        return reply(`✅ Tu reserva *${draft.code}* sigue activa y protegida. ¡Te esperamos en Satori Hotel! Escribe *menú* para volver al inicio.`, reset());
+        return reply(`Tu reserva *${draft.code}* sigue activa y protegida. ¡Te esperamos en Satori Hotel! Escribe *menú* para volver al inicio.`, reset());
     }
 
     return reply('No entendí tu respuesta. Por favor responde *Sí, confirmar* para cancelar la reserva o *No* para mantenerla.', S);
@@ -576,6 +706,7 @@ return reply('Escribe *menú* para volver al inicio.', reset());"""
 const source = $('H Normalizar Revisar Reserva').first().json;
 const wa_id = source.wa_id;
 const sender_name = source.sender_name;
+const draft = source.session?.review_draft || {};
 
 if (!apiResponse.code && !apiResponse.reservationGroupId) {
     const errorMsg = apiResponse.error || 'No se encontró ninguna reserva activa con ese código';
@@ -583,7 +714,7 @@ if (!apiResponse.code && !apiResponse.reservationGroupId) {
         json: {
             wa_id,
             sender_name,
-            response_text: `⚠️ *Reserva no encontrada*\\n\\n${errorMsg}.\\n\\nPor favor verifica el código e inténtalo de nuevo, o escribe *menú* para volver al inicio.`,
+            response_text: `*Reserva no encontrada*\\n\\n${errorMsg}.\\n\\nPor favor verifica el código e inténtalo de nuevo, o escribe *menú* para volver al inicio.`,
             session: {
                 state: 'revisar_reserva',
                 step: 'pedir_codigo',
@@ -597,24 +728,48 @@ if (!apiResponse.code && !apiResponse.reservationGroupId) {
 }
 
 const res = apiResponse;
+
+// Verificación estricta de Cédula / Documento de Identidad del titular
+const expectedDoc = String(res.guestDocument || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+const enteredDoc = String(draft.inputDocument || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+if (!expectedDoc || expectedDoc !== enteredDoc) {
+    return [{
+        json: {
+            wa_id,
+            sender_name,
+            response_text: `⚠️ *Validación de Identidad Fallida*\\n\\nEl documento ingresado no coincide con el titular registrado para la reserva *${res.code}*.\\n\\nPor motivos de seguridad y privacidad, no es posible acceder a la información de esta reserva.\\n\\nVerifica tus datos e inténtalo de nuevo escribiendo el documento correcto, o escribe *menú* para salir.`,
+            session: {
+                state: 'revisar_reserva',
+                step: 'pedir_documento',
+                agent_active: false,
+                wa_id,
+                sender_name,
+                review_draft: { inputCode: res.code }
+            }
+        }
+    }];
+}
+
 const roomNames = Array.isArray(res.rooms) ? res.rooms.map(r => `#${r.number} (${r.name || r.type})`).join(', ') : 'Habitación reservada';
 const total = res.totalPrice != null ? Number(res.totalPrice).toFixed(2) : '0.00';
 const paid = res.paidAmount != null ? Number(res.paidAmount).toFixed(2) : '0.00';
 const pending = res.pendingBalance != null ? Number(res.pendingBalance).toFixed(2) : '0.00';
 
-let msg = `📋 *Detalles de tu Reserva*\\n\\n` +
+let msg = `🔎 *Detalles de tu Reserva*\\n\\n` +
           `• Código: *${res.code}*\\n` +
           `• Titular: *${res.guestName || sender_name}*\\n` +
+          `• Documento: *${res.guestDocument}*\\n` +
           `• Estado: *${res.statusLabel || res.status}* (${res.paymentStatusLabel || res.paymentStatus})\\n` +
           `• Fechas: *${res.checkIn}* al *${res.checkOut}* (${res.nights} noche${res.nights > 1 ? 's' : ''})\\n` +
           `• Habitaciones: *${roomNames}*\\n` +
           `• Huéspedes: *${res.adults} adulto(s), ${res.children} niño(s)*\\n` +
           `• Mascota: *${res.withPet ? 'Sí' : 'No'}*\\n` +
           `• Total reserva: *$${total}*\\n` +
-          `• Pagado a la fecha: *$${paid}*\\n`;
+          `• Abonado a la fecha: *$${paid}*\\n`;
 
 if (Number(pending) > 0) {
-    msg += `• ⚠️ Saldo pendiente: *$${pending}*\\n`;
+    msg += `• Saldo pendiente: *$${pending}*\\n`;
 }
 
 if (res.status === 'cancelled') {
@@ -631,13 +786,13 @@ if (res.status === 'cancelled') {
 
 if (res.canPayRemaining) {
     msg += `\\n¿Qué deseas hacer?\\n` +
-           `1️⃣ *Pagar saldo restante ($${pending})*\\n` +
-           `2️⃣ *Cancelar reserva*\\n` +
-           `3️⃣ *Volver al menú*`;
+           `1. *Pagar saldo restante ($${pending})*\\n` +
+           `2. *Cancelar reserva*\\n` +
+           `3. *Volver al menú*`;
 } else if (res.canCancel) {
     msg += `\\n¿Qué deseas hacer?\\n` +
-           `1️⃣ *Cancelar reserva*\\n` +
-           `2️⃣ *Volver al menú*`;
+           `1. *Cancelar reserva*\\n` +
+           `2. *Volver al menú*`;
 } else {
     msg += `\\nℹ️ Esta reserva no admite cancelaciones automáticas. Escribe *menú* para volver.`;
 }
@@ -735,22 +890,22 @@ if (!apiResponse.reservationGroupId && !apiResponse.code) {
         json: {
             wa_id,
             sender_name,
-            response_text: `⚠️ *Error al procesar el pago*\\n\\n${errorMsg}.\\n\\nEscribe *menú* para volver al inicio.`,
+            response_text: `*Error al procesar el pago*\\n\\n${errorMsg}.\\n\\nEscribe *menú* para volver al inicio.`,
             session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }
         }
     }];
 }
 
-const code = apiResponse.code || (apiResponse.reservationGroupId ? String(apiResponse.reservationGroupId).split('-')[0].toUpperCase() : source.pay_code);
+const code = apiResponse.code || (apiResponse.reservationGroupId ? ('TS-' + String(apiResponse.reservationGroupId).replace(/-/g, '').slice(-4).toUpperCase()) : source.pay_code);
 const total = apiResponse.totalPrice != null ? Number(apiResponse.totalPrice).toFixed(2) : '0.00';
 const paid = apiResponse.paidAmount != null ? Number(apiResponse.paidAmount).toFixed(2) : total;
 
-const msg = `🎉 *¡Pago de Saldo Confirmado con Éxito!*\\n\\n` +
+const msg = `*¡Pago de Saldo Confirmado con Éxito!*\\n\\n` +
             `• Código de reserva: *${code}*\\n` +
             `• Total cancelado: *$${paid}*\\n` +
             `• Saldo pendiente: *$0.00*\\n` +
             `• Estado de pago: *Completamente pagado (100%)*\\n\\n` +
-            `Tu reserva ha quedado al día. ¡Te esperamos en Satori Hotel! ☕🌿\\n\\n` +
+            `Tu reserva ha quedado al día. ¡Te esperamos en Satori Hotel! \\n\\n` +
             `Escribe *menú* para volver al inicio.`;
 
 return [{
@@ -805,13 +960,13 @@ if (!reviews.length || (reviews.length === 1 && !reviews[0].comment && !reviews[
         json: {
             wa_id,
             sender_name,
-            response_text: `⭐ *Reseñas de Torre Satori*\\n\\nAún no hay reseñas registradas. ¡Sé el primero en compartir tu experiencia!\\n\\nEscribe *4* para dejar una reseña o *menú* para volver.`,
+            response_text: `**Reseñas de Torre Satori*\\n\\nAún no hay reseñas registradas. ¡Sé el primero en compartir tu experiencia!\\n\\nEscribe *4* para dejar una reseña o *menú* para volver.`,
             session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }
         }
     }];
 }
 
-const stars = (r) => '⭐'.repeat(Math.max(1, Math.min(5, Math.round(Number(r) || 5))));
+const stars = (r) => '*'.repeat(Math.max(1, Math.min(5, Math.round(Number(r) || 5))));
 const validReviews = reviews.filter(r => r.rating || r.comment);
 const avg = (validReviews.reduce((sum, r) => sum + Number(r.rating || 5), 0) / validReviews.length).toFixed(1);
 
@@ -822,10 +977,10 @@ const list = validReviews.slice(0, 5).map(r => {
     return `${s} *${author}* _(${src})_:\\n"${r.comment || 'Excelente estadía'}"`;
 }).join('\\n\\n');
 
-const msg = `🌟 *Opiniones sobre Torre Satori*\\n` +
+const msg = `*Opiniones sobre Torre Satori*\\n` +
             `Calificación promedio: *${avg} / 5.0* (${validReviews.length} opiniones recientes)\\n\\n` +
             `${list}\\n\\n` +
-            `💡 _Escribe *4* para dejar tu propia reseña o escribe *menú* para regresar al inicio._`;
+            `_Escribe *4* para dejar tu propia reseña o escribe *menú* para regresar al inicio._`;
 
 return [{
     json: {
@@ -850,13 +1005,13 @@ return [{
 const wa_id = J.wa_id;
 const sender_name = J.sender_name || 'Huésped';
 
-const msg = `⭐ *Tu Opinión es Muy Importante para Torre Satori*\\n\\n` +
+const msg = `**Tu Opinión es Muy Importante para Torre Satori*\\n\\n` +
             `Por favor califícanos del *1 al 5*, donde 1 es la menor calificación y 5 la mejor:\\n\\n` +
-            `1️⃣ Muy insatisfecho\\n` +
-            `2️⃣ Insatisfecho\\n` +
-            `3️⃣ Neutral\\n` +
-            `4️⃣ Bueno\\n` +
-            `5️⃣ Excelente ⭐⭐⭐⭐⭐\\n\\n` +
+            `1. Muy insatisfecho\\n` +
+            `2. Insatisfecho\\n` +
+            `3. Neutral\\n` +
+            `4. Bueno\\n` +
+            `5. Excelente *****\\n\\n` +
             `_Escribe el número del 1 al 5 o escribe menú para cancelar._`;
 
 return [{
@@ -929,17 +1084,17 @@ if (S.step === 'pedir_rating') {
     else if (normalized.includes('cuatro') || normalized.includes('buen')) rating = 4;
     else if (normalized.includes('cinco') || normalized.includes('excelent') || normalized.includes('genial')) rating = 5;
     else {
-        const starCount = (text.match(/⭐/g) || []).length;
+        const starCount = (text.match(/*/g) || []).length;
         if (starCount >= 1 && starCount <= 5) rating = starCount;
     }
 
     if (!rating) {
-        return reply('⚠️ Por favor indica un número del *1* al *5* para tu calificación (o escribe *menú* para cancelar).', S);
+        return reply('Por favor indica un número del *1* al *5* para tu calificación (o escribe *menú* para cancelar).', S);
     }
 
-    const starsStr = '⭐'.repeat(rating);
+    const starsStr = '*'.repeat(rating);
     const newDraft = Object.assign({}, draft, { rating });
-    return reply(`✅ Calificación registrada: *${starsStr} (${rating}/5)*\\n\\nAhora cuéntanos en detalle qué te pareció el hotel, la atención, las habitaciones o qué podemos mejorar:`, keep(newDraft, 'pedir_comentario'));
+    return reply(`Calificación registrada: *${starsStr} (${rating}/5)*\\n\\nAhora cuéntanos en detalle qué te pareció el hotel, la atención, las habitaciones o qué podemos mejorar:`, keep(newDraft, 'pedir_comentario'));
 }
 
 if (S.step === 'pedir_comentario') {
@@ -1037,11 +1192,11 @@ const sender_name = source.sender_name || 'Huésped';
 const placeId = $env.GOOGLE_PLACE_ID || 'ChIJ_TEST_TORRE_SATORI_SEVILLA_VALLE';
 const googleLink = 'https://search.google.com/local/writereview?placeid=' + placeId;
 
-const msg = `🙏 *¡Muchas gracias por tu reseña, ${sender_name}!*\\n\\n` +
-            `Tu comentario ha sido guardado exitosamente en nuestro sistema y nos motiva a seguir brindando el mejor servicio. 🌿\\n\\n` +
-            `⭐ *¿Nos ayudarías compartiéndola también en Google?*\\n` +
+const msg = `*¡Muchas gracias por tu reseña, ${sender_name}!*\\n\\n` +
+            `Tu comentario ha sido guardado exitosamente en nuestro sistema y nos motiva a seguir brindando el mejor servicio. \\n\\n` +
+            `**¿Nos ayudarías compartiéndola también en Google?*\\n` +
             `Tu reseña pública en Google Maps ayuda a que más viajeros conozcan Torre Satori. Puedes publicarla con un solo clic aquí:\\n` +
-            `👉 ${googleLink}\\n\\n` +
+            `${googleLink}\\n\\n` +
             `Escribe *menú* para continuar navegando.`;
 
 return [{
@@ -1067,11 +1222,11 @@ return [{
 const wa_id = J.wa_id;
 const sender_name = J.sender_name || 'Huésped';
 
-const msg = `🤖 *Asistente Inteligente de Reservas — Satori Hotel*\\n\\n` +
+const msg = `*Asistente Inteligente de Reservas — Satori Hotel*\\n\\n` +
             `¡Hola ${sender_name}! Puedes escribir en *un solo mensaje* todos los detalles de tu viaje en tus propias palabras.\\n\\n` +
             `*Ejemplo:*\\n` +
             `_«Quiero reservar del 2026-10-20 al 2026-10-23 para 2 adultos y 1 niño, viajo con mi perrito. Mi nombre es Juan Gómez y mi cédula es 1094900111»_\\n\\n` +
-            `🔒 _Aviso de Privacidad (Ley 1581 de 2012): Al enviar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva._\\n\\n` +
+            `_Aviso de Privacidad (Ley 1581 de 2012): Al enviar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva._\\n\\n` +
             `Escribe los datos de tu reserva o escribe *menú* para regresar al menú principal.`;
 
 return [{
@@ -1172,7 +1327,7 @@ if (S.step === 'ia_seleccion_habitacion') {
     const room = rooms.find((r, idx) => idx + 1 === num || String(r.number) === normalized || String(r.id) === normalized);
 
     if (!room) {
-        return reply('⚠️ No encontré esa opción. Por favor responde con el número de la lista (ej: *1*) o escribe *menú* para cancelar.', S);
+        return reply('No encontré esa opción. Por favor responde con el número de la lista (ej: *1*) o escribe *menú* para cancelar.', S);
     }
 
     const newDraft = Object.assign({}, draft, { selectedRoom: room, roomId: room.id });
@@ -1194,11 +1349,11 @@ if (S.step === 'ia_pago') {
     if (['1', '100', '100%', 'total', 'pago_100', 'completo'].some(k => normalized.includes(k))) opt = 'full';
     else if (['2', '50', '50%', 'mitad', 'anticipo', 'pago_50'].some(k => normalized.includes(k))) opt = 'deposit';
     else if (['3', 'cancelar', 'no'].some(k => normalized.includes(k))) {
-        return reply('❌ Reserva cancelada. El bloqueo de la habitación fue liberado. Escribe *menú* para volver al inicio.', reset());
+        return reply('Reserva cancelada. El bloqueo de la habitación fue liberado. Escribe *menú* para volver al inicio.', reset());
     }
 
     if (!opt) {
-        return reply('⚠️ Selecciona una opción válida:\\n1️⃣ Pagar 100%\\n2️⃣ Pagar 50% de anticipo\\n3️⃣ Cancelar', S);
+        return reply('Selecciona una opción válida:\\n1. Pagar 100%\\n2. Pagar 50% de anticipo\\n3. Cancelar', S);
     }
 
     const payload = {
@@ -1331,9 +1486,9 @@ const guestName = parsed.guestName || sender_name;
 const guestDocument = parsed.guestDocument || '';
 
 if (!checkIn || !checkOut || checkIn >= checkOut) {
-    const msg = `🤖 *Entendí parte de tu mensaje:*\\n` +
+    const msg = `*Entendí parte de tu mensaje:*\\n` +
                 `${parsed.summary || 'Necesito que me indiques las fechas de estadía.'}\\n\\n` +
-                `⚠️ *Me faltan las fechas de entrada y salida.*\\n` +
+                `*Me faltan las fechas de entrada y salida.*\\n` +
                 `Por favor indícalas con formato AAAA-MM-DD (ej: *2026-10-20 al 2026-10-23*) o escribe *menú* para ir al inicio.`;
     return [{
         json: {
@@ -1450,7 +1605,7 @@ if (!rooms.length || (rooms.length === 1 && !rooms[0].id)) {
         json: {
             wa_id,
             sender_name,
-            response_text: `😔 No encontré habitaciones disponibles del *${draft.checkIn}* al *${draft.checkOut}* para esa cantidad de huéspedes. Escribe *menú* para intentar con otras fechas.`,
+            response_text: `No encontré habitaciones disponibles del *${draft.checkIn}* al *${draft.checkOut}* para esa cantidad de huéspedes. Escribe *menú* para intentar con otras fechas.`,
             session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }
         }
     }];
@@ -1458,13 +1613,16 @@ if (!rooms.length || (rooms.length === 1 && !rooms[0].id)) {
 
 const choices = rooms.slice(0, 8);
 const lines = choices.map((r, i) => {
+    const base = r.baseAdultsCapacity || 0;
     const max = Number(r.maxAdultsCapacity || 0) + Number(r.childrenCapacity || 0);
-    return `${i + 1}. *${r.name || r.type} #${r.number}* — $${r.pricePerNight}/noche (Hasta ${max} personas)`;
+    const price = Number(r.pricePerNight || 0).toLocaleString('es-CO');
+    const num = r.number || r.id;
+    return `${i + 1}. Habitación #${num}\\n   💵 $${price}/noche | 👥 Base: ${base}, Máx: ${max} pers.`;
 });
 
-const msg = `✅ *Encontré habitaciones disponibles del ${draft.checkIn} al ${draft.checkOut}:*\\n\\n` +
+const msg = `*Encontré habitaciones disponibles del ${draft.checkIn} al ${draft.checkOut}:*\\n\\n` +
             `${lines.join('\\n')}\\n\\n` +
-            `👉 Responde con el *número de la opción* que deseas reservar (ejemplo: *1*):`;
+            `Responde con el *número de la opción* que deseas reservar (ejemplo: *1*):`;
 
 const newDraft = Object.assign({}, draft, { availableRooms: choices });
 
@@ -1524,7 +1682,7 @@ if (!apiResponse.lockToken) {
         json: {
             wa_id,
             sender_name,
-            response_text: '⚠️ No pudimos bloquear la habitación seleccionada. Puede que otro huésped la haya tomado. Escribe *menú* para intentar de nuevo.',
+            response_text: 'No pudimos bloquear la habitación seleccionada. Puede que otro huésped la haya tomado. Escribe *menú* para intentar de nuevo.',
             session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }
         }
     }];
@@ -1549,7 +1707,7 @@ draft.extraGuestPrice = extraGuestPrice;
 draft.extraTotal = extraTotal;
 draft.total = total;
 
-const summary = `🧾 *Resumen de Reserva Asistida por IA*\\n\\n` +
+const summary = `*Resumen de Reserva Asistida por IA*\\n\\n` +
     `• Habitación: *${room.name || room.type} #${room.number}*\\n` +
     `• Fechas: *${draft.checkIn}* al *${draft.checkOut}* (${nights} noche${nights > 1 ? 's' : ''})\\n` +
     `• Huéspedes: *${draft.adults} adulto(s), ${draft.children} niño(s)*\\n` +
@@ -1558,10 +1716,10 @@ const summary = `🧾 *Resumen de Reserva Asistida por IA*\\n\\n` +
     `• Tarifa base (${nights} noche${nights > 1 ? 's' : ''}): *$${baseStay.toFixed(2)}*\\n` +
     `• Recargo persona adicional: *$${extraTotal.toFixed(2)}* _${extraDesc}_\\n` +
     `• Total estadía: *$${totalStr}*\\n\\n` +
-    `💳 *¿Cómo deseas abonar tu estadía?*\\n` +
-    `1️⃣ *Pagar el 100% ($${totalStr})*\\n` +
-    `2️⃣ *Pagar el 50% de anticipo ($${half})*\\n` +
-    `3️⃣ *Cancelar*\\n\\n` +
+    `*¿Cómo deseas abonar tu estadía?*\\n` +
+    `1. *Pagar el 100% ($${totalStr})*\\n` +
+    `2. *Pagar el 50% de anticipo ($${half})*\\n` +
+    `3. *Cancelar*\\n\\n` +
     `_Responde 1, 2 o 3._`;
 
 return [{
@@ -1922,7 +2080,11 @@ return [{ json: { redis_key: $('Preparar Salida').first().json.redis_key, stale:
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(flow, f, indent=2, ensure_ascii=False)
 
-    print(f"Successfully generated {output_path} with {len(nodes)} nodes.")
+    print(f"Generated intermediate {output_path}, now applying clean architecture and spatial layout...")
+    import sys, os
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+    from scripts.reorganize_n8n_flow import reorganize
+    reorganize()
 
 if __name__ == '__main__':
     generate_v8()

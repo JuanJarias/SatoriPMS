@@ -14,7 +14,7 @@ sequenceDiagram
     actor H as Huésped (WhatsApp)
     participant N as Orquestador Chatbot (n8n V8)
     participant IA as Inteligencia Artificial (Gemini)
-    participant A as Servidor Central (Spring Boot API)
+    participant A as Servidor Central (API)
     participant R as Memoria Rápida (Redis 7)
     participant DB as Base de Datos (PostgreSQL 16)
 
@@ -34,16 +34,27 @@ sequenceDiagram
         H->>N: Elige número de habitación(es)
     else Opción 2: Asistente con Inteligencia Artificial
         H->>N: Selecciona "2. Asistente IA"
-        N-->>H: Da bienvenida e informa Aviso de Privacidad (Ley 1581)
-        H->>N: Describe en un solo mensaje fechas, personas, mascota y datos
+        N-->>H: Solicita todos los datos requeridos en un solo mensaje (fechas, personas, mascota, titular, documento y acompañantes) junto con Aviso de Privacidad (Ley 1581)
+        H->>N: Envía descripción de su viaje en lenguaje natural
         N->>IA: Solicita extraer datos estructurados del texto
-        IA-->>N: Devuelve fechas, adultos, niños, mascota, nombre y cédula
+        IA-->>N: Devuelve fechas, adultos, niños, mascota, titular, cédula y acompañantes
+        N-->>H: Presenta resumen de lo entendido y solicita confirmación ("¿Esta información es correcta? Responde Sí o escribe tus correcciones")
+        loop Confirmación y corrección interactiva
+            alt Si el huésped envía correcciones
+                H->>N: Envía ajustes o correcciones de datos
+                N->>IA: Reinterpreta y actualiza el borrador de reserva
+                IA-->>N: Devuelve borrador actualizado
+                N-->>H: Presenta nuevo resumen y vuelve a solicitar confirmación
+            else Si el huésped confirma
+                H->>N: Responde "Sí"
+            end
+        end
         N->>A: Consulta disponibilidad filtrada por capacidad y mascota<br/>(GET /api/rooms/availability)
         A->>DB: Verifica reservas activas y capacidad
         A->>R: Verifica ausencia de bloqueos temporales
         A-->>N: Devuelve habitaciones compatibles
-        N-->>H: Muestra opciones disponibles para elegir
-        H->>N: Responde con el número de la habitación deseada
+        N-->>H: Muestra opciones disponibles indicando que puede elegir una o varias (ej: 1 o 1, 2)
+        H->>N: Responde con el número o números de habitación deseados (ej: 1 o 1, 2)
     end
 
     rect rgb(255, 248, 231)
@@ -83,7 +94,34 @@ sequenceDiagram
 
 ---
 
-## 3. Aspectos Clave del Flujo
+## 3. Diagrama de Flujo del Asistente con Inteligencia Artificial
+
+```mermaid
+flowchart TD
+    Inicio["Huésped elige '2. Asistente IA'"] --> PideDatos["El asistente solicita en un solo mensaje:<br/>• Fechas de entrada y salida<br/>• Adultos y niños<br/>• Nombres de todos los integrantes<br/>• Documento del titular<br/>• Admisión de mascota<br/>• Aviso de Privacidad (Ley 1581)"]
+    PideDatos --> RespUsuario["Huésped envía texto libre con los datos"]
+    RespUsuario --> GeminiExtract["IA interpreta y extrae los datos estructurados"]
+    GeminiExtract --> MuestraResumen["IA presenta resumen de lo entendido:<br/>¿Esta información es correcta?<br/>Responde 'Sí' o escribe correcciones"]
+    
+    MuestraResumen --> Confirmacion{"¿Qué responde el huésped?"}
+    Confirmacion -- "Envía correcciones o 'No'" --> GeminiCorrige["IA actualiza el borrador<br/>con las correcciones"]
+    GeminiCorrige --> MuestraResumen
+    
+    Confirmacion -- "Responde 'Sí' (o confirmación)" --> ConsultaDisp["Servidor consulta habitaciones disponibles<br/>filtradas por capacidad y mascota"]
+    ConsultaDisp --> MuestraHabitaciones["Presenta habitaciones compatibles:<br/>'Elige 1 o varias separadas por coma (ej: 1, 2)'"]
+    
+    MuestraHabitaciones --> EligeHab["Huésped selecciona habitación(es)"]
+    EligeHab --> Bloqueo15Min["Bloqueo temporal por 15 minutos<br/>de todas las habitaciones elegidas"]
+    Bloqueo15Min --> ResumenPago["Muestra desglose de tarifa base,<br/>recargos y opciones:<br/>1) 100%  2) Anticipo 50%  3) Cancelar"]
+    
+    ResumenPago --> Pago{"Opción de Pago"}
+    Pago -- "100% o 50%" --> Confirmada["Reserva confirmada en base de datos<br/>con código TS-XXXX y liberación del candado"]
+    Pago -- "Cancelar o menú" --> Liberar["Liberación inmediata de habitaciones en memoria"]
+```
+
+---
+
+## 4. Aspectos Clave del Flujo
 
 1. **Dos caminos complementarios hacia la misma reserva:** Tanto el viajero que prefiere ser guiado pregunta por pregunta como el que prefiere redactar un solo mensaje en lenguaje natural convergen en las mismas reglas de validación del servidor central.
 2. **Transparencia en el cobro de personas adicionales:** Antes de que el huésped elija cómo pagar, el resumen discrimina siempre la tarifa base de las noches y el valor adicional cuando el grupo supera la capacidad base de la habitación.
