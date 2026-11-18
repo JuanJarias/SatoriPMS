@@ -246,3 +246,22 @@ python3 tests/chatbot/build_v8_chatbot_flow.py
    - **Candado Firme (PostgreSQL):** Bloqueo transaccional a nivel de base de datos que garantiza 0 sobreventas incluso ante interrupciones de red o fallos de concurrencia.
 4. **Protección de Datos Personales:** Cumplimiento riguroso del aviso de privacidad según la Ley 1581 de 2012 en el primer contacto con el asistente de Inteligencia Artificial.
 5. **Caducidad de Sesiones:** El tiempo de espera máximo por inactividad del huésped está calibrado en 10 minutos (600 segundos), tras lo cual se liberan las habitaciones reservadas temporalmente para permitir nuevas reservas.
+
+---
+
+## Chatbot V9 — Cobro de la reserva con Wompi
+
+El flujo [V9_ChatbotReservas.json](../../flows/n8n/v9-wompi/V9_ChatbotReservas.json) es el V8 con el cobro de la reserva conectado a Wompi. Al finalizar la reserva genera un link de pago por el 50% o el 100% del total, según la modalidad elegida. Ver [flows/n8n/v9-wompi/README.md](../../flows/n8n/v9-wompi/README.md).
+
+| Archivo | Propósito |
+| :--- | :--- |
+| `build_v9_chatbot_flow.py` | Genera el V9 a partir del V8 sin modificarlo; solo aplica el parche de cobro. |
+| `test_pago_wompi_v9.js` | 11 pruebas en memoria (W-01 a W-11) que ejecutan el código real de los nodos del V9. Con `--live` se suman 5 pruebas reales contra la API de Wompi (L-01 a L-05). |
+| `test_e2e_reserva_wompi_v9.js` | E2E con el stack levantado: conversación completa → reserva → link en Wompi → evento firmado. |
+
+```bash
+python3 tests/chatbot/build_v9_chatbot_flow.py
+node tests/chatbot/test_pago_wompi_v9.js [--live]
+python3 tests/chatbot/verify_n8n_flow_integrity.py flows/n8n/v9-wompi/V9_ChatbotReservas.json
+API_HOST=localhost node tests/chatbot/test_e2e_reserva_wompi_v9.js
+```
