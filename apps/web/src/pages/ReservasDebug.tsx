@@ -39,8 +39,13 @@ type Room = {
 
 const statusColors: Record<string, string> = {
   pending_payment: '#f59e0b',
+  BLOQUEADA_TEMPORAL: '#f59e0b',
   confirmed: '#22c55e',
+  CONFIRMADA: '#22c55e',
+  EN_CURSO: '#0284c7',
   cancelled: '#ef4444',
+  CANCELADA: '#ef4444',
+  EXPIRADA: '#6b7280',
   finished: '#6b7280',
 };
 
@@ -124,6 +129,15 @@ export default function ReservasDebug() {
     },
     onError: (err: Error) => {
       setMutationError(err.message || 'Error desconocido');
+    },
+  });
+
+  const checkInMutation = useMutation({
+    mutationFn: async (bookingId: number) => {
+      return apiClient.post(`/api/v1/bookings/${bookingId}/check-in`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservas-debug'] });
     },
   });
 
@@ -217,7 +231,7 @@ export default function ReservasDebug() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#111827', color: '#fff' }}>
-                {['ID', 'Estado', 'Pago', 'Habitación', 'Huésped', 'Fechas', 'Ocupación', 'Total', 'Fuente'].map(h => (
+                {['ID', 'Estado', 'Pago', 'Habitación', 'Huésped', 'Fechas', 'Ocupación', 'Total', 'Fuente', 'Acción'].map(h => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -256,6 +270,28 @@ export default function ReservasDebug() {
                     <span style={{ ...badgeStyle, background: row.source === 'chatbot' ? '#8b5cf6' : '#3b82f6' }}>
                       {row.source}
                     </span>
+                  </td>
+                  <td style={tdStyle}>
+                    {row.status === 'CONFIRMADA' || row.status === 'confirmed' ? (
+                      <button
+                        type="button"
+                        onClick={() => checkInMutation.mutate(row.id)}
+                        style={{
+                          background: '#0284c7',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '4px 10px',
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Check-in
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#6b7280' }}>—</span>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -20,6 +20,7 @@ from routers.conversations import router as conversations_router
 from routers.n8n_compat import router as n8n_compat_router
 from routers.payments import router as payments_router
 from routers.rooms import router as rooms_router
+from routers.web_operations import router as web_operations_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -41,6 +42,7 @@ app.include_router(bookings_router)
 app.include_router(payments_router)
 app.include_router(conversations_router)
 app.include_router(n8n_compat_router)
+app.include_router(web_operations_router)
 
 
 @app.get("/api/v1/health", status_code=status.HTTP_200_OK, tags=["Health"])

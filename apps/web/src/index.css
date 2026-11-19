@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  background-color: #f4eee2;
+  color: #2b2e2c;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #f6e3da;
+}
+
+:focus-visible {
+  outline: 2px solid #2a4d3c;
+  outline-offset: 2px;
+}
+
+.hatch-warn {
+  background-image: repeating-linear-gradient(135deg, #fbefd0 0 8px, #f3dfa6 8px 10px);
+}
+
+.hatch-maint {
+  background-image: repeating-linear-gradient(135deg, #ecece8 0 8px, #d6d7d1 8px 10px);
+}
+
+@keyframes slide-in {
+  0% {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.slide-in {
+  animation: 0.2s ease-out slide-in;
+}
