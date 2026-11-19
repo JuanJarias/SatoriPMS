@@ -301,6 +301,17 @@ public class BookingService {
             paidAmount = totalPrice;
             finalPaymentStatus = "paid";
             finalStatus = "confirmed";
+        } else if ("wompi_deposit".equalsIgnoreCase(request.getPaymentOption())
+                || "pending_deposit".equalsIgnoreCase(request.getPaymentOption())) {
+            paidAmount = BigDecimal.ZERO;
+            finalPaymentStatus = "pending";
+            finalStatus = "pending_payment";
+        } else if ("wompi_full".equalsIgnoreCase(request.getPaymentOption())
+                || "pending_full".equalsIgnoreCase(request.getPaymentOption())
+                || "pending".equalsIgnoreCase(request.getPaymentOption())) {
+            paidAmount = BigDecimal.ZERO;
+            finalPaymentStatus = "pending";
+            finalStatus = "pending_payment";
         } else {
             paidAmount = paymentStatus.equalsIgnoreCase("paid") ? totalPrice : BigDecimal.ZERO;
             finalPaymentStatus = paymentStatus;
@@ -653,5 +664,92 @@ public class BookingService {
                 "paid",
                 totalGroupPrice,
                 BigDecimal.ZERO);
+    }
+
+    /**
+     * Confirma asíncronamente el pago de una reserva tras la notificación exitosa de una pasarela externa (ej. Wompi APPROVED).
+     * Transiciona el estado de la reserva de 'pending_payment' a 'confirmed' y actualiza payment_status
+     * a 'partial' (para abono del 50%) o 'paid' (para pago total del 100%), registrando el monto efectivamente pagado.
+     *
+     * @param code Código oficial de reserva (TS-XXXX) o UUID de grupo
+     * @param confirmation DTO con datos de la transacción, monto y modalidad
+     * @return DTO con la reserva actualizada y conciliada
+     */
+    @Transactional
+    public BookingBatchResponseDto confirmExternalPayment(String code, ExternalPaymentConfirmationDto confirmation) {
+        if (code == null || code.trim().isBlank()) {
+            throw new IllegalArgumentException("El código de reserva es obligatorio");
+        }
+        String cleanCode = code.trim().toLowerCase();
+        List<Booking> bookings = bookingRepository.findByReservationGroupCodePrefix(cleanCode);
+        if (bookings.isEmpty()) {
+            throw new java.util.NoSuchElementException("No se encontró ninguna reserva con el código: " + code.trim());
+        }
+        Booking first = bookings.get(0);
+        if ("cancelled".equalsIgnoreCase(first.getStatus())) {
+            throw new IllegalStateException("No se puede registrar pago para una reserva cancelada");
+        }
+
+        BigDecimal totalGroupPrice = bookings.stream()
+                .map(b -> b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Determinación de la modalidad y monto a abonar
+        String targetPaymentOption = confirmation != null && confirmation.getPaymentOption() != null
+                ? confirmation.getPaymentOption().trim().toLowerCase()
+                : null;
+
+        BigDecimal incomingAmount = confirmation != null ? confirmation.getAmount() : null;
+
+        boolean isFullPayment;
+        if ("full".equals(targetPaymentOption) || "100".equals(targetPaymentOption)) {
+            isFullPayment = true;
+        } else if ("deposit".equals(targetPaymentOption) || "50".equals(targetPaymentOption)) {
+            isFullPayment = false;
+        } else if (incomingAmount != null && incomingAmount.compareTo(totalGroupPrice.multiply(new BigDecimal("0.75"))) >= 0) {
+            isFullPayment = true;
+        } else {
+            // Por defecto, si el saldo ya estaba parcial o la modalidad era anticipo
+            isFullPayment = "partial".equalsIgnoreCase(first.getPaymentStatus());
+        }
+
+        String newPaymentStatus = isFullPayment ? "paid" : "partial";
+        BigDecimal newTotalPaid = isFullPayment
+                ? totalGroupPrice
+                : (incomingAmount != null && incomingAmount.compareTo(BigDecimal.ZERO) > 0
+                    ? incomingAmount
+                    : totalGroupPrice.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+
+        for (int i = 0; i < bookings.size(); i++) {
+            Booking b = bookings.get(i);
+            b.setStatus("confirmed");
+            b.setPaymentStatus(newPaymentStatus);
+            if (isFullPayment) {
+                b.setPaidAmount(b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
+            } else {
+                if (bookings.size() == 1) {
+                    b.setPaidAmount(newTotalPaid);
+                } else {
+                    BigDecimal roomTotal = b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO;
+                    BigDecimal fraction = totalGroupPrice.compareTo(BigDecimal.ZERO) > 0
+                            ? roomTotal.divide(totalGroupPrice, 10, java.math.RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+                    b.setPaidAmount(newTotalPaid.multiply(fraction).setScale(2, java.math.RoundingMode.HALF_UP));
+                }
+            }
+        }
+        bookingRepository.saveAll(bookings);
+        bookingRepository.flush();
+
+        BigDecimal pendingBalance = totalGroupPrice.subtract(newTotalPaid).max(BigDecimal.ZERO);
+        return new BookingBatchResponseDto(
+                first.getReservationGroupId(),
+                totalGroupPrice,
+                bookings.stream().map(Booking::getId).toList(),
+                bookings.stream().map(Booking::getRoomId).toList(),
+                "confirmed",
+                newPaymentStatus,
+                newTotalPaid,
+                pendingBalance);
     }
 }

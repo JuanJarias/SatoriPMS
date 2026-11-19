@@ -35,12 +35,20 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
   - [MERCADOPAGO_ACCESS_TOKEN](#mercadopago_access_token)
   - [MERCADOPAGO_WEBHOOK_SECRET](#mercadopago_webhook_secret)
   - [BOOKING_TEST_PAYMENT_ENABLED](#booking_test_payment_enabled)
-- [7. Automatización del Chatbot (n8n)](#7-automatización-del-chatbot-n8n)
+- [7. Pasarela de Pagos Wompi (Colombia)](#7-pasarela-de-pagos-wompi-colombia)
+  - [WOMPI_ENABLED](#wompi_enabled)
+  - [WOMPI_PUBLIC_KEY](#wompi_public_key)
+  - [WOMPI_PRIVATE_KEY](#wompi_private_key)
+  - [WOMPI_EVENTS_SECRET](#wompi_events_secret)
+  - [WOMPI_API_URL y WOMPI_CHECKOUT_URL](#wompi_api_url-y-wompi_checkout_url)
+- [8. Reputación y Reseñas Oficiales (Google Reviews)](#8-reputación-y-reseñas-oficiales-google-reviews)
+  - [GOOGLE_REVIEWS_URL](#google_reviews_url)
+- [9. Automatización del Chatbot (n8n)](#9-automatización-del-chatbot-n8n)
   - [COMPOSE_PROFILES](#compose_profiles)
   - [N8N_BASIC_AUTH_USER](#n8n_basic_auth_user)
   - [N8N_BASIC_AUTH_PASSWORD](#n8n_basic_auth_password)
   - [N8N_PUBLIC_URL](#n8n_public_url)
-- [8. Panel Web de Recepción (Frontend)](#8-panel-web-de-recepción-frontend)
+- [10. Panel Web de Recepción (Frontend)](#10-panel-web-de-recepción-frontend)
   - [VITE_API_URL](#vite_api_url)
   - [VITE_WS_URL](#vite_ws_url)
 - [Resumen de Ubicación y Verificación](#resumen-de-ubicación-y-verificación)
@@ -377,7 +385,48 @@ Para que el hotel pueda enviar y recibir mensajes automáticos por WhatsApp, se 
 
 ---
 
-## 7. Automatización del Chatbot (n8n)
+## 7. Pasarela de Pagos Wompi (Colombia)
+
+El flujo conversacional V9 (`V9_ChatbotReservas.json`) incorpora la pasarela de pagos colombiana Wompi (Bancolombia) para la generación de enlaces de pago por el 50% de anticipo o el 100% total de la estadía:
+
+### WOMPI_ENABLED
+- **Para qué sirve:** Interruptor maestro que habilita o deshabilita la generación de enlaces de pago de Wompi sin alterar la estructura del flujo en n8n. Si está en `false`, el asistente confirma la reserva y deriva al huésped con el equipo de recepción si requiere pagar digitalmente.
+- **Valores posibles:** `true` o `false`.
+
+### WOMPI_PUBLIC_KEY
+- **Para qué sirve:** Identificador público de su comercio en Wompi (prefijo `pub_prod_` o `pub_test_`). Se utiliza para transacciones desde el navegador o widget web.
+
+### WOMPI_PRIVATE_KEY
+- **Para qué sirve:** Clave secreta que autoriza al orquestador n8n a crear enlaces de cobro (`POST /v1/payment_links`) asociados al código de reserva `TS-XXXX`.
+- **De dónde se saca:** En el panel de administración de Wompi ([https://comercios.wompi.co/](https://comercios.wompi.co/)) en la sección **Desarrolladores → Llaves de API**.
+
+### WOMPI_EVENTS_SECRET
+- **Para qué sirve:** Secreto criptográfico utilizado para validar la autenticidad e integridad de la firma SHA-256 en los eventos enviados al webhook `/webhook/wompi-events`. Evita ataques de suplantación o confirmaciones falsas de transacciones.
+- **De dónde se saca:** En el panel de Wompi en **Desarrolladores → Seguimiento de transacciones → Secreto de eventos**.
+
+### WOMPI_API_URL y WOMPI_CHECKOUT_URL
+- **Valores predeterminados:**
+  ```env
+  WOMPI_API_URL=https://production.wompi.co/v1      # O https://sandbox.wompi.co/v1 en pruebas
+  WOMPI_CHECKOUT_URL=https://checkout.wompi.co/l/
+  WOMPI_LINK_EXPIRATION_HOURS=24
+  ```
+
+---
+
+## 8. Reputación y Reseñas Oficiales (Google Reviews)
+
+### GOOGLE_REVIEWS_URL
+- **Para qué sirve:** Enlace canónico de destino hacia el perfil oficial de Torre Satori en Google Reviews / Google Travel. Es entregado al huésped al seleccionar la Opción 3 del menú en WhatsApp para consultar experiencias previas y registrar su propia calificación de forma transparente.
+- **Valor predeterminado:**
+  ```env
+  GOOGLE_REVIEWS_URL=https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews
+  ```
+- **Personalización:** Permite utilizar un enlace acortado propio de marca (por ejemplo `https://torresatori.com/resenas` o `https://g.page/r/.../review`).
+
+---
+
+## 9. Automatización del Chatbot (n8n)
 
 ### COMPOSE_PROFILES
 - **Para qué sirve:** Controla qué servicios secundarios levanta Docker Compose al ejecutar el comando de inicio. Si contiene `n8n`, levanta el orquestador del chatbot; si está vacío, levanta únicamente la base de datos, Redis y el backend.

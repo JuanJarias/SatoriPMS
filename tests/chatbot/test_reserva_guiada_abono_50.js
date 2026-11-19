@@ -96,43 +96,39 @@ async function run() {
   console.log('======================================================================');
 
   try {
-    console.log('[1/11] Enviando "menu"...');
+    console.log('[1/10] Enviando "menu"...');
     await sendMsg('menu');
     await sleep(2000);
 
-    console.log('[2/11] Seleccionando Opción 1 (Hacer una reserva)...');
+    console.log('[2/10] Seleccionando Opción 1 (Hacer una reserva)...');
     await sendMsg('1');
     await sleep(2000);
 
-    console.log(`[3/11] Ingresando check-in (${CHECK_IN})...`);
-    await sendMsg(CHECK_IN);
-    await sleep(2000);
+    console.log(`[3/10] Ingresando fechas en un solo mensaje (${CHECK_IN} al ${CHECK_OUT})...`);
+    await sendMsg(`${CHECK_IN} al ${CHECK_OUT}`);
+    await sleep(4500);
 
-    console.log(`[4/11] Ingresando check-out (${CHECK_OUT})...`);
-    await sendMsg(CHECK_OUT);
-    await sleep(3000);
-
-    console.log('[5/11] Seleccionando habitación disponible (Opción 1)...');
+    console.log('[4/10] Seleccionando habitación disponible (Opción 1)...');
     await sendMsg('1');
     await sleep(3500);
 
-    console.log('[6/11] Ingresando huéspedes (2 adultos)...');
+    console.log('[5/10] Ingresando huéspedes (2 adultos)...');
     await sendMsg('2 adultos');
-    await sleep(3000);
+    await sleep(3500);
 
-    console.log(`[7/11] Ingresando nombre del titular (${TEST_NAME})...`);
+    console.log(`[6/10] Ingresando nombre del titular (${TEST_NAME})...`);
     await sendMsg(TEST_NAME);
     await sleep(3000);
 
-    console.log('[8/11] Ingresando cédula (1094888999)...');
+    console.log('[7/10] Ingresando cédula (1094888999)...');
     await sendMsg('1094888999');
     await sleep(3000);
 
-    console.log('[9/11] Mascota (no)...');
+    console.log('[8/10] Mascota (no)...');
     await sendMsg('no');
     await sleep(3000);
 
-    console.log('[10/11] Acompañante (Camila Soto)...');
+    console.log('[9/10] Acompañante (Camila Soto)...');
     await sendMsg('Camila Soto');
     await sleep(3500);
 

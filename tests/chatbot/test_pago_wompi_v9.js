@@ -31,8 +31,8 @@ const path = require('path');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const V8 = JSON.parse(fs.readFileSync(path.join(ROOT, 'flows/n8n/V8_ChatbotReservas.json'), 'utf8'));
-const V9 = JSON.parse(fs.readFileSync(path.join(ROOT, 'flows/n8n/v9-wompi/V9_ChatbotReservas.json'), 'utf8'));
+const v9Path = path.join(ROOT, 'flows/n8n/V9_ChatbotReservas.json');
+const V9 = JSON.parse(fs.readFileSync(v9Path, 'utf8'));
 const LIVE = process.argv.includes('--live');
 
 function loadDotEnv() {
@@ -110,20 +110,21 @@ const sampleEvent = (status, linkId = 'AbC123') => ({
 
 // ── Pruebas en memoria ───────────────────────────────────────────────────────
 async function runInMemory() {
-  await test('W-01', 'V9 conserva el V8 intacto salvo el cobro de la reserva', () => {
-    const allowedNodes = new Set(['H Reserva Exitosa']);
-    const allowedConns = new Set(['API Confirmar Reserva']);
-    const v9 = Object.fromEntries(V9.nodes.map(n => [n.name, n]));
-    const changed = V8.nodes.filter(n => {
-      const a = Object.assign({}, n); const b = Object.assign({}, v9[n.name] || {});
-      delete a.position; delete b.position;
-      return JSON.stringify(a) !== JSON.stringify(b);
-    }).map(n => n.name);
-    const bad = changed.filter(n => !allowedNodes.has(n));
-    assert(bad.length === 0, `Nodos del V8 modificados fuera del cobro: ${bad.join(', ')}`);
-    const badConns = Object.keys(V8.connections).filter(k => !allowedConns.has(k) && JSON.stringify(V8.connections[k]) !== JSON.stringify(V9.connections[k]));
-    assert(badConns.length === 0, `Conexiones del V8 modificadas: ${badConns.join(', ')}`);
-    return `${V8.nodes.length} nodos V8 preservados; modificado solo: ${changed.join(', ')}; nuevos: ${V9.nodes.length - V8.nodes.length}`;
+  await test('W-01', 'V9 estructura completa y autónoma (Wompi, IA, Redirección Reseñas)', () => {
+    const requiredNodes = [
+      'H Preparar Cobro Wompi',
+      'Wompi Crear Link de Pago',
+      'H Datos Registro Link Wompi',
+      'Webhook Eventos Wompi',
+      'H Verificar Evento Wompi',
+      'H Mensaje Estado Pago Wompi',
+      'H Redirigir Reseñas Google'
+    ];
+    const nodeNames = new Set(V9.nodes.map(n => n.name));
+    const missing = requiredNodes.filter(name => !nodeNames.has(name));
+    assert(missing.length === 0, `Nodos críticos ausentes en V9: ${missing.join(', ')}`);
+    assert(V9.nodes.length >= 87, `Total nodos insuficiente: ${V9.nodes.length}`);
+    return `Flujo autónomo V9 verificado: ${V9.nodes.length} nodos, todos los nodos requeridos de cobro y reseñas presentes`;
   });
 
   await test('W-02', 'Anticipo 50%: link por exactamente la mitad del total', () => {

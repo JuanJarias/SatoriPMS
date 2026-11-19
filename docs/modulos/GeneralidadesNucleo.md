@@ -34,7 +34,7 @@ El sistema se organiza en áreas funcionales que cubren de principio a fin la op
 | **Eventos Especiales, Temporadas y Descuentos** | Definir rangos de fechas para eventos especiales, temporadas altas o campañas promocionales en las que se apliquen descuentos o tarifas diferenciadas de forma automática. | Administrador |
 | **Tienda Interna e Inventario** | Administrar el catálogo de productos de vitrina, registrar ventas de contado o con cargo a la habitación del huésped y controlar las existencias con alertas de agotamiento. | Recepcionista y Administrador |
 | **Facturación, Finanzas y Turnos** | Registrar ingresos y gastos operativos del hotel, calcular el pago de turnos del personal de recepción según las horas y recargos configurados, y exportar el balance contable mensual en formato Excel. | Administrador |
-| **Reseñas y Fidelización de Huéspedes** | Recopilar calificaciones de los clientes al finalizar su estadía, invitarlos a publicar su opinión en Google Maps y reconocer a los huéspedes frecuentes para otorgarles beneficios o descuentos. | Huéspedes y Administrador |
+| **Reseñas y Fidelización de Huéspedes** | Canalizar opiniones y calificaciones directamente hacia el perfil oficial de Torre Satori en Google Reviews para certificar imparcialidad pública, y reconocer a los huéspedes frecuentes para otorgarles beneficios o descuentos. | Huéspedes y Administrador |
 | **Seguridad, Roles y Auditoría** | Proteger el acceso al sistema diferenciando los permisos del Recepcionista y del Administrador, resguardar los datos personales conforme a la ley y mantener un historial inalterable de operaciones críticas. | Administrador |
 
 ---

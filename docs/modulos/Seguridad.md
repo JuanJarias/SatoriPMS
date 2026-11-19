@@ -44,6 +44,7 @@ El sistema distingue estrictamente dos perfiles de usuario:
 
 En cumplimiento del régimen colombiano de Habeas Data y protección de datos personales:
 - **Aviso de privacidad e información previa:** Tanto en el flujo de reserva guiada paso a paso como en el asistente con inteligencia artificial en WhatsApp, antes de recopilar el nombre completo y el número de documento de identidad del huésped, el asistente presenta el aviso de privacidad informando que los datos suministrados serán tratados por Torre Satori con la única finalidad de gestionar su reserva, registro hotelero y facturación.
+- **Verificación de identidad en dos pasos para consultas y cancelaciones:** Para impedir que terceros no autorizados accedan a los datos de la estadía o alteren reservas ajenas al conocer un código de reserva, el sistema exige validar conjuntamente el código de reserva (`TS-XXXX`) y el número de documento de identidad (cédula) del titular registrado.
 - **Finalidad exclusiva y confidencialidad:** Los números telefónicos, nombres, documentos de identidad y registros de acompañantes se utilizan únicamente para la prestación del servicio de hospedaje y no se comparten ni comercializan con terceros.
 
 ---

@@ -20,7 +20,7 @@ sequenceDiagram
 
     H->>N: Escribe "Hola" o "Menú"
     N->>R: Consulta o inicia sesión (session:{waId})
-    N-->>H: Presenta Menú Principal (Opciones 1 a 6)
+    N-->>H: Presenta Menú Principal (Opciones 1 a 5)
 
     alt Opción 1: Reserva Guiada Paso a Paso
         H->>N: Selecciona "1. Hacer una reserva"

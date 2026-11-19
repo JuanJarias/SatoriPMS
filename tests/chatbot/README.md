@@ -10,15 +10,15 @@ El propósito principal de este conjunto de pruebas es validar de manera determi
 
 ```text
 tests/chatbot/
-├── suite_pruebas_chatbot_v8.js      # Suite integral de 55 casos con motor AI Runner (CLI y Programatico)
-├── build_v8_chatbot_flow.py         # Generador determinista del flujo n8n V8 (80 nodos ensamblados)
+├── suite_pruebas_chatbot_v8.js      # Suite integral de 60 casos (incluye bloque V9 TC-56 a TC-60)
 ├── verify_n8n_flow_integrity.py     # Validador de topologia: 0 enlaces rotos, 0 huerfanos, 0 switch errors
+├── test_pago_wompi_v9.js            # Suite de pruebas de cobro Wompi (11 en memoria, 5 en vivo)
+├── test_e2e_v9_completo.js          # Prueba E2E en vivo de 9 pasos (fechas en 1 mensaje, mascota y aislamiento Redis)
+├── test_e2e_reserva_wompi_v9.js     # Prueba de integracion E2E de reserva con pasarela Wompi
 ├── test_reserva_guiada_abono_50.js  # Prueba de integracion de reserva guiada con abono del 50%
 ├── test_asistente_ia_autonomo.js    # Prueba de integracion del agente autonomo con extraccion JSON
 ├── test_cancelacion_reembolso.js    # Prueba de integracion de cancelacion y regla RN-03
 ├── test_pago_saldo_restante.js      # Prueba de integracion de liquidacion de saldo pendiente
-├── test_registro_resena_google.js   # Prueba de integracion de captura de calificaciones y enlace Google
-├── test_consulta_resenas.js         # Prueba de integracion de consulta publica y calculo de promedios
 └── test_escalamiento_agente_humano.js # Prueba de integracion de escalamiento y silencio operativo
 ```
 
@@ -63,7 +63,7 @@ flowchart TD
         subgraph Col1 ["Flujos Conversacionales"]
             F1["Flujo 1: Reserva Guiada (10)"]
             F2["Flujo 2: Reserva con IA (10)"]
-            F3["Flujo 3: Reseñas y Calificaciones (10)"]
+            F3["Flujo 3: Reseñas y Google Reviews (10)"]
             F1 --> F2 --> F3
         end
         subgraph Col2 ["Gestion Operativa y Calidad"]
@@ -119,19 +119,19 @@ Valida el asistente impulsado por modelos generativos que extrae datos de mensaj
 - **TC-19:** Aviso obligatorio y consentimiento expreso de política de tratamiento de datos personales (Ley 1581 de 2012).
 - **TC-20:** Cancelación del flujo IA y liberación automática de candados en memoria.
 
-### Flujo 3: Calificaciones y Reseñas (TC-21 a TC-30)
-Valida la recolección interna de opiniones y la redirección pública a Google Maps.
+### Flujo 3: Redirección Oficial a Google Reviews (TC-21 a TC-30)
+Valida la redirección transparente e imparcial hacia el perfil oficial de Google Reviews sin almacenamiento privado local.
 
-- **TC-21:** Consulta de opiniones y cálculo de calificación promedio ponderada con reseñas previas.
-- **TC-22:** Consulta de opiniones sin registros previos (emisión de mensaje de invitación cordial).
-- **TC-23:** Registro de calificación numérica válida (rango entero de 1 a 5).
-- **TC-24:** Rechazo de calificación fuera de rango (0, 6 o texto no numérico).
-- **TC-25:** Persistencia de reseña con atribución de origen `source: 'chatbot'`.
-- **TC-26:** Generación de enlace directo a Google Reviews / Google Maps con identificador Place ID.
-- **TC-27:** Sanitización y límite estricto de 500 caracteres en comentarios de huéspedes.
-- **TC-28:** Cancelación del flujo de reseñas mediante el comando de reinicio "menú".
-- **TC-29:** Registro válido de reseña con puntuación numérica y comentario vacío.
-- **TC-30:** Filtrado de registros inválidos o con calificación nula en la consulta pública.
+- **TC-21:** Emisión de mensaje formal con enlace a Google Reviews al elegir la opción 3 del menú.
+- **TC-22:** Validación de URL canónica limpia permanente sin tokens efímeros de sesión (`g2lb`, `ssta`, `ts`).
+- **TC-23:** Resolución dinámica y configurable del enlace mediante la variable `GOOGLE_REVIEWS_URL`.
+- **TC-24:** Reseteo inmediato de la sesión a estado `menu` y paso `esperando_opcion` para navegación continua.
+- **TC-25:** Reconocimiento flexible de palabras clave (`"reseña"`, `"opiniones"`, `"calificar"`, `"google"`).
+- **TC-26:** Activación de vista previa de enlace (`preview_url: true`) en el payload de mensajería para WhatsApp.
+- **TC-27:** Desacoplamiento total de tablas locales de reseña para certificar imparcialidad y reputación abierta.
+- **TC-28:** Detección de comandos de retorno al menú principal ("menú", "hola").
+- **TC-29:** Compatibilidad hacia atrás para entradas numéricas legacy 5 (Consultar) y 6 (Agente).
+- **TC-30:** Validación de tono formal sin pictogramas informales ni emojis en la comunicación.
 
 ### Flujo 4: Consulta, Pago de Saldo y Cancelación (TC-31 a TC-40)
 Valida la gestión de reservas confirmadas bajo la nomenclatura oficial `TS-XXXX`.
@@ -225,14 +225,11 @@ evaluarCalidad();
 
 ### Verificación de Integridad de Flujo n8n
 
-Para asegurar que las modificaciones al flujo [V8_ChatbotReservas.json](../../flows/n8n/V8_ChatbotReservas.json) mantengan 100% de coherencia topológica:
+Para asegurar que el flujo [V9_ChatbotReservas.json](../../flows/n8n/V9_ChatbotReservas.json) mantenga 100% de coherencia topológica:
 
 ```bash
-# Validar conexiones, nodos huerfanos y reglas de conmutacion:
+# Validar conexiones, nodos huérfanos y reglas de conmutación:
 python3 tests/chatbot/verify_n8n_flow_integrity.py
-
-# Reconstruir y reposicionar el flujo con arquitectura horizontal separada:
-python3 tests/chatbot/build_v8_chatbot_flow.py
 ```
 
 ---
@@ -249,19 +246,19 @@ python3 tests/chatbot/build_v8_chatbot_flow.py
 
 ---
 
-## Chatbot V9 — Cobro de la reserva con Wompi
+## Chatbot V9 — Cobro de la reserva con Wompi y Flujo Principal
 
-El flujo [V9_ChatbotReservas.json](../../flows/n8n/v9-wompi/V9_ChatbotReservas.json) es el V8 con el cobro de la reserva conectado a Wompi. Al finalizar la reserva genera un link de pago por el 50% o el 100% del total, según la modalidad elegida. Ver [flows/n8n/v9-wompi/README.md](../../flows/n8n/v9-wompi/README.md).
+El flujo principal y único en operación es [V9_ChatbotReservas.json](../../flows/n8n/V9_ChatbotReservas.json). Cuenta con el cobro de la reserva conectado a la pasarela Wompi y redirección oficial a Google Reviews. Al finalizar la reserva genera un link de pago por el 50% o el 100% del total, según la modalidad elegida.
 
 | Archivo | Propósito |
 | :--- | :--- |
-| `build_v9_chatbot_flow.py` | Genera el V9 a partir del V8 sin modificarlo; solo aplica el parche de cobro. |
 | `test_pago_wompi_v9.js` | 11 pruebas en memoria (W-01 a W-11) que ejecutan el código real de los nodos del V9. Con `--live` se suman 5 pruebas reales contra la API de Wompi (L-01 a L-05). |
 | `test_e2e_reserva_wompi_v9.js` | E2E con el stack levantado: conversación completa → reserva → link en Wompi → evento firmado. |
+| `verify_n8n_flow_integrity.py` | Validador topológico del flujo n8n V9. |
 
 ```bash
-python3 tests/chatbot/build_v9_chatbot_flow.py
 node tests/chatbot/test_pago_wompi_v9.js [--live]
-python3 tests/chatbot/verify_n8n_flow_integrity.py flows/n8n/v9-wompi/V9_ChatbotReservas.json
+python3 tests/chatbot/verify_n8n_flow_integrity.py
 API_HOST=localhost node tests/chatbot/test_e2e_reserva_wompi_v9.js
+```
 ```

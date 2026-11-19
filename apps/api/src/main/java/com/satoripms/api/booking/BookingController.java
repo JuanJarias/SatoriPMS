@@ -248,6 +248,54 @@ public class BookingController {
     }
 
     /**
+     * Endpoint para conciliación y confirmación asíncrona de pagos externos (ej. Webhook de Wompi).
+     * Transiciona la reserva de 'pending_payment' a 'confirmed' y registra el abono parcial (50%)
+     * o total (100%) en la base de datos de PostgreSQL.
+     *
+     * @param code Código de la reserva de grupo (TS-XXXX) o UUID
+     * @param confirmation DTO con los detalles del pago reportado por la pasarela
+     * @return DTO de respuesta con la reserva confirmada y su nuevo estado de pago
+     */
+    @PostMapping("/bookings/group/{code}/confirm-external-payment")
+    public ResponseEntity<?> confirmExternalPaymentByGroupCode(
+            @PathVariable String code,
+            @RequestBody(required = false) ExternalPaymentConfirmationDto confirmation) {
+        try {
+            return ResponseEntity.ok(bookingService.confirmExternalPayment(code, confirmation));
+        } catch (java.util.NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Variante del endpoint de confirmación de pago externo que recibe el código en el cuerpo JSON.
+     * Facilita la invocación directa desde webhooks o microservicios de conciliación.
+     *
+     * @param confirmation DTO con el código de reserva y datos del pago
+     * @return DTO de respuesta con la reserva confirmada y conciliada
+     */
+    @PostMapping("/bookings/confirm-external-payment")
+    public ResponseEntity<?> confirmExternalPayment(
+            @RequestBody ExternalPaymentConfirmationDto confirmation) {
+        if (confirmation == null || confirmation.getReservationCode() == null || confirmation.getReservationCode().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El campo reservationCode es obligatorio"));
+        }
+        try {
+            return ResponseEntity.ok(bookingService.confirmExternalPayment(confirmation.getReservationCode(), confirmation));
+        } catch (java.util.NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
      * Endpoint de auditoría y depuración en tiempo real.
      * Retorna todas las reservas del sistema con metadatos del huésped y de la habitación.
      * Es consumido por el panel web 'ReservasDebug.tsx' para monitoreo administrativo.

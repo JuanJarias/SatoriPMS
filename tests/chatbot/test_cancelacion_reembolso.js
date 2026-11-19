@@ -130,21 +130,27 @@ async function run() {
     console.log(`  • Reserva a cancelar: ID ${activeBooking.id}, Código: ${codePrefix}`);
     console.log(`  • Habitación: ${activeBooking.roomNumber}, Fechas: ${activeBooking.checkIn} a ${activeBooking.checkOut}`);
 
-    console.log('[2/5] Enviando "menu" y seleccionando Opción 5 (Revisar o Cancelar)...');
+    console.log('[2/6] Enviando "menu" y seleccionando Opción 4 (Consultar o Cancelar — V9)...');
     await sendMsg('menu');
     await sleep(2000);
-    await sendMsg('5');
+    await sendMsg('4');
     await sleep(2000);
 
-    console.log(`[3/5] Consultando código de reserva: ${codePrefix}...`);
+    console.log(`[3/6] Consultando código de reserva: ${codePrefix}...`);
     await sendMsg(codePrefix);
     await sleep(3000);
 
-    console.log('[4/5] Solicitando cancelar reserva ("cancelar")...');
+    if (activeBooking.guestDocument) {
+      console.log(`[4/6] Validando cédula del titular (${activeBooking.guestDocument})...`);
+      await sendMsg(String(activeBooking.guestDocument));
+      await sleep(3000);
+    }
+
+    console.log('[5/6] Solicitando cancelar reserva ("cancelar")...');
     await sendMsg('cancelar');
     await sleep(3000);
 
-    console.log('[5/5] Confirmando cancelación definitiva ("Sí, confirmar")...');
+    console.log('[6/6] Confirmando cancelación definitiva ("Sí, confirmar")...');
     await sendMsg('Sí, confirmar');
     await sleep(4000);
 

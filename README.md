@@ -87,7 +87,7 @@ flowchart TB
     end
 
     subgraph Orquestacion["Capa de Orquestación e Inteligencia"]
-        N8N["n8n 1.81.4 (Flujo V8)"]
+        N8N["n8n 1.81.4 (Flujos V8 / V9 Wompi)"]
         AI["Google Gemini (Flash Lite)"]
         N8N <--> AI
     end
@@ -132,8 +132,8 @@ flowchart TB
    cp apps/api/src/main/resources/db/migration/V2__seed_rooms.sql.example \
       apps/api/src/main/resources/db/migration/V2__seed_rooms.sql
 
-   cp apps/api/src/main/resources/db/migration/V6__seed_products.sql.example \
-      apps/api/src/main/resources/db/migration/V6__seed_products.sql
+   cp apps/api/src/main/resources/db/migration/V8__seed_products.sql.example \
+      apps/api/src/main/resources/db/migration/V8__seed_products.sql
    ```
 
 ---
@@ -164,7 +164,7 @@ flowchart TB
 
 3. **Servicios disponibles en el entorno local:**
    - **Servidor Principal (API):** `http://localhost:8080` (Documentación Swagger / OpenAPI: `http://localhost:8080/swagger-ui/index.html`)
-   - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (flujo conversacional activo: [V8_ChatbotReservas.json](flows/n8n/V8_ChatbotReservas.json)).
+   - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (flujo base: [V8_ChatbotReservas.json](flows/n8n/V8_ChatbotReservas.json) y flujo con pasarela de pago Wompi: [V9_ChatbotReservas.json](flows/n8n/v9-wompi/V9_ChatbotReservas.json)).
    - **Base de Datos (PostgreSQL 16):** Puerto local `5432`.
    - **Gestor de Bloqueos y Sesiones (Redis 7):** Puerto local `6379`.
 

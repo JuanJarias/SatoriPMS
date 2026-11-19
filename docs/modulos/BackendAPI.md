@@ -87,13 +87,21 @@ Su función es garantizar que todas las reglas del negocio —como el cálculo d
   - `Registrar ingreso del huésped (Check-in) : "POST /api/bookings/{id}/check-in"`
   - `Registrar salida del huésped (Check-out) : "POST /api/bookings/{id}/check-out"`
 
+### F. Conciliación Asíncrona de Pagos Externos (Pasarelas de Pago / Webhooks)
+- **Concepto para el negocio:** Permite conciliar pagos recibidos de forma asíncrona a través de pasarelas digitales (como Wompi). Cuando se genera un enlace de pago, la reserva se mantiene protegida en base de datos en estado de espera (`pending_payment`); una vez que la pasarela confirma la transacción (`APPROVED`), el webhook invoca este endpoint para formalizar la reserva a estado confirmada (`confirmed`), actualizar el estado de pago a `partial` (50%) o `paid` (100%) y asentar el importe efectivamente pagado.
+- **Identificadores técnicos de las operaciones:**
+  - `Confirmar pago externo por código : "POST /api/bookings/group/{code}/confirm-external-payment"`
+  - `Confirmar pago externo con código en cuerpo : "POST /api/bookings/confirm-external-payment"`
+
 ---
 
 ## 5. Operaciones de Conversaciones, Reseñas, Tienda y Finanzas
 
 ### A. Reseñas y Calificaciones de Huéspedes
-- `Consultar reseñas recientes : "GET /api/reviews"`: Devuelve las últimas opiniones registradas con su calificación de 1 a 5 estrellas, comentario, nombre del autor y fecha.
-- `Registrar nueva reseña : "POST /api/reviews"`: Guarda una nueva calificación enviada desde el chatbot de WhatsApp o desde el panel web.
+- **Canal de experiencia del huésped:** En el chatbot de WhatsApp, las opiniones se canalizan de forma abierta y transparente hacia el perfil oficial de **Torre Satori en Google Reviews** ([https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews](https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews)), prescindiendo de almacenamiento local en el bot para certificar imparcialidad.
+- **Operaciones de auditoría y soporte en el backend:**
+  - `Consultar reseñas registradas : "GET /api/reviews"`: Devuelve las opiniones almacenadas de Google Reviews para análisis de calidad interno en el panel web.
+  - `Resumen consolidado y métricas de reseñas : "GET /api/reviews/summary"`: Provee la calificación promedio, total de opiniones registradas y distribución por estrellas para alimentar el panel web. (Nota: La aplicación web opera en modo de solo lectura; no admite redacción de reseñas ni redirecciones externas).
 
 ### B. Bandeja de Conversaciones y Escalamiento a Recepción
 - `Listar conversaciones de WhatsApp : "GET /api/conversations"`: Permite al panel web consultar los chats de los huéspedes, priorizando aquellos que solicitaron atención de un recepcionista humano.

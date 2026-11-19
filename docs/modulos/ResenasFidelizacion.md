@@ -8,19 +8,22 @@ El módulo de **Reseñas y Fidelización** tiene un doble objetivo comercial par
 
 ---
 
-## 2. Captura y Consulta de Reseñas por WhatsApp
+## 2. Gestión Unificada de Reseñas mediante Google Reviews (Opción 3 del Menú)
 
-### A. Consulta Pública de Opiniones (Opción 3 del Menú)
-Cuando un viajero potencial desea conocer la experiencia de otros clientes antes de reservar:
-- El asistente de WhatsApp consulta las valoraciones más recientes almacenadas en el sistema.
-- Calcula y muestra la **calificación promedio del hotel sobre 5.0 estrellas** junto con los últimos comentarios verificados, indicando el nombre del huésped, la puntuación otorgada y el origen de la reseña.
+Para garantizar la máxima transparencia, autenticidad e imparcialidad, el chatbot de WhatsApp no almacena ni muestra reseñas en bases de datos internas privadas. Toda la reputación y valoración pública del hotel se canaliza directamente hacia el perfil oficial de **Torre Satori en Google Reviews**:
 
-### B. Registro de Nueva Reseña e Impulso en Google Maps (Opción 4 del Menú)
-Tanto al finalizar la estadía como en cualquier momento desde el menú principal de WhatsApp:
-1. **Calificación por estrellas:** El asistente invita al huésped a puntuar su experiencia del **1 al 5** (donde 1 es muy insatisfecho y 5 es excelente).
-2. **Comentario abierto:** A continuación, le solicita escribir con sus propias palabras qué le pareció la atención, la comodidad de la habitación o las instalaciones de Torre Satori.
-3. **Almacenamiento en el sistema:** La reseña queda registrada en la base de datos (`Tabla de reseñas : "review"`) con el nombre del autor (`Nombre del autor : "author_name"`), teléfono (`Teléfono de WhatsApp : "wa_id"`), calificación (`Estrellas : "rating"`), texto (`Comentario : "comment"`) y fecha.
-4. **Enlace directo a Google Maps:** Inmediatamente después de guardar el comentario interno, el asistente agradece al huésped y le entrega un enlace directo a la ficha oficial de **Torre Satori en Google** (configurada mediante `Identificador de lugar en Google : "GOOGLE_PLACE_ID"`) para que, con un solo toque, pueda publicar también su reseña en Google Maps y ayudar a que más viajeros descubran el hotel.
+### A. Política de Transparencia e Imparcialidad Hotelera
+- En el sector hotelero contemporáneo, los viajeros valoran la credibilidad de las plataformas públicas independientes frente a sistemas internos donde las opiniones podrían ser filtradas o sesgadas.
+- Al centralizar las calificaciones en Google, cada opinión positiva contribuye directamente a elevar el posicionamiento orgánico del hotel en **Google Maps**, **Google Search** y **Google Travel**, atrayendo nuevos clientes de manera orgánica sin intermediación de OTAs de alta comisión.
+
+### B. Flujo Unificado en WhatsApp (Opción 3: "Reseñas y opiniones")
+Cuando un huésped selecciona la **Opción 3** del menú principal (o escribe palabras como *"reseñas"*, *"opiniones"*, *"calificar"* o *"Google"*):
+1. **Mensaje de bienvenida formal:** El asistente saluda cordialmente explicando que todas las valoraciones son gestionadas de forma abierta en Google Reviews para certificar su autenticidad.
+2. **Entrega de enlace canónico directo:** Provee el enlace oficial permanente al perfil de Torre Satori en Google Travel / Google Reviews ([https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews](https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews)), con previsualización enriquecida (`preview_url: true`), permitiendo:
+   - Consultar las experiencias, fotos y calificaciones dejadas por otros viajeros.
+   - Publicar su propia calificación de 1 a 5 estrellas y reseña escrita directamente con su cuenta de Google en un solo toque.
+3. **Navegación inmediata:** La sesión permanece en el menú principal (`state: 'menu'`), permitiendo al usuario continuar consultando tarifas, reservando o hablando con un agente sin tener que completar formularios interactivos en el chat.
+4. **Configuración dinámica:** La URL de destino está respaldada por la variable de entorno `GOOGLE_REVIEWS_URL`, permitiendo actualizarla si el hotel adopta un enlace corto corporativo (por ejemplo: `https://torresatori.com/resenas`).
 
 ---
 

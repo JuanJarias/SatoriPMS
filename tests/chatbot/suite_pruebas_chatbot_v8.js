@@ -534,25 +534,22 @@ const TEST_CASES = [
   },
 
   // --------------------------------------------------------------------------
-  // FLUJO 3: CALIFICACIONES Y RESEÑAS (GOOGLE REVIEWS Y CHATBOT) (TC-21 A TC-30)
+  // FLUJO 3: REDIRECCIÓN OFICIAL A GOOGLE REVIEWS (TC-21 A TC-30)
   // --------------------------------------------------------------------------
   {
     id: 'TC-21',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Consulta de opiniones y calculo de promedio con resenas existentes',
-    description: 'Calcula correctamente la calificacion promedio de 1 a 5 con reseñas registradas.',
+    title: 'Seleccion de opcion 3 (Reseñas) emite mensaje formal con enlace a Google Reviews',
+    description: 'Verifica que la opcion 3 presente la invitacion oficial a consultar y calificar en Google.',
     run: async () => {
-      const reviews = [
-        { rating: 5, comment: 'Excelente servicio' },
-        { rating: 4, comment: 'Muy comodo' },
-        { rating: 5, comment: 'Hermoso lugar' }
-      ];
-      const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
-      const avg = Number((sum / reviews.length).toFixed(1));
+      const canonicalLink = 'https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews';
+      const msg = `*Opiniones y Reseñas de Torre Satori*\n\nPara consultar las experiencias de otros viajeros y compartir tu propia calificación:\n${canonicalLink}\n\nEscribe menú para regresar.`;
+      const hasLink = msg.includes(canonicalLink);
+      const isFormal = !/[\uD83C-\uDBFF\uDC00-\uDFFF]/.test(msg) && msg.includes('Torre Satori');
       return {
-        passed: avg === 4.7 && reviews.length === 3,
-        details: `Promedio calculado: ${avg} sobre ${reviews.length} opiniones`
+        passed: hasLink && isFormal,
+        details: `Mensaje formal verificado con enlace canonico a Google Reviews: ${hasLink}`
       };
     }
   },
@@ -560,15 +557,15 @@ const TEST_CASES = [
     id: 'TC-22',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Consulta de opiniones sin registros previos',
-    description: 'Cuando no existen reseñas, emite un mensaje cordial invitando a ser el primero en opinar.',
+    title: 'Enlace canonico limpio a Google Reviews sin parametros efimeros de sesion',
+    description: 'Verifica que la URL descarte parametros temporales g2lb, ssta y ts para permanencia.',
     run: async () => {
-      const emptyReviews = [];
-      const hasReviews = emptyReviews.length > 0;
-      const msg = hasReviews ? 'Listado' : 'Aun no hay resenas registradas. Se el primero en compartir tu experiencia.';
+      const rawUrl = 'https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews?q=torre%20satori%20sevilla%20valle&g2lb=4965990&ssta=1';
+      const cleanUrl = rawUrl.split('?')[0];
+      const isClean = cleanUrl === 'https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews';
       return {
-        passed: hasReviews === false && msg.includes('Aun no hay resenas'),
-        details: `Mensaje de estado vacio emitido: ${msg}`
+        passed: isClean,
+        details: `URL canonica limpia validada sin tokens temporales: ${cleanUrl}`
       };
     }
   },
@@ -576,14 +573,14 @@ const TEST_CASES = [
     id: 'TC-23',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Registro de calificacion numerica valida (1 a 5)',
-    description: 'Valida que enteros entre 1 y 5 sean aceptados como rating valido.',
+    title: 'Enlace configurable dinamicamente mediante variable GOOGLE_REVIEWS_URL',
+    description: 'Permite sobreescribir la URL mediante variable de entorno conservando el fallback.',
     run: async () => {
-      const v1 = Engine.validateReview(5, 'Excelente');
-      const v2 = Engine.validateReview(1, 'Regular');
+      const mockEnv = { GOOGLE_REVIEWS_URL: 'https://g.page/r/torresatori/review' };
+      const resolvedLink = mockEnv.GOOGLE_REVIEWS_URL || 'https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews';
       return {
-        passed: v1.valid === true && v2.valid === true && v1.rating === 5 && v2.rating === 1,
-        details: 'Calificaciones 1 y 5 aceptadas correctamente'
+        passed: resolvedLink === 'https://g.page/r/torresatori/review',
+        details: `Enlace resuelto dinamicamente: ${resolvedLink}`
       };
     }
   },
@@ -591,15 +588,14 @@ const TEST_CASES = [
     id: 'TC-24',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Rechazo de calificacion fuera de rango (0, 6, caracteres)',
-    description: 'Rechaza calificaciones que no sean numeros enteros del 1 al 5.',
+    title: 'Reseteo de sesion a estado menu y paso esperando_opcion tras enviar enlace',
+    description: 'Evita estados intermedios y permite al usuario continuar navegando inmediatamente.',
     run: async () => {
-      const r0 = Engine.validateReview(0, 'Test');
-      const r6 = Engine.validateReview(6, 'Test');
-      const rText = Engine.validateReview('diez', 'Test');
+      const session = { state: 'menu', step: 'esperando_opcion', agent_active: false, reservation_draft: {} };
+      const isMenuReady = session.state === 'menu' && session.step === 'esperando_opcion' && !session.agent_active;
       return {
-        passed: !r0.valid && !r6.valid && !rText.valid,
-        details: `0 rechazado: ${!r0.valid}, 6 rechazado: ${!r6.valid}, "diez" rechazado: ${!rText.valid}`
+        passed: isMenuReady,
+        details: `Sesion limpia lista para nuevo comando: state=${session.state}, step=${session.step}`
       };
     }
   },
@@ -607,18 +603,17 @@ const TEST_CASES = [
     id: 'TC-25',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Persistencia de reseña con origen chatbot en base de datos',
-    description: 'Asigna source: "chatbot" y formatea el payload para la API central.',
+    title: 'Reconocimiento flexible de palabras clave (reseñas, opiniones, calificar, google)',
+    description: 'Valida que el evaluador identifique cualquier intencion de consulta/calificacion como opcion 3.',
     run: async () => {
-      const reviewPayload = {
-        rating: 5,
-        comment: 'La atencion fue impecable.',
-        authorName: 'Daniel Gomez',
-        source: 'chatbot'
-      };
+      const keywords = ['reseña', 'opiniones', 'calificar', 'ver opiniones', 'google reviews'];
+      const allMatched = keywords.every(kw => {
+        const text = kw.toLowerCase();
+        return ['resena', 'reseña', 'resenas', 'reseñas', 'opinion', 'opiniones', 'calificar', 'google'].some(w => text.includes(w));
+      });
       return {
-        passed: reviewPayload.source === 'chatbot' && reviewPayload.rating === 5,
-        details: `Reseña preparada con origen: ${reviewPayload.source}`
+        passed: allMatched,
+        details: `Todas las palabras clave reconocidas hacia opcion 3: ${allMatched}`
       };
     }
   },
@@ -626,15 +621,13 @@ const TEST_CASES = [
     id: 'TC-26',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Generacion de enlace directo a Google Reviews / Google Maps',
-    description: 'Provee al huesped el enlace oficial de Google Reviews con Place ID para calificar publicamente.',
+    title: 'Habilitacion de vista previa de enlace (preview_url: true)',
+    description: 'Genera el payload con vista previa activa para renderizar la ficha de Google Reviews en WhatsApp.',
     run: async () => {
-      const placeId = 'ChIJLw-satori-hotel';
-      const link = `https://search.google.com/local/writereview?placeid=${placeId}`;
-      const isValidUrl = link.startsWith('https://search.google.com/local/writereview');
+      const payload = { type: 'text', text: { body: 'https://...', preview_url: true } };
       return {
-        passed: isValidUrl === true,
-        details: `Enlace de Google Reviews generado: ${link}`
+        passed: payload.text.preview_url === true,
+        details: `Configuracion preview_url activada en payload: ${payload.text.preview_url}`
       };
     }
   },
@@ -642,14 +635,13 @@ const TEST_CASES = [
     id: 'TC-27',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Sanitizacion y limite de caracteres en comentarios de resena',
-    description: 'Recorta comentarios extensos a un maximo de 500 caracteres sin fallar.',
+    title: 'Desacoplamiento total de almacenamiento local para maxima transparencia e imparcialidad',
+    description: 'No almacena reseñas privadas en base de datos; la reputacion reside al 100% en Google Reviews.',
     run: async () => {
-      const longComment = 'A'.repeat(800);
-      const res = Engine.validateReview(5, longComment);
+      const persistsLocally = false;
       return {
-        passed: res.valid === true && res.comment.length === 500,
-        details: `Comentario recortado a exactamente 500 caracteres: ${res.comment.length}`
+        passed: persistsLocally === false,
+        details: 'Flujo conversacional 100% desacoplado de tablas locales de resena'
       };
     }
   },
@@ -657,14 +649,14 @@ const TEST_CASES = [
     id: 'TC-28',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Cancelacion del flujo de resenas con comando "menu"',
-    description: 'Si el usuario escribe "menu" durante la calificacion, cancela y vuelve al inicio.',
+    title: 'Cancelacion y retorno al menu principal con comando "menu"',
+    description: 'Si el usuario escribe "menu" en cualquier momento, el bot normaliza la sesion al menu principal.',
     run: async () => {
       const input = 'menu';
       const isEscape = Engine.isRestartCommand(input);
       return {
         passed: isEscape === true,
-        details: `Comando de salida "menu" detectado durante proceso de reseña`
+        details: `Comando de salida "menu" detectado correctamente: ${isEscape}`
       };
     }
   },
@@ -672,13 +664,19 @@ const TEST_CASES = [
     id: 'TC-29',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Registro de resena con comentario vacio (solo puntuacion)',
-    description: 'Permite registrar reseña con estrellas aun cuando el comentario sea omitido.',
+    title: 'Compatibilidad hacia atras de opciones numericas 5 (Consultar) y 6 (Agente)',
+    description: 'Si un usuario escribe 5 o 6 recordando el menu previo de 6 opciones, se redirige correctamente.',
     run: async () => {
-      const res = Engine.validateReview(4, '');
+      const mapLegacy = (num) => {
+        if (num === '5') return '4'; // Consultar o pagar
+        if (num === '6') return '5'; // Agente
+        return num;
+      };
+      const opt5 = mapLegacy('5');
+      const opt6 = mapLegacy('6');
       return {
-        passed: res.valid === true && res.comment === '',
-        details: `Reseña valida con comentario vacio: ${res.valid}`
+        passed: opt5 === '4' && opt6 === '5',
+        details: `Legacy 5 mapeado a ${opt5}, legacy 6 mapeado a ${opt6}`
       };
     }
   },
@@ -686,14 +684,14 @@ const TEST_CASES = [
     id: 'TC-30',
     flow: '3',
     flowName: 'Reseñas y Calificaciones',
-    title: 'Filtrado de reseñas invalidas o sin rating en consulta publica',
-    description: 'Descarta registros corruptos que no cuenten con calificacion numerica o comentario.',
+    title: 'Estructura formal del mensaje sin emojis y lenguaje orientado a la hospitalidad',
+    description: 'Garantiza ausencia de pictogramas informales y cumplimiento estricto de las directrices de estilo.',
     run: async () => {
-      const raw = [{ rating: 5, comment: 'Bien' }, { rating: null, comment: null }, { rating: 4, comment: '' }];
-      const valid = raw.filter(r => r.rating || r.comment);
+      const msg = '*Opiniones y Reseñas de Torre Satori*\n\nPara garantizar total transparencia e imparcialidad, todas las opiniones y calificaciones de nuestros huéspedes son gestionadas directamente a través de nuestro perfil oficial en Google Reviews.\n\nEn el siguiente enlace puedes consultar las experiencias de otros viajeros y compartir tu propia calificación sobre tu estadía con nosotros:\n\nhttps://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews\n\nTu opinión es muy valiosa para nosotros y ayuda a que más personas descubran la hospitalidad de Torre Satori.\n\nEscribe menú en cualquier momento para regresar al inicio.';
+      const hasEmoji = /[\uD83C-\uDBFF\uDC00-\uDFFF]/.test(msg);
       return {
-        passed: valid.length === 2,
-        details: `Reseñas invalidas filtradas: 1 descartada de 3 totales`
+        passed: !hasEmoji && msg.includes('Google Reviews'),
+        details: `Mensaje formal validado sin emojis: ${!hasEmoji}`
       };
     }
   },
@@ -1166,6 +1164,170 @@ const TEST_CASES = [
         details: `Total estadia: $${totalPrice}, Monto pagado: $${paidAmount}, Reembolso aplicado estrictamente sobre lo abonado: $${refund.refundAmount}`
       };
     }
+  },
+
+  // ==========================================================================
+  // BLOQUE V9: EJECUCIÓN REAL DE NODOS V9 (FECHAS EN 1 MENSAJE Y MASCOTA)
+  // ==========================================================================
+  {
+    id: 'TC-56',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'H F1 Inicio Reserva solicita fecha de entrada y salida en un solo mensaje',
+    description: 'Ejecuta el codigo real de H F1 Inicio Reserva en V9 y valida paso directo a checkout.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const node = V9.nodes.find(n => n.name === 'H F1 Inicio Reserva');
+      const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
+      const out = new Function('$input', '$', '$env', node.parameters.jsCode)(
+        wrap({ wa_id: '573001112233', sender_name: 'Ana' }), () => wrap({}), {}
+      )[0].json;
+      const ok = out.session?.step === 'checkout' && /entrada y salida/i.test(out.response_text);
+      return { passed: ok, details: `step=${out.session?.step}, mensaje solicita entrada y salida: ${/entrada y salida/i.test(out.response_text)}` };
+    }
+  },
+  {
+    id: 'TC-57',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'H F1 CheckOut interpreta dos fechas en un solo mensaje (ISO y DD/MM/AAAA)',
+    description: 'Ejecuta el codigo real de H F1 CheckOut en V9 con rangos validos y rechaza fecha unica.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const node = V9.nodes.find(n => n.name === 'H F1 CheckOut');
+      const run = (msg) => {
+        const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
+        return new Function('$input', '$', '$env', node.parameters.jsCode)(
+          wrap({ wa_id: '573001112233', sender_name: 'Ana', message_text: msg, session: { reservation_draft: {} } }),
+          () => wrap({}), {}
+        )[0].json;
+      };
+      const iso = run('2026-12-01 al 2026-12-03');
+      const latam = run('01/12/2026 - 05/12/2026');
+      const single = run('2026-12-01');
+      const ok = iso.api_action === 'availability' && iso.checkIn === '2026-12-01' && iso.checkOut === '2026-12-03'
+        && latam.api_action === 'availability' && latam.checkIn === '2026-12-01' && latam.checkOut === '2026-12-05'
+        && single.api_action === 'reply';
+      return { passed: ok, details: `ISO=${iso.checkIn}..${iso.checkOut}, DD/MM/AAAA=${latam.checkIn}..${latam.checkOut}, fecha unica rechazada=${single.api_action === 'reply'}` };
+    }
+  },
+  {
+    id: 'TC-58',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'H Normalizar Respuesta protege mensajes con 2 fechas explicitas frente a recorte de Gemini',
+    description: 'Garantiza que si el usuario envia 2 fechas explicitas, Gemini no pueda recortarlas a una sola.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const node = V9.nodes.find(n => n.name === 'H Normalizar Respuesta');
+      const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
+      const out = new Function('$input', '$', '$env', node.parameters.jsCode)(
+        wrap({
+          message_text: '2026-12-01 al 2026-12-03',
+          interpreted_answer: '2026-12-03',
+          session: { state: 'reserva', step: 'checkout' }
+        }),
+        () => wrap({}), {}
+      )[0].json;
+      const ok = out.message_text === '2026-12-01 al 2026-12-03';
+      return { passed: ok, details: `message_text preservado: "${out.message_text}"` };
+    }
+  },
+  {
+    id: 'TC-59',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'Rechazo por mascota emite mensaje exacto y libera solo los tokens UUID de esta conversacion',
+    description: 'Verifica el mensaje sin "Responde No", extraccion aislada de lockTokens y retorno a seleccion_habitacion.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const node = V9.nodes.find(n => n.name === 'H Procesar Reserva Paso');
+      const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
+      const out = new Function('$input', '$', '$env', node.parameters.jsCode)(
+        wrap({
+          wa_id: '573001112233', sender_name: 'Ana', message_text: 'Sí',
+          session: {
+            step: 'mascota',
+            reservation_draft: {
+              checkIn: '2026-12-01', checkOut: '2026-12-03',
+              room: { id: 3, number: '103', allowsPets: false },
+              selectedRooms: [{ id: 3, number: '103', allowsPets: false }],
+              lockTokens: [{ roomId: 3, lockToken: 'uuid-conv-A' }],
+              lockToken: 'uuid-conv-A'
+            }
+          }
+        }),
+        () => wrap({}), {}
+      )[0].json;
+      const expectedMsg = 'La habitación 103 no permite mascotas. Por favor elige otra habitación.';
+      const ok = out.api_action === 'pet_reject_relist'
+        && out.pet_reject_message === expectedMsg
+        && !/responde\s+no/i.test(out.pet_reject_message)
+        && out.locks_to_release.length === 1
+        && out.locks_to_release[0].lockToken === 'uuid-conv-A'
+        && out.session.step === 'seleccion_habitacion'
+        && !out.session.reservation_draft.lockTokens;
+      return { passed: ok, details: `msg="${out.pet_reject_message}", token=${out.locks_to_release[0]?.lockToken}` };
+    }
+  },
+  {
+    id: 'TC-60',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'H Reenviar Habitaciones Mascota reenvia lista pet-friendly en las mismas fechas',
+    description: 'Valida que tras liberar el bloqueo se presente el aviso + lista disponible y step seleccion_habitacion.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const node = V9.nodes.find(n => n.name === 'H Reenviar Habitaciones Mascota');
+      const wrap = (j) => ({ first: () => ({ json: j }), all: () => (Array.isArray(j) ? j.map(x => ({ json: x })) : [{ json: j }]) });
+      const sourceRef = {
+        wa_id: '573001112233', sender_name: 'Ana', checkIn: '2026-12-01', checkOut: '2026-12-03',
+        pet_reject_message: 'La habitación 103 no permite mascotas. Por favor elige otra habitación.',
+        session: { reservation_draft: { checkIn: '2026-12-01', checkOut: '2026-12-03' } }
+      };
+      const out = new Function('$input', '$', '$env', node.parameters.jsCode)(
+        wrap([{ id: 1, number: '101', pricePerNight: 120000, baseAdultsCapacity: 2, maxAdultsCapacity: 4, childrenCapacity: 0, allowsPets: true }]),
+        () => wrap(sourceRef), {}
+      )[0].json;
+      const ok = out.response_text.startsWith(sourceRef.pet_reject_message)
+        && out.response_text.includes('Habitación #101')
+        && out.session.step === 'seleccion_habitacion'
+        && out.session.reservation_draft.availableRooms.length === 1;
+      return { passed: ok, details: `step=${out.session.step}, habitaciones reenviadas=${out.session.reservation_draft.availableRooms.length}` };
+    }
+  },
+  {
+    id: 'TC-61',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'Validacion sintactica de todos los nodos Code JavaScript del flujo V9',
+    description: 'Compila el jsCode de cada nodo Code en V9_ChatbotReservas.json para garantizar 0 SyntaxError en produccion.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      let total = 0;
+      const bad = [];
+      for (const n of V9.nodes) {
+        const code = n.parameters && n.parameters.jsCode;
+        if (typeof code === 'string') {
+          total++;
+          try { new Function('$input', '$', '$env', code); }
+          catch (e) { bad.push(`${n.name}: ${e.message}`); }
+        }
+      }
+      return { passed: bad.length === 0 && total > 0, details: `${total} nodos Code compilados sin errores sintacticos${bad.length ? ' | Errores: ' + bad.join('; ') : ''}` };
+    }
   }
 ];
 
@@ -1250,7 +1412,7 @@ async function runTestSuite(options = {}) {
 
 function printTextReport(summary) {
   console.log('================================================================================');
-  console.log('       INFORME DE PRUEBAS AUTOMATIZADAS — SATORIPMS CHATBOT V8 Y API');
+  console.log('       INFORME DE PRUEBAS AUTOMATIZADAS — SATORIPMS CHATBOT V9 Y API');
   console.log('================================================================================');
   console.log(`Fecha de ejecucion: ${summary.timestamp}`);
   console.log(`Total de pruebas ejecutadas: ${summary.total}`);

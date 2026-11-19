@@ -1,106 +1,54 @@
 package com.satoripms.api.review;
 
-import com.satoripms.api.booking.BookingRepository;
-import com.satoripms.api.guest.GuestRepository;
-import com.satoripms.api.guest.Guest;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
- * Controlador REST para el módulo de Reseñas y Fidelización de SatoriPMS.
+ * Controlador REST para la consulta en tiempo real de Reseñas Oficiales de Google Reviews en SatoriPMS.
  *
- * Expone endpoints para:
- * 1. Consultar las valoraciones y comentarios más recientes de huéspedes.
- * 2. Registrar nuevas opiniones recibidas a través del chatbot de WhatsApp o la aplicación web.
+ * Extrae y expone exclusivamente datos reales del perfil oficial de Hotel Torre Satori
+ * en Google Reviews (solo lectura, sin reseñas simuladas ni redirecciones externas).
  */
 @RestController
 @RequestMapping("/api/reviews")
 public class ReviewController {
 
-    private final ReviewRepository reviewRepository;
-    private final BookingRepository bookingRepository;
-    private final GuestRepository guestRepository;
+    private final GoogleReviewsService googleReviewsService;
 
-    /**
-     * Constructor con inyección de repositorios requeridos.
-     *
-     * @param reviewRepository  Repositorio JPA de reseñas
-     * @param bookingRepository Repositorio JPA de reservas
-     * @param guestRepository   Repositorio JPA de huéspedes
-     */
-    public ReviewController(ReviewRepository reviewRepository,
-                            BookingRepository bookingRepository,
-                            GuestRepository guestRepository) {
-        this.reviewRepository = reviewRepository;
-        this.bookingRepository = bookingRepository;
-        this.guestRepository = guestRepository;
+    public ReviewController(GoogleReviewsService googleReviewsService) {
+        this.googleReviewsService = googleReviewsService;
     }
 
     /**
-     * Consulta las reseñas más recientes ordenadas por fecha de creación descendente.
+     * Retorna las reseñas reales obtenidas desde Google Reviews.
      *
-     * @param limit Cantidad máxima de registros a retornar (por defecto 10)
-     * @return Lista de reseñas recientes para mostrar al huésped o en el portal web
+     * @param limit   Cantidad máxima de registros a retornar (por defecto 50)
+     * @param refresh Si es true, fuerza la actualización en vivo omitiendo la caché de 15 minutos
+     * @return Lista de reseñas reales de Google Reviews
      */
     @GetMapping
-    public ResponseEntity<?> getReviews(@RequestParam(defaultValue = "10") int limit) {
-        List<Review> reviews = reviewRepository.findTop10ByOrderByCreatedAtDesc();
-        return ResponseEntity.ok(reviews.stream().limit(limit).toList());
+    public ResponseEntity<List<Map<String, Object>>> getReviews(
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "false") boolean refresh
+    ) {
+        return ResponseEntity.ok(googleReviewsService.getReviews(limit, refresh));
     }
 
     /**
-     * Registra una nueva reseña de servicio.
-     * Soporta registro automático desde el chatbot (asociando el número de WhatsApp, huésped y reserva)
-     * o registro manual desde interfaces externas.
+     * Provee el resumen oficial en vivo desde Google Reviews:
+     * calificación promedio real, total de opiniones, distribución exacta por estrellas
+     * y listado de opiniones reales disponibles.
      *
-     * @param request Datos de la calificación (1-5 estrellas), comentario y origen
-     * @return Respuesta con el identificador asignado y confirmación del registro
+     * @param refresh Si es true, fuerza la actualización en vivo desde Google
+     * @return Métricas y reseñas reales para el panel de visualización web
      */
-    @PostMapping
-    public ResponseEntity<?> createReview(@RequestBody ReviewRequestDto request) {
-        if (request.getRating() == null || request.getRating() < 1 || request.getRating() > 5) {
-            return ResponseEntity.badRequest().body(Map.of("error", "La calificación debe ser entre 1 y 5"));
-        }
-        if (request.getComment() == null || request.getComment().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "El comentario es requerido"));
-        }
-
-        Review review = new Review();
-        review.setRating(request.getRating());
-        review.setComment(request.getComment());
-        review.setSource("chatbot");
-
-        if (request.getWaId() != null && !request.getWaId().isBlank()) {
-            Optional<Guest> guestOpt = guestRepository.findByWhatsappPhone(request.getWaId());
-            guestOpt.ifPresent(g -> review.setGuestId(g.getId()));
-            review.setAuthorName(guestOpt.map(Guest::getName).orElse(null));
-
-            if (request.getBookingId() != null) {
-                if (reviewRepository.existsByBookingId(request.getBookingId())) {
-                    return ResponseEntity.status(HttpStatus.CONFLICT)
-                        .body(Map.of("error", "Ya existe una reseña para esa reserva"));
-                }
-                review.setBookingId(request.getBookingId());
-                bookingRepository.findById(request.getBookingId())
-                    .ifPresent(b -> review.setRoomId(b.getRoomId()));
-            }
-        } else {
-            review.setAuthorName(request.getAuthorName());
-            review.setSource(request.getSource() != null ? request.getSource() : "google");
-        }
-
-        Review saved = reviewRepository.save(review);
-        return ResponseEntity.ok(Map.of(
-            "status", "ok",
-            "message", "Reseña guardada exitosamente",
-            "id", saved.getId(),
-            "rating", saved.getRating(),
-            "comment", saved.getComment()
-        ));
+    @GetMapping("/summary")
+    public ResponseEntity<Map<String, Object>> getReviewsSummary(
+            @RequestParam(defaultValue = "false") boolean refresh
+    ) {
+        return ResponseEntity.ok(googleReviewsService.getSummary(refresh));
     }
 }

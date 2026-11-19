@@ -50,6 +50,13 @@ Muestra las conversaciones de WhatsApp en las que el viajero solicitó hablar co
 - Resalta en la parte superior los chats con solicitud de atención humana activa.
 - Permite consultar el contexto del cliente y reanudar el asistente automático una vez resuelta la inquietud del viajero.
 
+### F. Visualización de Reseñas Oficiales de Google Reviews
+Disponible tanto para recepción como para administración:
+- **Consulta centralizada:** Extrae y presenta de forma directa las reseñas registradas en Google Reviews para Torre Satori Sevilla Valle.
+- **Métricas consolidadas:** Visualiza en tiempo real la calificación promedio (ej. 4.7 / 5.0), el total de opiniones verificadas y la tasa de satisfacción alta (calificaciones de 4 y 5 estrellas), junto con el desglose porcentual por cada nivel de estrellas.
+- **Buscador y filtros:** Permite filtrar opiniones por calificación en estrellas y buscar comentarios por huésped o palabra clave.
+- **Naturaleza de solo lectura:** Conforme a las directrices de imparcialidad y reputación abierta, en la aplicación web no se redactan reseñas ni se habilitan redirecciones externas; opera estrictamente como visor de auditoría y satisfacción del cliente.
+
 ---
 
 ## 4. Módulos Exclusivos de Administración

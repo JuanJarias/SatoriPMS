@@ -16,7 +16,8 @@ import {
   UtensilsCrossed,
   Tag,
   LogOut,
-  Settings
+  Settings,
+  Star
 } from 'lucide-react';
 import { StoreProvider, useStore } from './store';
 import { cn } from './ui';
@@ -33,6 +34,7 @@ import { Restaurante } from './screens/Restaurante';
 import { Eventos } from './screens/Eventos';
 import { Chatbot } from './screens/Chatbot';
 import { Admin } from './screens/Admin';
+import { Resenas } from './screens/Resenas';
 import { AccountSettingsModal } from './screens/AccountSettingsModal';
 
 const NAV_RECEPTION = [
@@ -44,6 +46,7 @@ const NAV_RECEPTION = [
   { k: 'salidas', label: 'Salidas', icon: ArrowRight, also: ['checkout'] },
   { k: 'tienda', label: 'Tienda Hotel', icon: ShoppingBag },
   { k: 'restaurante', label: 'Salgados Café', icon: UtensilsCrossed },
+  { k: 'resenas', label: 'Reseñas Google', icon: Star },
 ];
 
 const NAV_ADMIN = [
@@ -53,6 +56,7 @@ const NAV_ADMIN = [
   { k: 'a-usr', label: 'Recepcionistas', icon: Users },
   { k: 'a-log', label: 'Logs Auditoría', icon: ShieldCheck },
   { k: 'eventos', label: 'Eventos & Descuentos', icon: Tag },
+  { k: 'resenas', label: 'Reseñas Google', icon: Star },
 ];
 
 function AppLayout() {
@@ -253,6 +257,7 @@ function AppLayout() {
             {currentView === 'checkout' && <Operacion subview="checkout" code={viewParam} go={go} />}
             {currentView === 'tienda' && <Tienda go={go} />}
             {currentView === 'restaurante' && <Restaurante go={go} />}
+            {currentView === 'resenas' && <Resenas />}
             {currentView === 'eventos' && <Eventos />}
             {currentView === 'chatbot' && <Chatbot go={go} />}
             {currentView === 'a-dash' && <Admin subview="dash" go={go} />}

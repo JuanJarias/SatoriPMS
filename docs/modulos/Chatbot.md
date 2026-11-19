@@ -28,18 +28,17 @@ Antes de solicitar el nombre completo y el número de documento de identidad del
 
 ## 3. Menú Principal de Atención
 
-Al iniciar la conversación, el asistente saluda al huésped por su nombre de perfil de WhatsApp y despliega una lista interactiva con seis opciones numeradas:
+Al iniciar la conversación, el asistente saluda al huésped por su nombre de perfil de WhatsApp y despliega una lista interactiva con cinco opciones numeradas:
 
 | Opción | Identificador de Opción | Título en el Menú | Descripción Funcional |
 |---|---|---|---|
 | **1** | `Opción de reserva guiada : "menu_reserva"` | **Hacer una reserva** | Guía al viajero paso a paso para elegir fechas, habitaciones, huéspedes y modalidad de pago. |
 | **2** | `Opción de asistente con IA : "menu_ia"` | **Asistente IA** | Permite describir el viaje libremente en un solo mensaje para que la inteligencia artificial extraiga los datos y busque disponibilidad. |
-| **3** | `Opción de ver reseñas : "menu_resenas"` | **Ver reseñas** | Muestra la calificación promedio del hotel y las opiniones más recientes de otros huéspedes. |
-| **4** | `Opción de escribir reseña : "menu_escribir_resena"` | **Escribir reseña** | Permite calificar la estadía de 1 a 5 estrellas, dejar un comentario y obtener el enlace directo a Google Maps. |
-| **5** | `Opción de revisar o cancelar : "menu_cancelar"` | **Revisar o Cancelar** | Permite consultar el estado de una reserva con su código, pagar el saldo pendiente o solicitar su cancelación. |
-| **6** | `Opción de hablar con agente : "menu_agente"` | **Hablar con agente** | Silencia el asistente automático y transfiere la conversación al personal humano de recepción. |
+| **3** | `Opción de reseñas y opiniones : "menu_resenas"` | **Reseñas y opiniones** | Provee el enlace oficial canónico a Google Reviews para consultar opiniones reales y calificar la experiencia. |
+| **4** | `Opción de consultar o pagar : "menu_cancelar"` | **Consultar o Pagar** | Permite consultar el estado de una reserva activa, pagar saldo pendiente o cancelar mediante verificación en dos pasos (`TS-XXXX` + cédula). |
+| **5** | `Opción de hablar con agente : "menu_agente"` | **Hablar con agente** | Silencia el asistente automático y transfiere la conversación al personal humano de recepción. |
 
-El huésped puede seleccionar cualquiera de las seis opciones tocando el botón de la lista interactiva o escribiendo el número correspondiente (`1` al `6`).
+El huésped puede seleccionar cualquiera de las cinco opciones tocando el botón de la lista interactiva o escribiendo el número correspondiente (`1` al `5`), contando además con tolerancia para palabras clave descriptivas.
 
 ---
 
@@ -84,37 +83,36 @@ Pensado para viajeros que prefieren escribir todos sus requerimientos en un solo
 
 ---
 
-## 6. Flujo 3: Consulta y Registro de Reseñas (Opciones 3 y 4)
+## 6. Flujo 3: Opiniones y Reseñas Oficiales en Google Reviews (Opción 3)
 
-### A. Ver Reseñas (Opción 3)
-- El asistente consulta las calificaciones más recientes almacenadas en el sistema, calcula el promedio general de satisfacción sobre 5.0 estrellas y presenta hasta 5 comentarios reales indicando el nombre del autor, las estrellas otorgadas y el canal de origen.
+Para garantizar la máxima transparencia, autenticidad e imparcialidad, el chatbot no almacena ni simula reseñas en bases de datos internas privadas. Toda la reputación y valoración del hotel se canaliza de forma abierta hacia el perfil oficial de **Torre Satori en Google Reviews**:
 
-### B. Escribir una Reseña y Enlace a Google Maps (Opción 4)
-1. **Calificación numérica:** El asistente solicita al huésped calificar su experiencia del **1 al 5** (aceptando números, palabras como *"cinco"* o *"excelente"*, o emojis de estrellas).
-2. **Comentario descriptivo:** Una vez recibida la puntuación, pide al huésped un breve comentario sobre su estadía, la atención o las instalaciones.
-3. **Guardado y redirección a Google:** El sistema registra la reseña y responde agradeciendo al huésped junto con un enlace directo al perfil de **Torre Satori en Google Maps** para que pueda compartir también su opinión públicamente con un solo toque.
+1. **Mensaje formal de bienvenida a reseñas:** Al ingresar a la opción 3 (o escribir palabras como *"reseñas"*, *"opiniones"*, *"calificar"* o *"Google"*), el asistente emite un mensaje cordial orientado a la hospitalidad explicando la política de transparencia hotelera.
+2. **Enlace directo a Google Reviews:** Provee el enlace canónico directo al perfil oficial del establecimiento ([https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews](https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews)), con previsualización enriquecida (`preview_url: true`), permitiendo al usuario consultar experiencias verificadas de otros viajeros o calificar su propia estadía directamente desde su cuenta de Google.
+3. **Retorno al flujo:** La sesión permanece en estado de menú principal para que el huésped continúe navegando sin fricciones ni formularios extensos.
 
 ---
 
-## 7. Flujo 4: Revisar Reserva, Pagar Saldo Pendiente o Cancelar (Opción 5)
+## 7. Flujo 4: Consultar, Pagar Saldo o Cancelar Reserva (Opción 4)
 
-Permite al huésped autogestionar su reserva activa en cualquier momento utilizando su código de 8 caracteres:
+Permite al huésped autogestionar su reserva activa en cualquier momento garantizando la privacidad y protección de los datos de su estadía mediante una **verificación de identidad en dos pasos**:
 
-1. **Solicitud del código:** El asistente pide el código de reserva entregado al momento de la confirmación.
-2. **Presentación del estado de la reserva:** Muestra el titular, estado actual, fechas, número de noches, habitaciones asignadas, ocupación, valor total, monto abonado a la fecha y saldo pendiente:
+1. **Solicitud del código de reserva:** El asistente solicita el código oficial de la reserva (por ejemplo: `TS-4156`), con prefijo estándar `TS-` de Torre Satori.
+2. **Validación de identidad con documento del titular:** Para evitar que un tercero pueda consultar o manipular reservas ajenas al conocer un código, el asistente solicita obligatoriamente el número de documento de identidad o cédula del titular registrado. Si el documento no coincide exactamente con el titular de la reserva, el sistema rechaza la consulta por motivos de seguridad y privacidad.
+3. **Presentación del estado de la reserva:** Una vez validada la identidad, muestra el nombre del titular, estado de la reserva, fechas de entrada y salida, noches, habitaciones asignadas, desglose de huéspedes, tarifa total, monto abonado a la fecha y saldo pendiente:
    - Si la reserva tiene **saldo pendiente** (porque se confirmó con anticipo del 50%), habilita tres opciones: **1. Pagar saldo restante**, **2. Cancelar reserva** y **3. Volver al menú**.
    - Si la reserva ya está **pagada al 100%**, habilita: **1. Cancelar reserva** y **2. Volver al menú**.
-3. **Liquidación del saldo restante:** Si el huésped elige pagar el saldo pendiente, el sistema registra el pago del 50% restante, actualiza el estado de pago a completado (100%), deja el saldo pendiente en cero y envía el comprobante de actualización por WhatsApp.
-4. **Cancelación con cálculo transparente sobre lo abonado:**
+4. **Liquidación del saldo restante:** Si el huésped elige pagar el saldo pendiente, el sistema registra el pago del 50% restante, actualiza el estado de pago a completado (100%), deja el saldo pendiente en cero y envía el comprobante de actualización por WhatsApp.
+5. **Cancelación con cálculo transparente sobre lo abonado:**
    - Si el huésped elige cancelar, el asistente no anula la reserva de inmediato: primero muestra las **Políticas de Cancelación de Torre Satori**, informa cuánto dinero ha abonado el huésped hasta la fecha, cuántas horas faltan para la hora de entrada (15:00 del día de llegada) y cuál es el **reembolso estimado exacto calculado sobre lo abonado** (100% si faltan más de 72 horas, 50% entre 24 y 72 horas, o 0% si faltan menos de 24 horas).
    - Solicita una **doble confirmación** (*"Sí, confirmar"* para anular definitivamente o *"No"* para conservar la reserva).
    - Al confirmarse, la reserva pasa a estado cancelado, las habitaciones quedan libres de inmediato para nuevas reservas y se informa el resumen final de la operación.
 
 ---
 
-## 8. Flujo 5: Escalamiento a Recepción Humana (Opción 6)
+## 8. Flujo 5: Escalamiento a Recepción Humana (Opción 5)
 
-Cuando el viajero selecciona la opción 6 del menú o escribe palabras como *"agente"* o *"recepcionista"*:
+Cuando el viajero selecciona la opción 5 del menú o escribe palabras como *"agente"*, *"recepcionista"* o *"asesor"*:
 1. El sistema activa el indicador de atención humana en la sesión del usuario (`Atención por agente activa : "agent_active"`).
 2. Envía una alerta al panel de recepción para que el personal del hotel atienda el chat desde el WhatsApp del establecimiento o desde la bandeja de conversaciones de la aplicación web.
 3. Mientras el modo de agente humano está activo, el chatbot guarda silencio ante los nuevos mensajes del huésped para no interrumpir la conversación con el recepcionista, hasta que la atención concluya o el huésped escriba *"menú"* para reactivar el asistente automático.

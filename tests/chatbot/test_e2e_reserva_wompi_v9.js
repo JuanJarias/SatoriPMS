@@ -99,7 +99,7 @@ async function run() {
   console.log('='.repeat(70));
   let linkId = null;
   try {
-    const steps = [['menu', 2000], ['1', 2000], [CHECK_IN, 2000], [CHECK_OUT, 3000], ['1', 3500], ['2 adultos', 3000],
+    const steps = [['menu', 2000], ['1', 2000], [`${CHECK_IN} al ${CHECK_OUT}`, 4500], ['1', 3500], ['2 adultos', 3500],
       [TEST_NAME, 3000], ['1094888777', 3000], ['no', 3000], ['ninguno', 3500], ['2', 6000]];
     for (const [i, [msg, wait]] of steps.entries()) {
       console.log(`[${i + 1}/${steps.length}] Enviando "${msg}"...`);
