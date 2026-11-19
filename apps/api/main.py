@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import settings
 from core.database import get_db
 from routers.auth import router as auth_router
+from routers.bookings import router as bookings_router
+from routers.rooms import router as rooms_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -31,6 +33,8 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(rooms_router)
+app.include_router(bookings_router)
 
 
 @app.get("/api/v1/health", status_code=status.HTTP_200_OK, tags=["Health"])
