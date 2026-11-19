@@ -8,6 +8,7 @@ try:
     from models.booking import ACTIVE_BOOKING_STATUSES, Booking, BookingStatus
     from models.guest import Guest
     from models.room import Room
+    from models.user import User, UserRole
 except ImportError:
     from apps.api.core.database import Base
     from apps.api.models.audit_log import AuditLog
@@ -18,6 +19,7 @@ except ImportError:
     )
     from apps.api.models.guest import Guest
     from apps.api.models.room import Room
+    from apps.api.models.user import User, UserRole
 
 __all__ = [
     "ACTIVE_BOOKING_STATUSES",
@@ -27,6 +29,8 @@ __all__ = [
     "BookingStatus",
     "Guest",
     "Room",
+    "User",
+    "UserRole",
 ]
 
 sys.modules.setdefault("models", sys.modules[__name__])

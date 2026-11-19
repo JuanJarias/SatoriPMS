@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     PORT: int = 8080
 
+    JWT_SECRET: str = "satori_dev_jwt_secret_key_minimo_32_caracteres_2026"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRES_MINUTES: int = 480
+
     DATABASE_URL: str = (
         "postgresql+psycopg://satori:satori_dev@localhost:5432/satoripms"
     )
