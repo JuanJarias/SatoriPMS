@@ -230,133 +230,101 @@ pytest tests/test_rooms_availability.py tests/test_booking_lock.py -v
 
 ---
 
-## MÓDULO 3: Meta Cloud API, WhatsApp Real y n8n (Lotes M-META y M3)
+## MÓDULO 3: Meta Cloud API, Flujo n8n V10 (Compañero en `main`), Sesiones en PostgreSQL y Pagos Wompi/HMAC (Lotes M-META y M3)
 
-### 1. El Puente Mental Telemático
-* **Arquitectura de Webhook:** Un webhook no es más que una **llamada HTTP asíncrona hacia adelante (Push Notification)**. Meta no mantiene un socket TCP abierto permanente con tu servidor. Cada vez que un usuario presiona "Enviar" en su WhatsApp, los servidores de Meta empaquetan el mensaje en un JSON y hacen un `POST` HTTP hacia la URL pública HTTPS que registraste en n8n.
-* **El Rol de n8n (Gateway de Frontera):** n8n actúa como un **Proxy Inverso / Demultiplexor de Mensajería**. Su función es:
-  1. Responder el desafío inicial de Meta (`hub.challenge`) para establecer la confianza del canal.
-  2. Parsear el árbol complejo de Meta y normalizarlo a una trama simple (`{ wa_id: "57310...", text: "Quiero reservar" }`).
-  3. Hacer la llamada HTTP a FastAPI enviando una cabecera de autenticación fija de backend a backend (`X-Service-Key`).
-* **Persistencia de Sesión sin Redis:** En lugar de guardar variables de chat en Redis, n8n llama a `GET /api/v1/conversations/session/{wa_id}` en FastAPI. FastAPI consulta la tabla `conversation` en PostgreSQL, lee la columna `session_data` (tipo `JSONB`) y le devuelve a n8n en qué paso del flujo va el huésped (ej. `step: "AWAITING_ROOM_SELECTION"`). Cero Redis, 100% transaccional.
+### 1. El Puente Mental Telemático: ¿Cómo funciona el flujo n8n `V10` de tu compañero?
+* **Arquitectura de Webhook (Push HTTP):** Meta y Wompi no mantienen un socket abierto permanente. Cuando el huésped escribe en WhatsApp o paga en Wompi, sus servidores hacen un `POST` HTTP hacia n8n.
+* **Anatomía del flujo `V10_ChatbotReservas.json` (91 nodos subidos por tu compañero a `origin/main`):**
+  1. **3 Puertas de Entrada (Webhooks en n8n):**
+     - `GET /webhook/whatsapp-webhook`: Responde automáticamente el reto `hub.challenge` cuando registras el webhook en Meta for Developers.
+     - `POST /webhook/whatsapp-webhook`: Recibe cada mensaje entrante del huésped desde WhatsApp Cloud API.
+     - `POST /webhook/wompi-events`: Recibe la notificación de pago desde **Wompi**, calcula en un nodo JavaScript el hash SHA-256 con `WOMPI_EVENTS_SECRET` y verifica que el pago esté `APPROVED`.
+  2. **Rutas Conversacionales del Huésped:**
+     - **Opción 1 (Reserva Guiada):** Pide fechas (`checkIn`, `checkOut`) ──► llama a `GET /api/rooms/availability` ──► bloquea habitación 15 min (`POST /api/bookings/lock`) ──► pide adultos/niños, aviso **Ley 1581**, nombre y documento ──► muestra desglose tarifa base + recargo (**RN-01**) ──► confirma (`POST /api/bookings/confirm` generando código `TS-XXXX`) y crea link de pago en **Wompi** (100% o abono 50%).
+     - **Opción 2 (Asistente IA con Gemini):** El huésped envía todo en un solo mensaje libre; n8n invoca a Gemini Flash para extraer el JSON estructurado, pide confirmación y bloquea una o varias habitaciones.
+     - **Opciones 3, 4 y 5:** Consulta de reserva (`GET /api/bookings/group/{code}`), pago del 50% restante (`POST .../pay-remaining`), cancelación con reembolso **RN-03** (`POST .../cancellation`) y escalamiento a humano (`POST /api/notifications/agent-request`).
+* **Estrategia de Integración desde `origin/main` hacia `migracion-fastapi` (Checkout Selectivo, NO `git merge` global):**
+  - En `origin/main` aún vive el backend Java legado en `apps/api/src/`. Si hiciéramos un `git merge origin/main` completo, mezclaríamos archivos Java con nuestro FastAPI.
+  - Por eso aplicamos **integración selectiva (`git checkout origin/main -- <rutas>`)**: traemos únicamente los flujos `flows/n8n/V9_ChatbotReservas.json`, `flows/n8n/V10_ChatbotReservas.json`, `tests/chatbot/` y `docs/Guia_Configuracion_Entorno.md`, reemplazamos los **7 nodos Redis** del flujo por llamadas HTTP a nuestra tabla `conversation` en PostgreSQL 16 (cumpliendo cero Redis de `AGENTS.md`), y exponemos en FastAPI tanto las rutas `/api/v1/...` como los alias `/api/...` en `camelCase` que el flujo n8n espera.
 
-### 2. Qué Estudiar y Dónde (Tiempo estimado: 40 minutos)
-1. **Configuración de WhatsApp Cloud API en Meta Developers (20 min):**
-   * Aprende dónde se crea la App de tipo "Business", cómo se activa el producto "WhatsApp", dónde se obtienen el `Phone Number ID` y el `WhatsApp Business Account ID`.
-   * Entiende qué es un **System User** en Meta Business Suite: un usuario de servicio que permite generar un token que no vence cada 24 horas.
-   * *Lectura:* [Meta Developers - WhatsApp Cloud API Getting Started](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started).
-2. **Nodos de n8n requeridos para el Camino Feliz (20 min):**
-   * **Webhook Node:** Escucha peticiones HTTP de Meta (modo GET para verificación de webhook y POST para mensajes entrantes).
-   * **Switch / If Node:** Evalúa el contenido del mensaje o el estado conversacional.
-   * **HTTP Request Node:** Hace llamadas REST con autenticación a FastAPI.
-   * **WhatsApp Send Message Node:** Envía la respuesta de texto con botones al usuario.
+### 2. Qué Estudiar y Dónde (Tiempo estimado: 35 minutos)
+1. **Validación Criptográfica de Webhooks (HMAC SHA-256) e Idempotencia (15 min):**
+   * Ni el chatbot ni la web confirman pagos por "pantalla de éxito": solo un webhook firmado criptográficamente (`X-Hub-Signature-256` con `hmac.compare_digest` o checksum SHA-256 de Wompi) confirma el pago.
+   * **Idempotencia:** Si la pasarela reintenta el mismo `payment_id` / `transaction_id`, FastAPI detecta que ya fue procesado y devuelve `200 OK` sin duplicar cobros ni reservas.
+2. **Persistencia de Sesión Conversacional en PostgreSQL (`conversation`) (10 min):**
+   * Tabla `conversation` con `wa_id` único y columna `session_data` (`JSONB` / `Text`), expuesta vía `GET/PUT/DELETE /api/v1/conversations/session/{wa_id}`.
+3. **Configuración de Meta for Developers (10 min):**
+   * Si tu cuenta nueva de Facebook muestra el bloqueo temporal de 1 hora al crear el portfolio comercial, puedes esperar la hora o invitar en *Roles de la app* a la cuenta con antigüedad de tu compañero para que pulse *Continuar* en WhatsApp y obtenga `WHATSAPP_TOKEN` y `WHATSAPP_PHONE_ID`.
 
 ### 3. Criterio de Suficiencia ("Semáforo Verde — ¿Sé lo suficiente para avanzar?")
-* [x] **Check 1:** ¿Sé cómo responder al handshake de verificación de Meta (`hub.mode=subscribe`, `hub.verify_token`, `hub.challenge`)? (Respuesta: el webhook de n8n debe devolver en el body directamente el valor numérico recibido en `hub.challenge`).
-* [x] **Check 2:** ¿Sé cuáles son las limitaciones del número de prueba de Meta? (Respuesta: máximo 5 números de celular autorizados previamente en el portal de desarrolladores, y ventana de 24 horas para responder mensajes libres).
-* [x] **Check 3:** ¿Puedo dibujar el camino feliz completo de 5 pasos en WhatsApp? (Respuesta: 1. Saludo -> 2. Consulta fechas -> 3. Selección habitación -> 4. Bloqueo 15m y link sandbox -> 5. Mensaje con voucher de confirmación).
+* [x] **Check 1:** ¿Por qué traemos los archivos de `flows/n8n/` y `apps/web/` con `git checkout origin/main -- ...` en vez de `git merge origin/main`? (Respuesta: para importar el 100% del trabajo de n8n y React de mi compañero sin arrastrar los archivos Java eliminados ni sobrescribir nuestro backend FastAPI).
+* [x] **Check 2:** ¿Qué pasa si llega un webhook a `POST /api/v1/payments/webhook` con firma inválida vs. con un `payment_id` repetido? (Respuesta: firma inválida devuelve `401 Unauthorized`; `payment_id` repetido devuelve `200 OK` por idempotencia sin reprocesar).
+* [x] **Check 3:** ¿Cómo conversa el flujo n8n `V10` con nuestro FastAPI sin cambiar la lógica que programó mi compañero? (Respuesta: FastAPI expone los endpoints compatibles `/api/rooms/availability`, `/api/bookings/lock`, `/api/bookings/unlock`, `/api/bookings/confirm`, `/api/bookings/group/{code}` y `/api/notifications/agent-request` traduciendo `camelCase` y delegando al candado GiST de PostgreSQL 16).
 
-### 4. Plan de Ejecución Inmediato (Lotes M-META y M3)
+### 4. Plan de Ejecución Inmediato (Lote M3 Unificado: Sesiones + Pagos HMAC + Compatibilidad n8n V10)
 
-#### A. Pasos Manuales en Meta for Developers (Lote M-META — 11 de Noviembre):
-1. Inicia sesión en [developers.facebook.com](https://developers.facebook.com/) con tu cuenta.
-2. Crea una aplicación de tipo **Business** y nómbrala `Torre Satori PMS`.
-3. Añade el producto **WhatsApp**.
-4. En "API Setup", copia tu **Phone Number ID** temporal y tu número de prueba.
-5. En "To" (Destinatarios), registra tu número móvil personal de WhatsApp y confírmalo con el código SMS que Meta te enviará.
-6. En Meta Business Suite -> Configuración del Negocio -> Usuarios del Sistema: crea un usuario de sistema admin y genera un token con permiso `whatsapp_business_messaging`. Guárdalo en tu archivo `.env`.
+#### A. Archivos a crear/modificar:
+1. Importar selectivamente desde `origin/main`: `flows/n8n/V9_ChatbotReservas.json`, `flows/n8n/V10_ChatbotReservas.json`, `tests/chatbot/` y `docs/Guia_Configuracion_Entorno.md`, adaptando la sesión en `V10` a PostgreSQL (sin Redis).
+2. `apps/api/models/conversation.py` y migración Alembic `003_conversations_and_payments.py`: Tabla `conversation` (`wa_id`, `sender_name`, `state`, `step`, `agent_active`, `session_json`, `updated_at`).
+3. `apps/api/routers/conversations.py`: Endpoints `GET/PUT/DELETE /api/v1/conversations/session/{wa_id}`, `GET /api/conversations` y `POST /api/notifications/agent-request`.
+4. `apps/api/routers/payments.py` y `apps/api/services/payment_service.py`: Endpoint `POST /api/v1/payments/webhook` con validación `X-Hub-Signature-256` (`hmac.compare_digest` con `PAYMENT_WEBHOOK_SECRET`), idempotencia por `payment_id`, transición de `BLOQUEADA_TEMPORAL` a `CONFIRMADA`, generación de código `TS-XXXX` y registro en `audit_log`.
+5. `apps/api/routers/n8n_compat.py`: Endpoints compatibles con el flujo n8n `V10` (`/api/rooms/availability`, `/api/bookings/lock`, `/api/bookings/unlock`, `/api/bookings/confirm`, `/api/bookings/group/{code}`, `/cancellation` con **RN-03** y `/pay-remaining`).
+6. `tests/test_payment_webhook.py` y `tests/test_n8n_integration.py`: Suite de pruebas automatizadas del Lote M3.
 
-#### B. Adaptación de n8n en el Repositorio (Lote M3):
-1. `apps/api/routers/conversations.py`: Endpoints `/api/v1/conversations/session/{wa_id}` para leer y actualizar el estado conversacional en PostgreSQL (columna JSONB `session_data`).
-2. `flows/n8n/V8_ChatbotReservas.json`: Reemplazar los 5 nodos obsoletos de Redis por nodos HTTP Request que consulten los endpoints de sesión de FastAPI.
+#### B. Instrucción precisa para modo AGY (Lote M3):
+> *"Implementa el Lote M3 integrando el trabajo de n8n de `origin/main`: 1) Importa selectivamente `flows/n8n/V9_ChatbotReservas.json`, `flows/n8n/V10_ChatbotReservas.json`, `tests/chatbot/` y `docs/Guia_Configuracion_Entorno.md` desde `origin/main`, y adapta `V10_ChatbotReservas.json` para persistir sesiones en FastAPI/PostgreSQL en lugar de Redis. 2) Crea el modelo `Conversation` y la migración Alembic `003_conversations_and_payments.py`. 3) Implementa `POST /api/v1/payments/webhook` en `apps/api/routers/payments.py` validando la firma `X-Hub-Signature-256` con `hmac.compare_digest` (`PAYMENT_WEBHOOK_SECRET`), idempotencia por `payment_id`, transición a `CONFIRMADA` con código `TS-XXXX` y registro en `audit_log`. 4) Expón los endpoints compatibles con el flujo n8n V10 (`/api/rooms/availability`, `/api/bookings/lock`, `/api/bookings/unlock`, `/api/bookings/confirm`, `/api/bookings/group/{code}`, `/cancellation` RN-03, `/pay-remaining`, `/api/notifications/agent-request` y `/api/v1/conversations/session/{wa_id}`). 5) Cubre todo con tests en pytest (`tests/test_payment_webhook.py` y `tests/test_n8n_integration.py`)."*
 
 #### C. Comandos de Verificación en Consola:
 ```bash
-# Probar endpoint de sesión conversacional en FastAPI
-curl -X GET http://localhost:8080/api/v1/conversations/session/573117778888 \
-  -H "X-Service-Key: tu_clave_secreta"
+# Aplicar migración 003 y correr pruebas de webhook HMAC, sesiones y contratos n8n V10
+cd apps/api && ../../.venv/bin/alembic upgrade head && cd ../..
+.venv/bin/pytest tests/test_payment_webhook.py tests/test_n8n_integration.py -v
 ```
 
 ---
 
-## MÓDULO 4: Webhook de Pagos Sandbox e Idempotencia (Lote M3)
+## MÓDULO 4: Integración del Frontend Web Completo de `origin/main` y Despliegue (Lotes M4 y M-DEP)
 
 ### 1. El Puente Mental Telemático
-* **Por qué no confiar en el cliente:** En una arquitectura web, el frontend nunca le dice al servidor "el pago fue exitoso, confírmalo". Un atacante con abrir las herramientas de desarrollo del navegador podría alterar la respuesta de red.
-* **Integridad por HMAC SHA-256:** La pasarela de pagos (Wompi, MercadoPago o Sandbox) procesa la transacción y envía un webhook directamente desde su servidor al servidor de FastAPI (`POST /api/v1/payments/webhook`).
-  Para asegurar que nadie suplante a la pasarela, esta envía una cabecera `X-Hub-Signature-256: sha256=<hash>`.
-  FastAPI toma el body crudo (bytes), calcula `hmac_sha256(SECRET_KEY, raw_body)` y compara bit a bit. Si coinciden, el pago es 100% auténtico.
-* **Idempotencia (Descarte de Paquetes Duplicados):** En redes con pérdida de paquetes o reintentos automáticos, la pasarela puede reenviar el mismo webhook 3 veces. Para evitar registrar cobros dobles, FastAPI guarda en la base de datos el `transaction_id`. Si llega un evento con un `transaction_id` ya registrado, responde HTTP 200 inmediatamente sin tocar la reserva.
+* **Integración de las Pantallas React de `origin/main`:** En `origin/main`, tu compañero construyó 12 pantallas completas en `apps/web/src/screens/`:
+  - `Login.tsx` (Autenticación de personal)
+  - `Dashboard.tsx` (Dashboard financiero y KPIs de ocupación/ingresos)
+  - `Reservas.tsx` y `CalendarView.tsx` (Calendario interactivo de las 9 habitaciones y gestión de reservas)
+  - `Operacion.tsx` (Check-in / Check-out en mostrador y cobro de consumos)
+  - `Rooms.tsx` (CRUD dinámico de las 9 habitaciones)
+  - `Restaurante.tsx` y `Tienda.tsx` (Salgados Café y cargos al folio de la habitación)
+  - `Eventos.tsx` (Tarifas dinámicas y ferias turísticas)
+  - `Resenas.tsx` (Reseñas de huéspedes y Google Reviews)
+  - `Chatbot.tsx` (Bandeja de conversaciones WhatsApp y escalamiento a agente humano)
+  - `Admin.tsx` (Usuarios, roles RBAC y bitácora de auditoría `audit_log`)
+* **Cómo se integra en `migracion-fastapi`:** Traemos `apps/web/` desde `origin/main` mediante `git checkout origin/main -- apps/web` y exponemos en FastAPI los endpoints REST que alimentan esas pantallas (`rooms`, `bookings`, `conversations`, `restaurant/menu` y `orders`, `events`, `reviews`, `auth`), verificando que `npm run build` compile con 0 errores de TypeScript.
 
 ### 2. Qué Estudiar y Dónde (Tiempo estimado: 25 minutos)
-1. **Librería estándar `hmac` y `hashlib` en Python (15 min):**
-   * Observa cómo se calcula la firma:
-     ```python
-     import hmac, hashlib
-     def verify_signature(payload_bytes: bytes, signature_header: str, secret: str) -> bool:
-         expected = hmac.new(secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
-         return hmac.compare_digest(f"sha256={expected}", signature_header)
-     ```
-   * *Concepto clave:* Se usa `hmac.compare_digest` para evitar ataques de temporización (timing attacks).
-2. **Transición Atómica de Estado (10 min):**
-   * Actualizar el registro de la habitación de `BLOQUEADA_TEMPORAL` a `CONFIRMADA`, asignar el código de grupo (ej. `SAT-8X92`) y registrar el evento en `audit_log`.
+1. **Variables de Entorno y CORS en Vite (`VITE_API_URL`) (10 min):**
+   * El navegador en `http://localhost:5173` consume FastAPI en `http://localhost:8080`.
+2. **Arranque en Frío (Cold Start) y Plan B de Demo (15 min):**
+   * Ejecutar `curl /api/v1/health` 5 minutos antes de la sustentación y tener `/docs` (Swagger UI) listo como Plan B.
 
 ### 3. Criterio de Suficiencia ("Semáforo Verde — ¿Sé lo suficiente para avanzar?")
-* [x] **Check 1:** ¿Puedo explicar qué pasa si envío una petición a `/payments/webhook` con una firma alterada o vacía? (Respuesta: FastAPI lanza una excepción HTTP 401 Unauthorized y la base de datos no sufre cambios).
-* [x] **Check 2:** ¿Por qué la idempotencia exige responder HTTP 200 cuando llega un webhook repetido en lugar de dar error? (Respuesta: porque si respondes con error, la pasarela creerá que el servidor falló y continuará reintentando enviar el webhook indefinidamente).
+* [x] **Check 1:** ¿Sé qué comando ejecutar en `apps/web` para comprobar que las 12 pantallas de React compilan sin errores? (Respuesta: `cd apps/web && npm run build`).
+* [x] **Check 2:** ¿Cómo se registra el Check-in o cambio de estado manual desde la web? (Respuesta: la petición viaja con el JWT del recepcionista/administrador, actualiza la reserva a `EN_CURSO` o `CONFIRMADA` en PostgreSQL 16 y deja un registro inmutable en `audit_log`).
 
-### 4. Plan de Ejecución Inmediato (Lote M3)
+### 4. Plan de Ejecución Inmediato (Lote M4)
 
 #### A. Archivos a crear/modificar:
-1. `apps/api/routers/payments.py`: Endpoint `POST /api/v1/payments/webhook`.
-2. `apps/api/services/payment_service.py`: Lógica de validación de firma criptográfica, verificación de idempotencia y transición atómica de la reserva a `CONFIRMADA`.
+1. Importar selectivamente `apps/web/` desde `origin/main` (`git checkout origin/main -- apps/web`).
+2. `apps/api/routers/web_operations.py` (y modelos de apoyo para CRUD de habitaciones, Salgados Café, eventos y reseñas): Endpoints consumidos por `apps/web/src/store.tsx` y las 12 pantallas de `apps/web/src/screens/`.
+3. `tests/test_web_operations.py`: Pruebas de endpoints web (check-in con auditoría, CRUD habitaciones, Salgados Café, eventos y debug de reservas).
 
-#### B. Instrucción precisa para modo AGY:
-> *"Implementa el webhook de pagos con validación criptográfica en `apps/api/routers/payments.py`. El endpoint `POST /api/v1/payments/webhook` debe recibir el payload raw en bytes, extraer la cabecera `X-Hub-Signature-256` y validar la firma con `hmac.compare_digest` usando `PAYMENT_WEBHOOK_SECRET`. Valida idempotencia verificando que `payment_id` no exista previamente. Al procesar un pago exitoso, transiciona la reserva de `BLOQUEADA_TEMPORAL` a `CONFIRMADA`, genera el código de reserva de 8 caracteres y registra el evento en `audit_log`. Cubre con tests en pytest: firma inválida retorna 401, firma válida confirma reserva, y webhook duplicado retorna 200 sin reprocesar."*
+#### B. Instrucción precisa para modo AGY (Lote M4):
+> *"Implementa el Lote M4 integrando el frontend completo de `origin/main`: 1) Trae `apps/web/` desde `origin/main` (`git checkout origin/main -- apps/web`). 2) Inspecciona todas las llamadas HTTP que realiza `apps/web/src/` y expón en FastAPI los endpoints requeridos para Login, Dashboard, Calendario, Check-in/Check-out con registro en `audit_log`, CRUD de Habitaciones, Salgados Café, Eventos Especiales, Reseñas y Bandeja de Chatbot. 3) Cubre los endpoints de operación web con tests en `tests/test_web_operations.py` y verifica que `cd apps/web && npm run build` compile limpiamente con 0 errores."*
 
 #### C. Comandos de Verificación en Consola:
 ```bash
-# Probar webhook de pagos con pytest
-pytest tests/test_payment_webhook.py -v
-```
+# 1. Probar endpoints de operación web en pytest
+.venv/bin/pytest tests/test_web_operations.py -v
 
----
-
-## MÓDULO 5: Integración Frontend Web y Despliegue en la Nube (Lotes M4 y M-DEP)
-
-### 1. El Puente Mental Telemático
-* **El Frontend React:** No es más que una **aplicación cliente que corre dentro del navegador del usuario**. No tiene base de datos propia; todos sus datos provienen de peticiones HTTP JSON hacia la API de FastAPI.
-* **CORS (Cross-Origin Resource Sharing):** Como el frontend corre en `http://localhost:5173` (o `https://satori.vercel.app`) y la API en `http://localhost:8080` (o `https://satori.railway.app`), el navegador aplica la política de mismo origen. FastAPI debe incluir cabeceras HTTP `Access-Control-Allow-Origin: *` (o el dominio exacto) para que el navegador permita la comunicación.
-* **Despliegue Multi-Nube:**
-  * **Vercel:** Aloja los archivos estáticos de React (HTML, JS, CSS) en una red CDN distribuida globalmente.
-  * **Railway:** Aloja el contenedor Docker con la API de FastAPI en ejecución continua.
-  * **Supabase:** Aloja la base de datos PostgreSQL 16 con `btree_gist` activo.
-
-### 2. Qué Estudiar y Dónde (Tiempo estimado: 25 minutos)
-1. **Configuración de Variables de Entorno en Vite (10 min):**
-   * En React con Vite, cualquier variable pública debe empezar por `VITE_` (ej. `VITE_API_URL`).
-   * Observa [`apps/web/src/api/client.ts`](file:///home/jjarias/Documents/UNIVERSIDAD/8vo%20semestre/Integrador-ii/SatoriPMS/apps/web/src/api/client.ts) para ver cómo axios usa `baseURL: import.meta.env.VITE_API_URL`.
-2. **Riesgo de Arranque en Frío (Cold Start) (15 min):**
-   * Plataformas gratuitas como Railway o Render suspenden los contenedores que no reciben tráfico durante 15 minutos. La primera petición HTTP después de reposo tarda 30-50 segundos en levantar la instancia.
-   * *Protocolo de mitigación para la sustentación:* Ejecutar un ping `curl https://satori-api.up.railway.app/api/v1/health` 5 minutos antes de la presentación para que el contenedor esté pre-calentado en memoria RAM.
-
-### 3. Criterio de Suficiencia ("Semáforo Verde — ¿Sé lo suficiente para avanzar?")
-* [x] **Check 1:** ¿Sé qué comando ejecutar en la carpeta `apps/web` para comprobar que no hay ningún error de tipos en TypeScript? (Respuesta: `npm run build`, el cual ejecuta `tsc && vite build`).
-* [x] **Check 2:** ¿Puedo explicar cómo el frontend sabe si el usuario tiene rol de Recepcionista? (Respuesta: tras el login exitoso, el frontend recibe el token JWT, lo almacena en `localStorage` o memoria y lo adjunta en cada petición en la cabecera `Authorization: Bearer <token>`).
-
-### 4. Plan de Ejecución Inmediato (Lotes M4 y M-DEP)
-
-#### A. Archivos a crear/modificar:
-1. `apps/web/src/pages/ReservasDebug.tsx`: Conectar la tabla de reservas activas al endpoint real `GET /api/v1/bookings/debug`.
-2. `apps/web/src/pages/Login.tsx`: Formulario de login consumiendo `POST /api/v1/auth/login`.
-3. Botón de **Check-in Manual**: En la fila de la reserva, botón que envía `POST /api/v1/bookings/{id}/check-in`, transiciona a `EN_CURSO` y refresca la grilla.
-
-#### B. Instrucción precisa para modo AGY:
-> *"Implementa el Lote M4: Conecta el frontend React existente en `apps/web` con los endpoints de FastAPI. Adapta `apps/web/src/api/client.ts` para que lea `VITE_API_URL`. En `ReservasDebug.tsx`, conecta la consulta de reservas con TanStack Query y añade la acción de 'Check-in' que invoque el endpoint de recepción registrando el evento en `audit_log`. Verifica que `npm run build` en `apps/web` compile limpiamente con 0 errores de TypeScript."*
-
-#### C. Comandos de Verificación en Consola:
-```bash
-# Verificar compilación TypeScript en frontend
+# 2. Verificar compilación de producción del frontend React + TypeScript
 cd apps/web && npm run build
 ```
 
