@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# SatoriPMS - Script de Inicialización y Desarrollo (Dev Server)
+# SatoriPMS - Script Unificado de Levantamiento Local (Postgres + FastAPI + React)
 # ==============================================================================
-set -e # Salir inmediatamente si un comando falla
+set -e
 
-# ------------------------------------------------------------------------------
-# Variables y Colores
-# ------------------------------------------------------------------------------
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
@@ -16,224 +13,176 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Opciones por defecto
 START_FRONTEND=true
+RUN_TESTS=false
 STOP_ONLY=false
 DESTROY_ONLY=false
-UPDATE_INFRA=false
+API_PID=""
 
-# ------------------------------------------------------------------------------
-# Funciones de Logging
-# ------------------------------------------------------------------------------
 log_step()    { echo -e "\n${BOLD}${BLUE}==>${NC} ${BOLD}$1${NC}"; }
 log_info()    { echo -e "  ${CYAN}[INFO]${NC} $1"; }
 log_success() { echo -e "  ${GREEN}[OK]${NC}   $1"; }
 log_warn()    { echo -e "  ${YELLOW}[WARN]${NC} $1"; }
 log_error()   { echo -e "  ${RED}[ERR]${NC}  $1"; }
 
-# ------------------------------------------------------------------------------
-# Función de Ayuda
-# ------------------------------------------------------------------------------
 show_help() {
     echo -e "${BOLD}Uso: ./start-dev.sh [opciones]${NC}"
     echo
-    echo "Opciones de Arranque:"
-    echo "  -h, --help            Muestra esta ayuda y sale."
-    echo "  --no-frontend         Levanta la infraestructura Docker pero NO inicia React."
-    echo "  -u, --update          Reconstruye las imágenes de Docker (útil si cambiaste código del backend)."
-    echo
-    echo "Opciones de Detención/Destrucción:"
-    echo "  -d, --down            Detiene los contenedores sin borrar los datos."
-    echo "  -D, --destroy         ¡PELIGRO! Detiene y BORRA completamente todos los contenedores y volúmenes (base de datos)."
-    echo
-    echo "Ejemplos:"
-    echo "  ./start-dev.sh -u                (Actualiza infraestructura e inicia)"
-    echo "  ./start-dev.sh --destroy         (Destruye todo el entorno)"
+    echo "Opciones:"
+    echo "  -h, --help         Muestra esta ayuda y sale."
+    echo "  -t, --test         Ejecuta la suite de 21 pruebas pytest antes de abrir el frontend."
+    echo "  --no-frontend      Levanta PostgreSQL 16, migraciones Alembic y verifica FastAPI sin abrir Vite."
+    echo "  -d, --down         Detiene procesos locales y contenedores Docker sin borrar datos."
+    echo "  -D, --destroy      Detiene y borra contenedores y volúmenes de base de datos."
 }
 
-# ------------------------------------------------------------------------------
-# Analizar Argumentos CLI
-# ------------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        --no-frontend)
-            START_FRONTEND=false
-            shift
-            ;;
-        -d|--down)
-            STOP_ONLY=true
-            shift
-            ;;
-        -D|--destroy)
-            DESTROY_ONLY=true
-            shift
-            ;;
-        -u|--update)
-            UPDATE_INFRA=true
-            shift
-            ;;
-        *)
-            log_error "Opción no reconocida: $1"
-            show_help
-            exit 1
-            ;;
+        -h|--help) show_help; exit 0 ;;
+        -t|--test) RUN_TESTS=true; shift ;;
+        --no-frontend) START_FRONTEND=false; shift ;;
+        -d|--down) STOP_ONLY=true; shift ;;
+        -D|--destroy) DESTROY_ONLY=true; shift ;;
+        *) log_error "Opción no reconocida: $1"; show_help; exit 1 ;;
     esac
 done
 
-# ------------------------------------------------------------------------------
-# Fase de Detención / Destrucción
-# ------------------------------------------------------------------------------
-if [ "$DESTROY_ONLY" = true ]; then
-    log_step "DESTRUCCIÓN DE INFRAESTRUCTURA"
-    log_warn "Esta acción eliminará TODOS los contenedores y los volúmenes (incluyendo la BD Postgres)."
-    read -p "¿Estás seguro de que deseas destruir todo? (escribe 'si' para confirmar): " -r confirm
-
-    if [[ "$confirm" != "si" && "$confirm" != "yes" && "$confirm" != "SI" ]]; then
-        log_info "Operación de destrucción cancelada."
-        exit 0
+# Detectar comando de Docker (con o sin sudo según permisos del socket)
+resolve_docker_cmd() {
+    if docker info >/dev/null 2>&1; then
+        echo "docker compose"
+    else
+        echo "sudo docker compose"
     fi
-    
-    log_info "Destruyendo infraestructura y volúmenes..."
-    docker compose down -v
-    log_success "Infraestructura y datos destruidos correctamente."
+}
+
+cleanup() {
+    if [[ -n "$API_PID" ]] && kill -0 "$API_PID" 2>/dev/null; then
+        echo -e "\n  ${CYAN}[INFO]${NC} Deteniendo servidor FastAPI (PID $API_PID)..."
+        kill "$API_PID" 2>/dev/null || true
+        wait "$API_PID" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT INT TERM
+
+if [ "$DESTROY_ONLY" = true ]; then
+    log_step "DESTRUCCIÓN DE INFRAESTRUCTURA LOCAL"
+    COMPOSE_CMD=$(resolve_docker_cmd)
+    pkill -f "uvicorn apps.api.main:app" 2>/dev/null || true
+    $COMPOSE_CMD down -v
+    log_success "Contenedores y volúmenes eliminados."
     exit 0
 fi
 
 if [ "$STOP_ONLY" = true ]; then
-    log_step "Deteniendo SatoriPMS..."
-    docker compose down
-    log_success "Infraestructura detenida. Los datos de la BD están a salvo."
+    log_step "Deteniendo servicios locales de SatoriPMS..."
+    COMPOSE_CMD=$(resolve_docker_cmd)
+    pkill -f "uvicorn apps.api.main:app" 2>/dev/null || true
+    $COMPOSE_CMD down
+    log_success "Servicios detenidos (datos de PostgreSQL conservados)."
     exit 0
 fi
 
-# ------------------------------------------------------------------------------
-# Fase 1: Verificación de Dependencias
-# ------------------------------------------------------------------------------
-check_dependencies() {
-    log_step "PASO 1: Verificando dependencias del sistema"
-    local deps=("docker" "node" "npm" "python3")
-    local missing=0
+# ── PASO 1: Archivo .env y entorno Python (.venv) ────────────────────────────
+log_step "PASO 1: Preparando configuración (.env) y entorno Python (.venv)"
+if [ ! -f "$ROOT_DIR/.env" ]; then
+    cp "$ROOT_DIR/.env.example" "$ROOT_DIR/.env"
+    log_info "Se creó .env automáticamente a partir de .env.example para pruebas locales."
+else
+    log_success "Archivo .env detectado."
+fi
 
-    for cmd in "${deps[@]}"; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
-            log_error "Comando '$cmd' no encontrado. Por favor instálalo."
-            missing=1
-        else
-            log_success "'$cmd' está instalado."
+if [ ! -d "$ROOT_DIR/.venv" ]; then
+    log_info "Creando entorno virtual .venv e instalando dependencias..."
+    python3 -m venv "$ROOT_DIR/.venv"
+    "$ROOT_DIR/.venv/bin/pip" install --upgrade pip -q
+    "$ROOT_DIR/.venv/bin/pip" install -r "$ROOT_DIR/apps/api/requirements.txt" -q
+fi
+log_success "Entorno Python (.venv) listo."
+
+# ── PASO 2: PostgreSQL 16 y Migraciones Alembic ──────────────────────────────
+log_step "PASO 2: Verificando PostgreSQL 16 (puerto 5432) y migraciones Alembic"
+PG_READY=false
+if "$ROOT_DIR/.venv/bin/python" -c "import socket; s=socket.create_connection(('127.0.0.1', 5432), 1); s.close()" 2>/dev/null; then
+    PG_READY=true
+    log_success "PostgreSQL 16 ya está activo en 127.0.0.1:5432."
+else
+    log_info "Iniciando contenedor postgres:16-alpine con Docker Compose..."
+    COMPOSE_CMD=$(resolve_docker_cmd)
+    $COMPOSE_CMD up -d postgres
+    for _ in {1..20}; do
+        if "$ROOT_DIR/.venv/bin/python" -c "import socket; s=socket.create_connection(('127.0.0.1', 5432), 1); s.close()" 2>/dev/null; then
+            PG_READY=true
+            break
         fi
+        sleep 1
     done
+fi
 
-    if [ $missing -eq 1 ]; then
-        log_error "Faltan dependencias críticas. Abortando."
-        exit 1
+if [ "$PG_READY" != true ]; then
+    log_error "No se pudo conectar a PostgreSQL en 127.0.0.1:5432."
+    exit 1
+fi
+
+log_info "Aplicando migraciones Alembic (001 GiST + 002 Users + 003 Conversations)..."
+(cd "$ROOT_DIR/apps/api" && "$ROOT_DIR/.venv/bin/alembic" upgrade head)
+log_success "Esquema PostgreSQL 16 con btree_gist y 9 habitaciones actualizado."
+
+if [ "$RUN_TESTS" = true ]; then
+    log_step "PASO 2.1: Ejecutando suite de 21 pruebas automatizadas (pytest)"
+    "$ROOT_DIR/.venv/bin/pytest" -v
+fi
+
+# ── PASO 3: Backend FastAPI en puerto 8080 ───────────────────────────────────
+log_step "PASO 3: Levantando Backend FastAPI (http://localhost:8080)"
+pkill -f "uvicorn apps.api.main:app" 2>/dev/null || true
+"$ROOT_DIR/.venv/bin/uvicorn" apps.api.main:app --host 0.0.0.0 --port 8080 > /tmp/satori_api.log 2>&1 &
+API_PID=$!
+
+API_READY=false
+for _ in {1..25}; do
+    if curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
+        API_READY=true
+        break
     fi
-}
+    sleep 0.4
+done
 
-# ------------------------------------------------------------------------------
-# Fase 2: Verificación de Entorno (.env)
-# ------------------------------------------------------------------------------
-check_env() {
-    log_step "PASO 2: Verificando archivo de entorno"
-    if [ ! -f .env ]; then
-        log_warn "No se encontró el archivo .env"
-        if [ -f .env.example ]; then
-            log_info "Creando .env a partir de .env.example..."
-            cp .env.example .env
-            log_error "Se creó un .env por defecto. Ajusta las variables antes de continuar."
-            exit 1
-        else
-            log_error "Tampoco se encontró .env.example. Proyecto corrupto."
-            exit 1
-        fi
-    else
-        log_success "Archivo .env detectado correctamente."
-    fi
-}
+if [ "$API_READY" != true ]; then
+    log_error "FastAPI no respondió en http://127.0.0.1:8080/api/v1/health. Revisa /tmp/satori_api.log"
+    cat /tmp/satori_api.log
+    exit 1
+fi
+HEALTH_JSON=$(curl -fsS http://127.0.0.1:8080/api/v1/health)
+log_success "FastAPI activo (PID $API_PID) -> /api/v1/health: $HEALTH_JSON"
 
-# ------------------------------------------------------------------------------
-# Fase 3: Desplegar / Actualizar Infraestructura
-# ------------------------------------------------------------------------------
-deploy_infra() {
-    log_step "PASO 3: Levantando Infraestructura Backend (Docker)"
-    
-    local compose_cmd="docker compose"
+if [ "$START_FRONTEND" = false ]; then
+    log_info "Modo --no-frontend: verificación de infraestructura completada."
+    exit 0
+fi
 
-    if [ "$UPDATE_INFRA" = true ]; then
-        log_info "Actualizando imagen ligera de API..."
-        $compose_cmd up -d --build api
-        $compose_cmd up -d --remove-orphans
-    else
-        log_info "Iniciando contenedores existentes..."
-        $compose_cmd up -d --remove-orphans
-    fi
-    
-    log_info "Verificando contenedores..."
-    sleep 2
-    log_success "Infraestructura de contenedores inicializada."
-}
-
-# ------------------------------------------------------------------------------
-# Fase 4: Iniciar Frontend
-# ------------------------------------------------------------------------------
-start_frontend() {
-    log_step "PASO 4: Preparando Frontend (React + Vite)"
-    cd "$ROOT_DIR/apps/web"
-    
-    log_info "Instalando dependencias de npm..."
+# ── PASO 4: Frontend React + Vite en puerto 5173 ─────────────────────────────
+log_step "PASO 4: Levantando Frontend Web React + Vite (http://localhost:5173)"
+cd "$ROOT_DIR/apps/web"
+if [ ! -d "node_modules" ]; then
+    log_info "Instalando paquetes de npm en apps/web..."
     npm install --silent
-    log_success "Dependencias de frontend listas."
+fi
 
-    # Extraer perfiles para reflejar si n8n se inicia
-    local compose_profiles
-    compose_profiles=$(grep '^COMPOSE_PROFILES=' "$ROOT_DIR/.env" | cut -d '=' -f2- || true)
-    local n8n_public_url
-    n8n_public_url=$(grep '^N8N_PUBLIC_URL=' "$ROOT_DIR/.env" | cut -d '=' -f2- || true)
+echo -e "\n${BOLD}${GREEN}======================================================================${NC}"
+echo -e "${BOLD}${GREEN}🏨 TORRE SATORI PMS — ENTORNO WEB LOCAL ACTIVO${NC}"
+echo -e "${BOLD}${GREEN}======================================================================${NC}"
+echo -e "  • ${BOLD}Aplicación Web (React):${NC}   ${CYAN}http://localhost:5173${NC}"
+echo -e "  • ${BOLD}Swagger UI (FastAPI):${NC}     ${CYAN}http://localhost:8080/docs${NC}"
+echo -e "  • ${BOLD}Healthcheck API:${NC}          ${CYAN}http://localhost:8080/api/v1/health${NC}"
+echo -e "  • ${BOLD}Logs del Backend:${NC}         ${CYAN}/tmp/satori_api.log${NC}"
+echo -e "----------------------------------------------------------------------"
+echo -e "  ${BOLD}Credenciales de Prueba para Iniciar Sesión en la Web:${NC}"
+echo -e "  • ${BOLD}Rol Administrador:${NC}  usuario ${YELLOW}admin@gmail.com${NC}         | clave ${YELLOW}admin123${NC}"
+echo -e "  • ${BOLD}Rol Recepcionista:${NC}  usuario ${YELLOW}recepcion@satoripms.com${NC} | clave ${YELLOW}recepcion123${NC}"
+echo -e "${BOLD}${GREEN}======================================================================${NC}"
+echo -e "  ${YELLOW}(Presiona Ctrl + C para detener tanto React como FastAPI)${NC}\n"
 
-    echo -e "\n${BOLD}${GREEN}======================================================================${NC}"
-    echo -e "${BOLD}${GREEN}🎉 ¡SATORIPMS ESTÁ INICIANDO!${NC}"
-    echo -e "${BOLD}${GREEN}======================================================================${NC}"
-    echo -e "${BOLD}Resumen de Acceso a Servicios:${NC}"
-    echo -e "   • App Web (Frontend):  ${CYAN}http://localhost:5173${NC}"
-    echo -e "   • Backend API:         ${CYAN}http://localhost:8080/docs${NC}"
-    if [[ ",${compose_profiles}," == *",n8n,"* ]]; then
-        echo -e "   • n8n Chatbot:         ${CYAN}${n8n_public_url:-http://localhost:5678}${NC}"
-    else
-        echo -e "   • n8n Chatbot:         ${YELLOW}desactivado (perfil n8n no incluido)${NC}"
-    fi
-    
-    echo -e "${BOLD}${GREEN}======================================================================${NC}\n"
-
-    log_info "Levantando servidor de desarrollo Vite..."
-    npm run dev
-}
-
-# ------------------------------------------------------------------------------
-# Ejecución Principal
-# ------------------------------------------------------------------------------
-main() {
-    # Evitar ejecutar como root
-    if [ "$EUID" -eq 0 ]; then
-        log_error "Por favor no ejecutes este script como root o con sudo."
-        exit 1
-    fi
-
-    check_dependencies
-    check_env
-    deploy_infra
-    
-    if [ "$START_FRONTEND" = true ]; then
-        start_frontend
-    else
-        log_step "PASO 4: Frontend Omitido"
-        log_info "El frontend se omitió por la bandera --no-frontend."
-        log_success "Infraestructura lista."
-    fi
-}
-
-main "$@"
+npm run dev

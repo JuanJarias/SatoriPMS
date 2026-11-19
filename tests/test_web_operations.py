@@ -55,6 +55,9 @@ async def test_web_booking_creation_checkin_en_curso_and_checkout_with_audit() -
         assert checkout_res.status_code == 200
         assert checkout_res.json()["paymentStatus"] == "paid"
 
+        # Restaurar Hab 201 a available tras la prueba
+        await client.put("/api/rooms/201", json={"status": "available"})
+
     async with AsyncSessionLocal() as session:
         audit_res = await session.execute(
             select(AuditLog)

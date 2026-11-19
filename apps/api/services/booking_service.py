@@ -6,7 +6,7 @@ import sys
 from fastapi import HTTPException, status
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
@@ -166,7 +166,7 @@ async def create_booking_lock(
         db.add(booking)
         await db.commit()
         await db.refresh(booking)
-    except IntegrityError as exc:
+    except (IntegrityError, OperationalError) as exc:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

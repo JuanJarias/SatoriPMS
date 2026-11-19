@@ -23,6 +23,8 @@ class Base(DeclarativeBase):
 engine = create_async_engine(
     settings.async_database_url,
     pool_pre_ping=True,
+    pool_size=20,
+    max_overflow=20,
     future=True,
 )
 

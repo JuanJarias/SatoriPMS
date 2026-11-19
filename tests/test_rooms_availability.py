@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from httpx import ASGITransport, AsyncClient
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
 from apps.api.core.database import AsyncSessionLocal
 from apps.api.main import app
@@ -13,9 +13,10 @@ from apps.api.models import Booking, BookingStatus, Guest, Room
 
 
 async def _clear_bookings_and_get_room_101() -> tuple[int, int]:
-    """Limpia reservas previas y garantiza un huésped de prueba junto al ID de la habitación 101."""
+    """Limpia reservas previas, restaura las 9 habitaciones a available y garantiza un huésped de prueba."""
     async with AsyncSessionLocal() as session:
         await session.execute(delete(Booking))
+        await session.execute(update(Room).values(status="available", active=True))
         room_res = await session.execute(select(Room).where(Room.number == "101"))
         room = room_res.scalar_one()
 

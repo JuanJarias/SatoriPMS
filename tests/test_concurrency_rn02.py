@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import delete, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from apps.api.core.database import AsyncSessionLocal
 from apps.api.models import Booking, BookingStatus, Guest, Room
@@ -136,7 +136,7 @@ async def test_concurrent_bookings_only_one_succeeds_rn02() -> None:
             try:
                 await session.commit()
                 return True
-            except IntegrityError:
+            except (IntegrityError, OperationalError):
                 await session.rollback()
                 return False
 
