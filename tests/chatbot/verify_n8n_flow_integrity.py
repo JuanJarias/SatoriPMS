@@ -1,7 +1,12 @@
 import json
+import os
+import sys
 
-def verify_flow():
-    with open('flows/n8n/V8_ChatbotReservas.json', 'r', encoding='utf-8') as f:
+DEFAULT_FLOW = 'flows/n8n/V9_ChatbotReservas.json'
+
+def verify_flow(path=DEFAULT_FLOW):
+    print(f"Flow: {path}")
+    with open(path, 'r', encoding='utf-8') as f:
         flow = json.load(f)
 
     nodes = flow['nodes']
@@ -34,7 +39,7 @@ def verify_flow():
 
     # 2. Check orphan nodes (nodes that have no incoming or outgoing connections, except Webhook which is entry point)
     orphans = []
-    entry_nodes = {'WhatsApp Webhook', 'Webhook Verificación'}
+    entry_nodes = {'WhatsApp Webhook', 'Webhook Verificación', 'Webhook Eventos Wompi'}
     for n in nodes:
         name = n['name']
         if name not in connected_nodes and name not in entry_nodes:
@@ -62,5 +67,6 @@ def verify_flow():
         print("\n>>> ALL CHECKS PASSED: 100% INTEGRITY, ZERO BROKEN LINKS, ZERO ORPHANS, ZERO SWITCH MISMATCHES <<<")
 
 if __name__ == '__main__':
-    verify_flow()
+    # Uso: python3 tests/chatbot/verify_n8n_flow_integrity.py [ruta_flujo.json]
+    verify_flow(sys.argv[1] if len(sys.argv) > 1 else DEFAULT_FLOW)
 

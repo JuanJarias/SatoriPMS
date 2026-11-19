@@ -16,6 +16,9 @@ from core.config import settings
 from core.database import get_db
 from routers.auth import router as auth_router
 from routers.bookings import router as bookings_router
+from routers.conversations import router as conversations_router
+from routers.n8n_compat import router as n8n_compat_router
+from routers.payments import router as payments_router
 from routers.rooms import router as rooms_router
 
 app = FastAPI(
@@ -35,6 +38,9 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(rooms_router)
 app.include_router(bookings_router)
+app.include_router(payments_router)
+app.include_router(conversations_router)
+app.include_router(n8n_compat_router)
 
 
 @app.get("/api/v1/health", status_code=status.HTTP_200_OK, tags=["Health"])

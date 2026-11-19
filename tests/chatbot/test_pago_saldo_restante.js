@@ -121,24 +121,32 @@ async function run() {
       throw new Error('No se encontró ninguna reserva activa con estado de pago "partial" para liquidar saldo.');
     }
 
-    const codePrefix = partialBooking.reservationGroupId
-      ? partialBooking.reservationGroupId.substring(0, 8)
-      : 'RES-' + partialBooking.id;
+    const codePrefix = partialBooking.companions && partialBooking.companions.startsWith('TS-')
+      ? partialBooking.companions
+      : (partialBooking.reservationGroupId
+          ? 'TS-' + partialBooking.reservationGroupId.replace(/-/g, '').slice(-4).toUpperCase()
+          : 'TS-' + partialBooking.id);
 
     console.log(`  • Reserva encontrada: ID ${partialBooking.id}, Código: ${codePrefix}`);
     console.log(`  • Total: $${partialBooking.totalPrice}, Pagado actualmente: $${partialBooking.paidAmount}`);
 
-    console.log('[2/4] Enviando "menu" y seleccionando Opción 5 (Revisar Reserva)...');
+    console.log('[2/5] Enviando "menu" y seleccionando Opción 4 (Revisar Reserva — V9)...');
     await sendMsg('menu');
     await sleep(2000);
-    await sendMsg('5');
+    await sendMsg('4');
     await sleep(2000);
 
-    console.log(`[3/4] Ingresando código de reserva: ${codePrefix}...`);
+    console.log(`[3/5] Ingresando código de reserva: ${codePrefix}...`);
     await sendMsg(codePrefix);
     await sleep(3000);
 
-    console.log('[4/4] Seleccionando Opción 1 (Pagar saldo restante)...');
+    if (partialBooking.guestDocument) {
+      console.log(`[4/5] Validando cédula del titular (${partialBooking.guestDocument})...`);
+      await sendMsg(String(partialBooking.guestDocument));
+      await sleep(3000);
+    }
+
+    console.log('[5/5] Seleccionando Opción 1 (Pagar saldo restante)...');
     await sendMsg('1');
     await sleep(4500);
 

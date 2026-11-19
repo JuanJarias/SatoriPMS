@@ -72,8 +72,8 @@ async function run() {
     await sendMsg('menu');
     await sleep(2000);
 
-    console.log('[2/2] Seleccionando Opción 6 (Hablar con un agente)...');
-    const res = await sendMsg('6');
+    console.log('[2/2] Seleccionando Opción 5 (Hablar con un agente — V9)...');
+    const res = await sendMsg('5');
     await sleep(3000);
 
     // ─── ASERCIÓN FINAL ───

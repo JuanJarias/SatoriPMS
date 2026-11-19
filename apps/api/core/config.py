@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRES_MINUTES: int = 480
 
+    PAYMENT_WEBHOOK_SECRET: str = "satori_dev_payment_webhook_secret_hmac_2026"
+
     DATABASE_URL: str = (
         "postgresql+psycopg://satori:satori_dev@localhost:5432/satoripms"
     )

@@ -6,6 +6,7 @@ try:
     from core.database import Base
     from models.audit_log import AuditLog
     from models.booking import ACTIVE_BOOKING_STATUSES, Booking, BookingStatus
+    from models.conversation import Conversation
     from models.guest import Guest
     from models.room import Room
     from models.user import User, UserRole
@@ -17,6 +18,7 @@ except ImportError:
         Booking,
         BookingStatus,
     )
+    from apps.api.models.conversation import Conversation
     from apps.api.models.guest import Guest
     from apps.api.models.room import Room
     from apps.api.models.user import User, UserRole
@@ -27,6 +29,7 @@ __all__ = [
     "Base",
     "Booking",
     "BookingStatus",
+    "Conversation",
     "Guest",
     "Room",
     "User",
