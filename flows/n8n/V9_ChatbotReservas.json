@@ -752,7 +752,7 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        6528,
+        6816,
         896
       ],
       "alwaysOutputData": true,
@@ -788,7 +788,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        6832,
+        7024,
         896
       ],
       "onError": "continueRegularOutput"
@@ -803,8 +803,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        7136,
-        896
+        7312,
+        672
       ],
       "webhookId": "c48b0d28-8948-4714-849d-faf1a054852f"
     },
@@ -821,8 +821,8 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        7440,
-        896
+        7552,
+        672
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -841,8 +841,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        7728,
-        896
+        7808,
+        672
       ]
     },
     {
@@ -875,8 +875,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        8032,
-        896
+        8064,
+        672
       ]
     },
     {
@@ -888,8 +888,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        7152,
-        1136
+        7328,
+        912
       ]
     },
     {
@@ -917,8 +917,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        7456,
-        1136
+        7568,
+        912
       ],
       "onError": "continueRegularOutput"
     },
@@ -932,8 +932,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        7744,
-        1136
+        7824,
+        912
       ],
       "webhookId": "3cc811e7-93d1-43e9-8655-53ab4a0d5b19"
     },
@@ -950,8 +950,8 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        8048,
-        1136
+        8080,
+        912
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -970,8 +970,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        8352,
-        1136
+        7328,
+        1152
       ]
     },
     {
@@ -1004,8 +1004,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        8656,
-        1136
+        7584,
+        1152
       ]
     },
     {
@@ -1018,8 +1018,8 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        8352,
-        1344
+        7824,
+        1136
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -1315,7 +1315,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst D = (J.session && J.session.reservation_draft) || {};\nconst step = (J.session && J.session.step) || (D && D.step);\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n\nconst keep = (draft, nextStep) => ({\n  state: 'reserva',\n  step: nextStep,\n  agent_active: false,\n  wa_id: J.wa_id,\n  sender_name: J.sender_name,\n  reservation_draft: Object.assign({}, draft, { step: nextStep })\n});\n\nconst output = (response_text, session, extra = {}) => ({\n  json: Object.assign({ wa_id: J.wa_id, sender_name: J.sender_name, response_text, session }, extra)\n});\n\nif (step === 'huespedes') {\n  const numberTokens = (normalized.match(/\\d+/g) || []).map(Number);\n  const adultMatches = [...normalized.matchAll(/(\\d+)\\s*(adultos?|personas?|huespedes?)/g)];\n  const childMatches = [...normalized.matchAll(/(\\d+)\\s*(ninos?|niños?|menores?)/g)];\n  let adults = adultMatches.length ? Number(adultMatches[0][1]) : (numberTokens[0] ?? null);\n  let children = childMatches.length ? Number(childMatches[0][1]) : (numberTokens[1] ?? 0);\n  if (adults == null && numberTokens.length) adults = numberTokens[0];\n  if (children === 0 && numberTokens.length > 1 && !childMatches.length) children = numberTokens[1];\n  const max = Number(D.room && D.room.maxAdultsCapacity || 0) + Number(D.room && D.room.childrenCapacity || 0);\n  if (!adults || adults < 1 || children < 0) return [output('Indica las personas así: *2 adultos y 1 niño*.', keep(D, 'huespedes'))];\n  if (max && adults + children > max) return [output('Esa habitación admite máximo *' + max + ' personas* según su capacidad. Regresa a la selección escribiendo *menú* o elige otra habitación.', keep(D, 'seleccion_habitacion'))];\n  const base = Number(D.room && D.room.baseAdultsCapacity || 0);\n  const extraPrice = Number(D.room && D.room.extraGuestPrice || 0);\n  const extraGuests = Math.max(0, adults + children - base);\n  const draft = Object.assign({}, D, { adults, children, extraGuests, extraGuestPrice: extraPrice, extraTotal: extraGuests * extraPrice });\n\n  return [output(`Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\n*Aviso de Privacidad (Ley 1581 de 2012):* Al continuar y suministrar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva y estadía.\\n\\nIndica el nombre completo de la persona titular de la reserva:`, keep(draft, 'nombre'))];\n}\n\nif (step === 'nombre') {\n  if (text.length < 3) return [output('Indica un nombre completo válido.', keep(D, 'nombre'))];\n  return [output('Gracias. Ahora indica el número de identificación (cédula o pasaporte) del titular.', keep(Object.assign({}, D, { guestName: text }), 'identificacion'))];\n}\n\nif (step === 'identificacion') {\n  const document = text.replace(/\\s+/g, '').replace(/[^0-9]/g, '');\n  if (!/^\\d{6,10}$/.test(document)) return [output('La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', keep(D, 'identificacion'))];\n  return [output('¿Viajas con mascota?', keep(Object.assign({}, D, { document }), 'mascota'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: '¿Viajas con mascota?' }, action: { buttons: [{ type: 'reply', reply: { id: 'pet_si', title: 'Sí' } }, { type: 'reply', reply: { id: 'pet_no', title: 'No' } }] } } } })];\n}\n\nif (step === 'mascota') {\n  const hasPet = ['si', 'sí', 'pet_si', 'yes'].includes(normalized);\n  const noPet = ['no', 'pet_no'].includes(normalized);\n  if (!hasPet && !noPet) return [output('Responde usando *Sí* o *No* para la mascota.', keep(D, 'mascota'))];\n  if (hasPet && D.room && D.room.allowsPets === false) {\n    const nonPetRooms = Array.isArray(D.selectedRooms)\n      ? D.selectedRooms.filter(r => r && r.allowsPets === false)\n      : [D.room];\n    const roomNumbers = nonPetRooms.map(r => r.number || r.id).filter(Boolean);\n    const petRejectMessage = roomNumbers.length > 1\n      ? `Las habitaciones ${roomNumbers.join(', ')} no permiten mascotas. Por favor elige otra habitación.`\n      : `La habitación ${roomNumbers[0] || D.room.number || D.room.id} no permite mascotas. Por favor elige otra habitación.`;\n\n    const locksToRelease = [];\n    if (Array.isArray(D.lockTokens)) {\n      D.lockTokens.forEach(lt => {\n        if (lt && lt.roomId && lt.lockToken) locksToRelease.push({ roomId: lt.roomId, lockToken: lt.lockToken });\n      });\n    } else if (D.roomId && D.lockToken) {\n      locksToRelease.push({ roomId: D.roomId, lockToken: D.lockToken });\n    }\n\n    const cleanDraft = {\n      checkIn: D.checkIn,\n      checkOut: D.checkOut,\n      adults: 1,\n      children: 0,\n      hasPet: true\n    };\n\n    return [output(\n      petRejectMessage,\n      keep(cleanDraft, 'seleccion_habitacion'),\n      {\n        api_action: 'pet_reject_relist',\n        pet_reject_message: petRejectMessage,\n        locks_to_release: locksToRelease,\n        checkIn: D.checkIn,\n        checkOut: D.checkOut\n      }\n    )];\n  }\n  return [output('¿Cuáles son los nombres de tus acompañantes? Si viajas solo, responde *ninguno*.', keep(Object.assign({}, D, { hasPet }), 'acompanantes'))];\n}\n\nif (step === 'acompanantes') {\n  const noCompanions = ['ninguno', 'no', 'solo yo', 'nadie', 'sin acompanantes', 'no hay', 'no tengo', 'no viajan mas'].includes(normalized);\n  const companions = noCompanions ? '' : text;\n  const nights = Math.max(1, Math.round((new Date(D.checkOut) - new Date(D.checkIn)) / 86400000));\n  const nightly = Number(D.room && D.room.pricePerNight || 0);\n  const baseStay = nights * nightly;\n  const extraGuests = Number(D.extraGuests || 0);\n  const extraGuestPrice = Number(D.extraGuestPrice || (D.room && D.room.extraGuestPrice) || 0);\n  const extraTotal = extraGuests * extraGuestPrice * nights;\n  const total = baseStay + extraTotal;\n  const half = (total / 2).toFixed(2);\n  const totalStr = total.toFixed(2);\n  const draft = Object.assign({}, D, { companions, nights, baseStay, extraTotal, total });\n  const extraDesc = extraGuests > 0 ? `(${extraGuests} adic. x $${extraGuestPrice.toFixed(2)} x ${nights} noche${nights > 1 ? 's' : ''})` : '(Sin recargo)';\n\n  const summary = `*Resumen de tu Reserva*\\n\\n` +\n    `• Habitación: *${D.room.name || D.room.type} #${D.room.number}*\\n` +\n    `• Entrada: *${D.checkIn}*\\n` +\n    `• Salida: *${D.checkOut}* (${nights} noche${nights > 1 ? 's' : ''})\\n` +\n    `• Huéspedes: *${D.adults} adulto(s), ${D.children} niño(s)*\\n` +\n    `• Mascota: *${D.hasPet ? 'Sí' : 'No'}*\\n` +\n    `• Titular: *${D.guestName}* (${D.document})\\n` +\n    `• Acompañantes: *${companions || 'Ninguno'}*\\n` +\n    `• Tarifa base (${nights} noche${nights > 1 ? 's' : ''}): *$${baseStay.toFixed(2)}*\\n` +\n    `• Recargo persona adicional: *$${extraTotal.toFixed(2)}* _${extraDesc}_\\n` +\n    `• Total estadía: *$${totalStr}*\\n\\n` +\n    `*¿Cómo deseas realizar el pago?*\\n` +\n    `1. *Pagar el 100% ahora ($${totalStr})*\\n` +\n    `2. *Pagar el 50% de anticipo ($${half})* (saldo al check-in)\\n` +\n    `3. *Cancelar reserva*\\n\\n` +\n    `_Responde 1, 2 o 3._`;\n\n  return [output(summary, keep(draft, 'pago'), {\n    response_payload: {\n      type: 'interactive',\n      interactive: {\n        type: 'button',\n        body: { text: summary },\n        action: {\n          buttons: [\n            { type: 'reply', reply: { id: 'pago_100', title: 'Pagar 100%' } },\n            { type: 'reply', reply: { id: 'pago_50', title: 'Pagar 50%' } },\n            { type: 'reply', reply: { id: 'pago_cancelar', title: 'Cancelar' } }\n          ]\n        }\n      }\n    }\n  })];\n}\n\nif (step === 'pago') {\n  let opt = J.payment_selection;\n  if (!opt) {\n    if (['1', '100', '100%', 'total', 'pago_100', 'completo'].some(k => normalized.includes(k))) opt = 'full';\n    else if (['2', '50', '50%', 'mitad', 'anticipo', 'pago_50'].some(k => normalized.includes(k))) opt = 'deposit';\n  }\n\n  if (opt === 'full' || opt === 'deposit') {\n    const payload = {\n      waId: J.wa_id,\n      guestName: D.guestName,\n      guestDocument: D.document,\n      companions: D.companions || '',\n      checkIn: D.checkIn,\n      checkOut: D.checkOut,\n      adults: Number(D.adults || 0),\n      children: Number(D.children || 0),\n      hasPet: Boolean(D.hasPet),\n      rooms: Array.isArray(D.lockTokens) ? D.lockTokens.map(e => ({ roomId: e.roomId, lockToken: e.lockToken })) : [{ roomId: D.roomId, lockToken: D.lockToken }],\n      paymentOption: opt\n    };\n\n    const optMsg = opt === 'deposit' ? 'el 50% de anticipo' : 'el 100% total';\n    return [output(`Confirmando tu reserva con pago de ${optMsg}...`, { state: 'reserva', step: 'confirmando', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: Object.assign({}, D, { payload, paymentOption: opt }) }, { api_action: 'confirm', payload })];\n  }\n\n  return [output('Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];\n}\n\nreturn [output('Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];"
+        "jsCode": "const J = $input.first().json;\nconst D = (J.session && J.session.reservation_draft) || {};\nconst step = (J.session && J.session.step) || (D && D.step);\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n\nconst keep = (draft, nextStep) => ({\n  state: 'reserva',\n  step: nextStep,\n  agent_active: false,\n  wa_id: J.wa_id,\n  sender_name: J.sender_name,\n  reservation_draft: Object.assign({}, draft, { step: nextStep })\n});\n\nconst output = (response_text, session, extra = {}) => ({\n  json: Object.assign({ wa_id: J.wa_id, sender_name: J.sender_name, response_text, session }, extra)\n});\n\nif (step === 'huespedes') {\n  const numberTokens = (normalized.match(/\\d+/g) || []).map(Number);\n  const adultMatches = [...normalized.matchAll(/(\\d+)\\s*(adultos?|personas?|huespedes?)/g)];\n  const childMatches = [...normalized.matchAll(/(\\d+)\\s*(ninos?|niños?|menores?)/g)];\n  let adults = adultMatches.length ? Number(adultMatches[0][1]) : (numberTokens[0] ?? null);\n  let children = childMatches.length ? Number(childMatches[0][1]) : (numberTokens[1] ?? 0);\n  if (adults == null && numberTokens.length) adults = numberTokens[0];\n  if (children === 0 && numberTokens.length > 1 && !childMatches.length) children = numberTokens[1];\n  const max = Number(D.room && D.room.maxAdultsCapacity || 0) + Number(D.room && D.room.childrenCapacity || 0);\n  if (!adults || adults < 1 || children < 0) return [output('Indica las personas así: *2 adultos y 1 niño*.', keep(D, 'huespedes'))];\n  if (max && adults + children > max) return [output('Esa habitación admite máximo *' + max + ' personas* según su capacidad. Regresa a la selección escribiendo *menú* o elige otra habitación.', keep(D, 'seleccion_habitacion'))];\n  const base = Number(D.room && D.room.baseAdultsCapacity || 0);\n  const extraPrice = Number(D.room && D.room.extraGuestPrice || 0);\n  const extraGuests = Math.max(0, adults + children - base);\n  const draft = Object.assign({}, D, { adults, children, extraGuests, extraGuestPrice: extraPrice, extraTotal: extraGuests * extraPrice });\n\n  return [output(`Huéspedes registrados: *${adults} adulto(s)* y *${children} niño(s)*.\\n\\n*Aviso de Privacidad (Ley 1581 de 2012):* Al continuar y suministrar tus datos personales, autorizas a Torre Satori para su tratamiento con la única finalidad de gestionar tu reserva y estadía.\\n\\nIndica el nombre completo de la persona titular de la reserva:`, keep(draft, 'nombre'))];\n}\n\nif (step === 'nombre') {\n  if (text.length < 3) return [output('Indica un nombre completo válido.', keep(D, 'nombre'))];\n  return [output('Gracias. Ahora indica el número de identificación (cédula o pasaporte) del titular.', keep(Object.assign({}, D, { guestName: text }), 'identificacion'))];\n}\n\nif (step === 'identificacion') {\n  const document = text.replace(/\\s+/g, '').replace(/[^0-9]/g, '');\n  if (!/^\\d{6,10}$/.test(document)) return [output('La identificación debe tener solo números y entre 6 y 10 dígitos. Inténtalo de nuevo.', keep(D, 'identificacion'))];\n  return [output('¿Viajas con mascota?', keep(Object.assign({}, D, { document }), 'mascota'), { response_payload: { type: 'interactive', interactive: { type: 'button', body: { text: '¿Viajas con mascota?' }, action: { buttons: [{ type: 'reply', reply: { id: 'pet_si', title: 'Sí' } }, { type: 'reply', reply: { id: 'pet_no', title: 'No' } }] } } } })];\n}\n\nconst buildSummaryResponse = (baseDraft, companionsText) => {\n  const nights = Math.max(1, Math.round((new Date(baseDraft.checkOut) - new Date(baseDraft.checkIn)) / 86400000));\n  const nightly = Number(baseDraft.room && baseDraft.room.pricePerNight || 0);\n  const baseStay = nights * nightly;\n  const extraGuests = Number(baseDraft.extraGuests || 0);\n  const extraGuestPrice = Number(baseDraft.extraGuestPrice || (baseDraft.room && baseDraft.room.extraGuestPrice) || 0);\n  const extraTotal = extraGuests * extraGuestPrice * nights;\n  const total = baseStay + extraTotal;\n  const half = (total / 2).toFixed(2);\n  const totalStr = total.toFixed(2);\n  const draft = Object.assign({}, baseDraft, { companions: companionsText, nights, baseStay, extraTotal, total });\n  const extraDesc = extraGuests > 0 ? `(${extraGuests} adic. x $${extraGuestPrice.toFixed(2)} x ${nights} noche${nights > 1 ? 's' : ''})` : '(Sin recargo)';\n\n  const summary = `*Resumen de tu Reserva*\\n\\n` +\n    `• Habitación: *${baseDraft.room.name || baseDraft.room.type} #${baseDraft.room.number}*\\n` +\n    `• Entrada: *${baseDraft.checkIn}*\\n` +\n    `• Salida: *${baseDraft.checkOut}* (${nights} noche${nights > 1 ? 's' : ''})\\n` +\n    `• Huéspedes: *${baseDraft.adults} adulto(s), ${baseDraft.children} niño(s)*\\n` +\n    `• Mascota: *${baseDraft.hasPet ? 'Sí' : 'No'}*\\n` +\n    `• Titular: *${baseDraft.guestName}* (${baseDraft.document})\\n` +\n    `• Acompañantes: *${companionsText || 'Ninguno'}*\\n` +\n    `• Tarifa base (${nights} noche${nights > 1 ? 's' : ''}): *$${baseStay.toFixed(2)}*\\n` +\n    `• Recargo persona adicional: *$${extraTotal.toFixed(2)}* _${extraDesc}_\\n` +\n    `• Total estadía: *$${totalStr}*\\n\\n` +\n    `*¿Cómo deseas realizar el pago?*\\n` +\n    `1. *Pagar el 100% ahora ($${totalStr})*\\n` +\n    `2. *Pagar el 50% de anticipo ($${half})* (saldo al check-in)\\n` +\n    `3. *Cancelar reserva*\\n\\n` +\n    `_Responde 1, 2 o 3._`;\n\n  return [output(summary, keep(draft, 'pago'), {\n    response_payload: {\n      type: 'interactive',\n      interactive: {\n        type: 'button',\n        body: { text: summary },\n        action: {\n          buttons: [\n            { type: 'reply', reply: { id: 'pago_100', title: 'Pagar 100%' } },\n            { type: 'reply', reply: { id: 'pago_50', title: 'Pagar 50%' } },\n            { type: 'reply', reply: { id: 'pago_cancelar', title: 'Cancelar' } }\n          ]\n        }\n      }\n    }\n  })];\n};\n\nif (step === 'mascota') {\n  const hasPet = ['si', 'sí', 'pet_si', 'yes'].includes(normalized);\n  const noPet = ['no', 'pet_no'].includes(normalized);\n  if (!hasPet && !noPet) return [output('Responde usando *Sí* o *No* para la mascota.', keep(D, 'mascota'))];\n  if (hasPet && D.room && D.room.allowsPets === false) {\n    const nonPetRooms = Array.isArray(D.selectedRooms)\n      ? D.selectedRooms.filter(r => r && r.allowsPets === false)\n      : [D.room];\n    const roomNumbers = nonPetRooms.map(r => r.number || r.id).filter(Boolean);\n    const petRejectMessage = roomNumbers.length > 1\n      ? `Las habitaciones ${roomNumbers.join(', ')} no permiten mascotas. Por favor elige otra habitación.`\n      : `La habitación ${roomNumbers[0] || D.room.number || D.room.id} no permite mascotas. Por favor elige otra habitación.`;\n\n    const locksToRelease = [];\n    if (Array.isArray(D.lockTokens)) {\n      D.lockTokens.forEach(lt => {\n        if (lt && lt.roomId && lt.lockToken) locksToRelease.push({ roomId: lt.roomId, lockToken: lt.lockToken });\n      });\n    } else if (D.roomId && D.lockToken) {\n      locksToRelease.push({ roomId: D.roomId, lockToken: D.lockToken });\n    }\n\n    const cleanDraft = {\n      checkIn: D.checkIn,\n      checkOut: D.checkOut,\n      adults: 1,\n      children: 0,\n      hasPet: true\n    };\n\n    return [output(\n      petRejectMessage,\n      keep(cleanDraft, 'seleccion_habitacion'),\n      {\n        api_action: 'pet_reject_relist',\n        pet_reject_message: petRejectMessage,\n        locks_to_release: locksToRelease,\n        checkIn: D.checkIn,\n        checkOut: D.checkOut\n      }\n    )];\n  }\n\n  const nextDraft = Object.assign({}, D, { hasPet });\n  const expectedCompanions = Math.max(0, Number(nextDraft.adults || 1) + Number(nextDraft.children || 0) - 1);\n  if (expectedCompanions === 0) {\n    return buildSummaryResponse(nextDraft, '');\n  }\n\n  return [output(\n    `¿Cuáles son los nombres de tus ${expectedCompanions} acompañantes?\\n` +\n    `Por favor escribe cada nombre completo separado por una coma (,).\\n` +\n    `Ejemplo: _María Gómez, Carlos Pérez_`,\n    keep(nextDraft, 'acompanantes')\n  )];\n}\n\nif (step === 'acompanantes') {\n  const expectedCompanions = Math.max(0, Number(D.adults || 1) + Number(D.children || 0) - 1);\n  if (expectedCompanions === 0) {\n    return buildSummaryResponse(D, '');\n  }\n  const noCompanions = ['ninguno', 'no', 'solo yo', 'nadie', 'sin acompanantes', 'no hay', 'no tengo', 'no viajan mas'].includes(normalized);\n  const companionList = noCompanions\n    ? []\n    : text.split(',').map(s => s.trim()).filter(s => s.length >= 2);\n\n  if (companionList.length < expectedCompanions) {\n    return [output(\n      `Debes indicar los nombres completos de tus *${expectedCompanions} acompañantes*, cada uno separado por una coma (,). (Recibimos ${companionList.length} de ${expectedCompanions}).\\n` +\n      `Ejemplo: _María Gómez, Carlos Pérez_`,\n      keep(D, 'acompanantes')\n    )];\n  }\n\n  return buildSummaryResponse(D, companionList.join(', '));\n}\n\nif (step === 'pago') {\n  let opt = J.payment_selection;\n  if (!opt) {\n    if (['1', '100', '100%', 'total', 'pago_100', 'completo'].some(k => normalized.includes(k))) opt = 'full';\n    else if (['2', '50', '50%', 'mitad', 'anticipo', 'pago_50'].some(k => normalized.includes(k))) opt = 'deposit';\n  }\n\n  if (opt === 'full' || opt === 'deposit') {\n    const payload = {\n      waId: J.wa_id,\n      guestName: D.guestName,\n      guestDocument: D.document,\n      companions: D.companions || '',\n      checkIn: D.checkIn,\n      checkOut: D.checkOut,\n      adults: Number(D.adults || 0),\n      children: Number(D.children || 0),\n      hasPet: Boolean(D.hasPet),\n      rooms: Array.isArray(D.lockTokens) ? D.lockTokens.map(e => ({ roomId: e.roomId, lockToken: e.lockToken })) : [{ roomId: D.roomId, lockToken: D.lockToken }],\n      paymentOption: ((typeof $env !== 'undefined' && $env && String($env.WOMPI_ENABLED == null ? 'true' : $env.WOMPI_ENABLED).toLowerCase() !== 'false' && $env.WOMPI_PRIVATE_KEY) ? ('wompi_' + opt) : opt)\n    };\n\n    const optMsg = opt === 'deposit' ? 'el 50% de anticipo' : 'el 100% total';\n    return [output(`Confirmando tu reserva con pago de ${optMsg}...`, { state: 'reserva', step: 'confirmando', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: Object.assign({}, D, { payload, paymentOption: opt }) }, { api_action: 'confirm', payload })];\n  }\n\n  return [output('Reserva cancelada. Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];\n}\n\nreturn [output('Escribe *menú* para volver al inicio.', { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id: J.wa_id, sender_name: J.sender_name, reservation_draft: {} })];"
       },
       "id": "31ea5d92-668d-4e49-9d2f-8e508ac832cc",
       "name": "H Procesar Reserva Paso",
@@ -1477,14 +1477,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// V9 · Resumen de la reserva + enlace de pago Wompi.\nconst apiResponse = (() => { try { return $('API Confirmar Reserva').first().json || {}; } catch (e) { return {}; } })();\nconst prep = (() => { try { return $('H Preparar Cobro Wompi').first().json || {}; } catch (e) { return {}; } })();\nconst wompi = (() => { try { return $('Wompi Crear Link de Pago').first().json || {}; } catch (e) { return {}; } })();\nconst source = (() => {\n  try { return $('H Procesar Reserva Paso').first().json; } catch (e) {}\n  try { return $('H Normalizar IA').first().json; } catch (e) {}\n  return {};\n})();\n\nconst wa_id = source.wa_id || prep.wa_id || '';\nconst sender_name = source.sender_name || prep.sender_name || 'Huésped';\nconst cop = (n) => '$' + Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 });\n\nconst linkId = wompi && wompi.data && wompi.data.id ? String(wompi.data.id) : null;\nconst checkoutBase = String((typeof $env !== 'undefined' && $env && $env.WOMPI_CHECKOUT_URL) || 'https://checkout.wompi.co/l/').replace(/\\/?$/, '/');\nconst paymentUrl = linkId ? checkoutBase + linkId : null;\n\nlet text = '';\nif (apiResponse.reservationGroupId) {\n  const code = prep.reservation_code || apiResponse.code || ('TS-' + String(apiResponse.reservationGroupId).replace(/-/g, '').slice(-4).toUpperCase());\n  const total = apiResponse.totalPrice != null ? Number(apiResponse.totalPrice) : Number(prep.total_price || 0);\n  const toPay = prep.amount_to_charge != null ? Number(prep.amount_to_charge) : Number(apiResponse.paidAmount || 0);\n  const isPartial = prep.payment_option ? prep.payment_option === 'deposit' : apiResponse.paymentStatus === 'partial';\n  const pending = Math.max(0, total - toPay);\n\n  text = `*¡Tu reserva ha sido registrada con éxito!*\\n\\n` +\n         `• Código de reserva: *${code}*\\n` +\n         `• Total de la estadía: *${cop(total)}*\\n` +\n         `• Valor a pagar ahora: *${cop(toPay)}* ${isPartial ? '_(Anticipo del 50%)_' : '_(Pago total 100%)_'}\\n`;\n  if (isPartial) {\n    text += `• Saldo pendiente: *${cop(pending)}* _(se paga al momento del check-in)_\\n`;\n  }\n\n  if (paymentUrl) {\n    let vence = '';\n    try {\n      vence = new Date(prep.expires_at).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short', timeStyle: 'short', hourCycle: 'h23' });\n    } catch (e) { vence = ''; }\n    text += `\\n*Realiza tu pago de forma segura con Wompi:*\\n${paymentUrl}\\n\\n` +\n            `Puedes pagar con tarjeta, PSE, Nequi o Bancolombia. ` +\n            `El enlace es de un solo uso${vence ? ' y vence el *' + vence + '*' : ''}. ` +\n            `Te confirmaremos por este chat cuando recibamos el pago.\\n\\n`;\n  } else {\n    text += `\\nEn este momento no pudimos generar tu enlace de pago. ` +\n            `Escribe *agente* y nuestro equipo de recepción te lo enviará en breve.\\n\\n`;\n  }\n\n  text += `Conserva tu código *${code}* para cualquier consulta.\\n` +\n          `¡Te esperamos en *Torre Satori*!\\n\\n` +\n          `Escribe *menú* para volver al inicio.`;\n} else {\n  let errorMsg = apiResponse.error || apiResponse.message || apiResponse.detail;\n  if (errorMsg && typeof errorMsg === 'object') errorMsg = errorMsg.message || JSON.stringify(errorMsg);\n  if (!errorMsg) errorMsg = JSON.stringify(apiResponse);\n  text = `Lo sentimos, no pudimos completar tu reserva.\\nMotivo: ${errorMsg}.\\n\\nSi el tiempo de 15 minutos expiró, las habitaciones se liberaron automáticamente. Escribe *menú* para intentar de nuevo.`;\n}\n\nreturn [{\n  json: {\n    wa_id,\n    sender_name,\n    response_text: text,\n    response_payload: { type: 'text', text: { body: text, preview_url: Boolean(paymentUrl) } },\n    payment_url: paymentUrl,\n    wompi_link_id: linkId,\n    locks_confirmed: Boolean(apiResponse.reservationGroupId),\n    session: { state: 'menu', step: 'esperando_opcion', agent_active: false,\n               wa_id, sender_name, reservation_draft: {} }\n  }\n}];"
+        "jsCode": "// V9 · Resumen de la reserva + enlace de pago Wompi.\nconst apiResponse = (() => { try { return $('API Confirmar Reserva').first().json || {}; } catch (e) { return {}; } })();\nconst prep = (() => { try { return $('H Preparar Cobro Wompi').first().json || {}; } catch (e) { return {}; } })();\nconst wompi = (() => { try { return $('Wompi Crear Link de Pago').first().json || {}; } catch (e) { return {}; } })();\nconst source = (() => {\n  try { return $('H Procesar Reserva Paso').first().json; } catch (e) {}\n  try { return $('H Normalizar IA').first().json; } catch (e) {}\n  return {};\n})();\n\nconst wa_id = source.wa_id || prep.wa_id || '';\nconst sender_name = source.sender_name || prep.sender_name || 'Huésped';\nconst cop = (n) => '$' + Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 });\n\nconst linkId = wompi && wompi.data && wompi.data.id ? String(wompi.data.id) : null;\nconst checkoutBase = String((typeof $env !== 'undefined' && $env && $env.WOMPI_CHECKOUT_URL) || 'https://checkout.wompi.co/l/').replace(/\\/?$/, '/');\nconst paymentUrl = linkId ? checkoutBase + linkId : null;\n\nlet text = '';\nif (apiResponse.reservationGroupId) {\n  const code = prep.reservation_code || apiResponse.code || ('TS-' + String(apiResponse.reservationGroupId).replace(/-/g, '').slice(-4).toUpperCase());\n  const total = apiResponse.totalPrice != null ? Number(apiResponse.totalPrice) : Number(prep.total_price || 0);\n  const toPay = prep.amount_to_charge != null ? Number(prep.amount_to_charge) : Number(apiResponse.paidAmount || 0);\n  const isPartial = prep.payment_option ? prep.payment_option === 'deposit' : apiResponse.paymentStatus === 'partial';\n  const pending = Math.max(0, total - toPay);\n\n  const isPendingWompi = apiResponse.status === 'pending_payment';\n  text = (isPendingWompi ? `*¡Tu pre-reserva ha sido registrada!*\\n_Quedará confirmada automáticamente en cuanto completes el pago._\\n\\n` : `*¡Tu reserva ha sido registrada con éxito!*\\n\\n`) +\n         `• Código de reserva: *${code}*\\n` +\n         `• Total de la estadía: *${cop(total)}*\\n` +\n         `• Valor a pagar ahora: *${cop(toPay)}* ${isPartial ? '_(Anticipo del 50%)_' : '_(Pago total 100%)_'}\\n`;\n  if (isPartial) {\n    text += `• Saldo pendiente: *${cop(pending)}* _(se paga al momento del check-in)_\\n`;\n  }\n\n  if (paymentUrl) {\n    let vence = '';\n    try {\n      vence = new Date(prep.expires_at).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short', timeStyle: 'short', hourCycle: 'h23' });\n    } catch (e) { vence = ''; }\n    text += `\\n*Realiza tu pago de forma segura con Wompi:*\\n${paymentUrl}\\n\\n` +\n            `Puedes pagar con tarjeta, PSE, Nequi o Bancolombia. ` +\n            `El enlace es de un solo uso${vence ? ' y vence el *' + vence + '*' : ''}. ` +\n            `Te confirmaremos por este chat cuando recibamos el pago.\\n\\n`;\n  } else {\n    text += `\\nEn este momento no pudimos generar tu enlace de pago. ` +\n            `Escribe *agente* y nuestro equipo de recepción te lo enviará en breve.\\n\\n`;\n  }\n\n  text += `Conserva tu código *${code}* para cualquier consulta.\\n` +\n          `¡Te esperamos en *Torre Satori*!\\n\\n` +\n          `Escribe *menú* para volver al inicio.`;\n} else {\n  let errorMsg = apiResponse.error || apiResponse.message || apiResponse.detail;\n  if (errorMsg && typeof errorMsg === 'object') errorMsg = errorMsg.message || JSON.stringify(errorMsg);\n  if (!errorMsg) errorMsg = JSON.stringify(apiResponse);\n  text = `Lo sentimos, no pudimos completar tu reserva.\\nMotivo: ${errorMsg}.\\n\\nSi el tiempo de 15 minutos expiró, las habitaciones se liberaron automáticamente. Escribe *menú* para intentar de nuevo.`;\n}\n\nreturn [{\n  json: {\n    wa_id,\n    sender_name,\n    response_text: text,\n    response_payload: { type: 'text', text: { body: text, preview_url: Boolean(paymentUrl) } },\n    payment_url: paymentUrl,\n    wompi_link_id: linkId,\n    locks_confirmed: Boolean(apiResponse.reservationGroupId),\n    session: { state: 'menu', step: 'esperando_opcion', agent_active: false,\n               wa_id, sender_name, reservation_draft: {} }\n  }\n}];"
       },
       "id": "ddd8663a-3778-43b7-bb5c-4cc0952108fd",
       "name": "H Reserva Exitosa",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5936,
+        5888,
         2800
       ]
     },
@@ -1555,7 +1555,7 @@
       "typeVersion": 3.4,
       "position": [
         3968,
-        3344
+        3328
       ]
     },
     {
@@ -1798,7 +1798,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst S = J.session || {};\nconst draft = S.ia_draft || {};\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n\nconst keep = (newDraft, nextStep) => ({\n    state: 'ia_reserva',\n    step: nextStep,\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    ia_draft: newDraft\n});\n\nconst reset = () => ({\n    state: 'menu',\n    step: 'esperando_opcion',\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    reservation_draft: {}\n});\n\nconst reply = (msg, newSession, extra = {}) => [{\n    json: Object.assign({\n        wa_id: J.wa_id,\n        sender_name: J.sender_name,\n        response_text: msg,\n        session: newSession,\n        api_action: 'reply'\n    }, extra)\n}];\n\n// PASO 1: Procesar mensaje inicial o complementario acumulando datos del borrador previo\nif (S.step === 'esperando_datos' || !S.step) {\n    const today = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);\n    const hasPrev = draft && Object.keys(draft).length > 0;\n    const prevContext = hasPrev\n      ? `Datos ya recopilados previamente (NO borres ni sobrescribas campos existentes salvo que el usuario los corrija explícitamente):\\n${JSON.stringify(draft)}\\n`\n      : '';\n    const prompt = `Eres un asistente de reservas de hotel. Extrae y acumula los datos de reserva del texto del usuario en formato JSON estricto.\nFecha de referencia hoy (Colombia): ${today}.\n${prevContext}Reglas estrictas:\n- NUNCA inventes ni asumas el nombre del titular ni su cédula si el usuario no los escribió explícitamente.\n- Si el usuario ya había dado algún dato en mensajes anteriores, consérvalo en el JSON resultante.\nPropiedades JSON:\n- checkIn: string YYYY-MM-DD o null si no se conoce\n- checkOut: string YYYY-MM-DD o null si no se conoce\n- adults: número entero >= 1 o null si el usuario no ha indicado cuántos adultos viajan\n- children: número entero >= 0 (0 si no menciona niños)\n- hasPet: boolean (true si menciona mascota/mascoticas/perro/gato, false si dice sin mascota/no llevo mascota, null si no lo mencionó)\n- guestName: string con el nombre completo del titular escrito por el usuario, o null si no lo ha dado\n- guestDocument: string con solo los dígitos de cédula/documento si el usuario lo dio, o null si no lo ha dado\n- companions: string con nombres de acompañantes si se mencionan, o \"\"\n- summary: resumen breve en español de lo entendido en este mensaje.\n\nTexto del usuario: ${JSON.stringify(text)}`;\n\n    return [{\n        json: Object.assign({}, J, {\n            api_action: 'gemini_ia',\n            geminiRequest: {\n                contents: [{ parts: [{ text: prompt }] }],\n                generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }\n            },\n            session: keep(draft, 'interpretando')\n        })\n    }];\n}\n\n// PASO 2: Confirmación o Corrección de los datos interpretados\nif (S.step === 'confirmar_datos') {\n    const isConfirm = ['si', 'sí', 'correcto', 'de acuerdo', 'ok', 'yes', 'claro', 'dale', 'confirmo', 'así es', 'asi es'].some(k => normalized === k || normalized.startsWith(k + ' ') || normalized.endsWith(' ' + k));\n    \n    if (isConfirm) {\n        // Proceder a buscar habitaciones disponibles en la API\n        return [{\n            json: Object.assign({}, J, {\n                api_action: 'availability',\n                checkIn: draft.checkIn,\n                checkOut: draft.checkOut,\n                adults: draft.adults || 1,\n                children: draft.children || 0,\n                pet: Boolean(draft.hasPet),\n                session: keep(draft, 'buscando_disponibilidad')\n            })\n        }];\n    } else {\n        // El usuario envía correcciones\n        const today = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);\n        const prompt = `Eres un asistente de reservas de hotel. El usuario tenía este borrador de reserva:\n${JSON.stringify(draft)}\nY ahora envía este mensaje de corrección o ajuste: \"${text}\".\nFecha de referencia hoy (Colombia): ${today}.\nActualiza los datos del borrador con las correcciones del usuario en formato JSON estricto:\n- checkIn: string YYYY-MM-DD\n- checkOut: string YYYY-MM-DD\n- adults: número entero >= 1\n- children: número entero >= 0\n- hasPet: boolean\n- guestName: string (nombre del titular)\n- guestDocument: string (cédula)\n- companions: string (acompañantes)\n- summary: resumen breve y amable en español de los cambios aplicados.`;\n\n        return [{\n            json: Object.assign({}, J, {\n                api_action: 'gemini_ia',\n                geminiRequest: {\n                    contents: [{ parts: [{ text: prompt }] }],\n                    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }\n                },\n                session: keep(draft, 'corrigiendo')\n            })\n        }];\n    }\n}\n\n// PASO 3: Selección de una o varias habitaciones\nif (S.step === 'ia_seleccion_habitacion') {\n    const rooms = Array.isArray(draft.availableRooms) ? draft.availableRooms : [];\n    const nums = (text.match(/\\d+/g) || []).map(Number);\n    const chosenRooms = [];\n\n    for (const n of nums) {\n        const found = rooms.find((r, idx) => idx + 1 === n || Number(r.number) === n || Number(r.id) === n);\n        if (found && !chosenRooms.some(cr => cr.id === found.id)) {\n            chosenRooms.push(found);\n        }\n    }\n\n    if (!chosenRooms.length) {\n        return reply('No encontré esa opción de habitación. Por favor responde con el número o números de la lista (ej: *1* o *1, 2*) o escribe *menú* para cancelar.', S);\n    }\n\n    const newDraft = Object.assign({}, draft, { selectedRooms: chosenRooms, chosenCount: chosenRooms.length });\n    \n    // Emitir un item por cada habitación para que la API las bloquee todas\n    return chosenRooms.map(room => ({\n        json: Object.assign({}, J, {\n            api_action: 'lock',\n            roomId: room.id,\n            checkIn: draft.checkIn,\n            checkOut: draft.checkOut,\n            lockRoom: room,\n            session: keep(newDraft, 'bloqueando')\n        })\n    }));\n}\n\n// PASO 4: Selección de Modalidad de Pago\nif (S.step === 'ia_pago') {\n    let opt = null;\n    if (['1', '100', '100%', 'total', 'pago_100', 'completo'].some(k => normalized.includes(k))) opt = 'full';\n    else if (['2', '50', '50%', 'mitad', 'anticipo', 'pago_50'].some(k => normalized.includes(k))) opt = 'deposit';\n    else if (['3', 'cancelar', 'no'].some(k => normalized.includes(k))) {\n        return reply('Reserva cancelada. Los bloqueos de las habitaciones fueron liberados. Escribe *menú* para volver al inicio.', reset());\n    }\n\n    if (!opt) {\n        return reply('Selecciona una opción válida:\\n1. Pagar 100%\\n2. Pagar 50% de anticipo\\n3. Cancelar', S);\n    }\n\n    const lockTokens = Array.isArray(draft.lockTokens) ? draft.lockTokens : [];\n    const payload = {\n        waId: J.wa_id,\n        guestName: draft.guestName || J.sender_name || 'Huésped',\n        guestDocument: draft.guestDocument || '12345678',\n        companions: draft.companions || '',\n        checkIn: draft.checkIn,\n        checkOut: draft.checkOut,\n        adults: Number(draft.adults || 1),\n        children: Number(draft.children || 0),\n        hasPet: Boolean(draft.hasPet),\n        rooms: lockTokens.map(lt => ({ roomId: lt.roomId, lockToken: lt.lockToken })),\n        paymentOption: opt\n    };\n\n    const optMsg = opt === 'deposit' ? 'el 50% de anticipo' : 'el 100% total';\n    return [{\n        json: Object.assign({}, J, {\n            api_action: 'confirm',\n            payload,\n            session: keep(Object.assign({}, draft, { payload, paymentOption: opt }), 'confirmando'),\n            response_text: `Confirmando tu reserva con ${optMsg}...`\n        })\n    }];\n}\n\nreturn reply('Escribe *menú* para volver al inicio.', reset());"
+        "jsCode": "const J = $input.first().json;\nconst S = J.session || {};\nconst draft = S.ia_draft || {};\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n\nconst keep = (newDraft, nextStep) => ({\n    state: 'ia_reserva',\n    step: nextStep,\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    ia_draft: newDraft\n});\n\nconst reset = () => ({\n    state: 'menu',\n    step: 'esperando_opcion',\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    reservation_draft: {}\n});\n\nconst reply = (msg, newSession, extra = {}) => [{\n    json: Object.assign({\n        wa_id: J.wa_id,\n        sender_name: J.sender_name,\n        response_text: msg,\n        session: newSession,\n        api_action: 'reply'\n    }, extra)\n}];\n\n// PASO 1: Procesar mensaje inicial o complementario acumulando datos del borrador previo\nif (S.step === 'esperando_datos' || !S.step) {\n    const today = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);\n    const hasPrev = draft && Object.keys(draft).length > 0;\n    const prevContext = hasPrev\n      ? `Datos ya recopilados previamente (NO borres ni sobrescribas campos existentes salvo que el usuario los corrija explícitamente):\\n${JSON.stringify(draft)}\\n`\n      : '';\n    const prompt = `Eres un asistente de reservas de hotel. Extrae y acumula los datos de reserva del texto del usuario en formato JSON estricto.\nFecha de referencia hoy (Colombia): ${today}.\n${prevContext}Reglas estrictas:\n- NUNCA inventes ni asumas el nombre del titular ni su cédula si el usuario no los escribió explícitamente.\n- Si el usuario ya había dado algún dato en mensajes anteriores, consérvalo en el JSON resultante.\nPropiedades JSON:\n- checkIn: string YYYY-MM-DD o null si no se conoce\n- checkOut: string YYYY-MM-DD o null si no se conoce\n- adults: número entero >= 1 o null si el usuario no ha indicado cuántos adultos viajan\n- children: número entero >= 0 (0 si no menciona niños)\n- hasPet: boolean (true si menciona mascota/mascoticas/perro/gato, false si dice sin mascota/no llevo mascota, null si no lo mencionó)\n- guestName: string con el nombre completo del titular escrito por el usuario, o null si no lo ha dado\n- guestDocument: string con solo los dígitos de cédula/documento si el usuario lo dio, o null si no lo ha dado\n- companions: string con nombres de acompañantes si se mencionan, o \"\"\n- summary: resumen breve en español de lo entendido en este mensaje.\n\nTexto del usuario: ${JSON.stringify(text)}`;\n\n    return [{\n        json: Object.assign({}, J, {\n            api_action: 'gemini_ia',\n            geminiRequest: {\n                contents: [{ parts: [{ text: prompt }] }],\n                generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }\n            },\n            session: keep(draft, 'interpretando')\n        })\n    }];\n}\n\n// PASO 2: Confirmación o Corrección de los datos interpretados\nif (S.step === 'confirmar_datos') {\n    const isConfirm = ['si', 'sí', 'correcto', 'de acuerdo', 'ok', 'yes', 'claro', 'dale', 'confirmo', 'así es', 'asi es'].some(k => normalized === k || normalized.startsWith(k + ' ') || normalized.endsWith(' ' + k));\n    \n    if (isConfirm) {\n        // Proceder a buscar habitaciones disponibles en la API\n        return [{\n            json: Object.assign({}, J, {\n                api_action: 'availability',\n                checkIn: draft.checkIn,\n                checkOut: draft.checkOut,\n                adults: draft.adults || 1,\n                children: draft.children || 0,\n                pet: Boolean(draft.hasPet),\n                session: keep(draft, 'buscando_disponibilidad')\n            })\n        }];\n    } else {\n        // El usuario envía correcciones\n        const today = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);\n        const prompt = `Eres un asistente de reservas de hotel. El usuario tenía este borrador de reserva:\n${JSON.stringify(draft)}\nY ahora envía este mensaje de corrección o ajuste: \"${text}\".\nFecha de referencia hoy (Colombia): ${today}.\nActualiza los datos del borrador con las correcciones del usuario en formato JSON estricto:\n- checkIn: string YYYY-MM-DD\n- checkOut: string YYYY-MM-DD\n- adults: número entero >= 1\n- children: número entero >= 0\n- hasPet: boolean\n- guestName: string (nombre del titular)\n- guestDocument: string (cédula)\n- companions: string (acompañantes)\n- summary: resumen breve y amable en español de los cambios aplicados.`;\n\n        return [{\n            json: Object.assign({}, J, {\n                api_action: 'gemini_ia',\n                geminiRequest: {\n                    contents: [{ parts: [{ text: prompt }] }],\n                    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }\n                },\n                session: keep(draft, 'corrigiendo')\n            })\n        }];\n    }\n}\n\n// PASO 3: Selección de una o varias habitaciones\nif (S.step === 'ia_seleccion_habitacion') {\n    const rooms = Array.isArray(draft.availableRooms) ? draft.availableRooms : [];\n    const nums = (text.match(/\\d+/g) || []).map(Number);\n    const chosenRooms = [];\n\n    for (const n of nums) {\n        const found = rooms.find((r, idx) => idx + 1 === n || Number(r.number) === n || Number(r.id) === n);\n        if (found && !chosenRooms.some(cr => cr.id === found.id)) {\n            chosenRooms.push(found);\n        }\n    }\n\n    if (!chosenRooms.length) {\n        return reply('No encontré esa opción de habitación. Por favor responde con el número o números de la lista (ej: *1* o *1, 2*) o escribe *menú* para cancelar.', S);\n    }\n\n    const newDraft = Object.assign({}, draft, { selectedRooms: chosenRooms, chosenCount: chosenRooms.length });\n    \n    // Emitir un item por cada habitación para que la API las bloquee todas\n    return chosenRooms.map(room => ({\n        json: Object.assign({}, J, {\n            api_action: 'lock',\n            roomId: room.id,\n            checkIn: draft.checkIn,\n            checkOut: draft.checkOut,\n            lockRoom: room,\n            session: keep(newDraft, 'bloqueando')\n        })\n    }));\n}\n\n// PASO 4: Selección de Modalidad de Pago\nif (S.step === 'ia_pago') {\n    let opt = null;\n    if (['1', '100', '100%', 'total', 'pago_100', 'completo'].some(k => normalized.includes(k))) opt = 'full';\n    else if (['2', '50', '50%', 'mitad', 'anticipo', 'pago_50'].some(k => normalized.includes(k))) opt = 'deposit';\n    else if (['3', 'cancelar', 'no'].some(k => normalized.includes(k))) {\n        return reply('Reserva cancelada. Los bloqueos de las habitaciones fueron liberados. Escribe *menú* para volver al inicio.', reset());\n    }\n\n    if (!opt) {\n        return reply('Selecciona una opción válida:\\n1. Pagar 100%\\n2. Pagar 50% de anticipo\\n3. Cancelar', S);\n    }\n\n    const lockTokens = Array.isArray(draft.lockTokens) ? draft.lockTokens : [];\n    const payload = {\n        waId: J.wa_id,\n        guestName: draft.guestName || J.sender_name || 'Huésped',\n        guestDocument: draft.guestDocument || '12345678',\n        companions: draft.companions || '',\n        checkIn: draft.checkIn,\n        checkOut: draft.checkOut,\n        adults: Number(draft.adults || 1),\n        children: Number(draft.children || 0),\n        hasPet: Boolean(draft.hasPet),\n        rooms: lockTokens.map(lt => ({ roomId: lt.roomId, lockToken: lt.lockToken })),\n        paymentOption: ((typeof $env !== 'undefined' && $env && String($env.WOMPI_ENABLED == null ? 'true' : $env.WOMPI_ENABLED).toLowerCase() !== 'false' && $env.WOMPI_PRIVATE_KEY) ? ('wompi_' + opt) : opt)\n    };\n\n    const optMsg = opt === 'deposit' ? 'el 50% de anticipo' : 'el 100% total';\n    return [{\n        json: Object.assign({}, J, {\n            api_action: 'confirm',\n            payload,\n            session: keep(Object.assign({}, draft, { payload, paymentOption: opt }), 'confirmando'),\n            response_text: `Confirmando tu reserva con ${optMsg}...`\n        })\n    }];\n}\n\nreturn reply('Escribe *menú* para volver al inicio.', reset());"
       },
       "id": "e89d1011-0011-4000-8000-000000000011",
       "name": "H Normalizar IA",
@@ -2068,8 +2068,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        6528,
-        1152
+        6416,
+        880
       ]
     },
     {
@@ -2093,8 +2093,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        6832,
-        1136
+        6624,
+        752
       ],
       "onError": "continueRegularOutput"
     },
@@ -2119,8 +2119,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        8656,
-        1344
+        8096,
+        1136
       ],
       "onError": "continueRegularOutput"
     },
@@ -2139,7 +2139,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// V9 · Prepara el cobro de la reserva en Wompi segun la modalidad elegida (50% o 100%).\nconst api = $input.first().json || {};\nconst env = (typeof $env !== 'undefined' && $env) ? $env : {};\n\nconst source = (() => {\n  try { return $('H Procesar Reserva Paso').first().json; } catch (e) {}\n  try { return $('H Normalizar IA').first().json; } catch (e) {}\n  return {};\n})();\nconst payload = source.payload || {};\n\nconst confirmed = Boolean(api.reservationGroupId);\nconst code = api.code || (confirmed ? ('TS-' + String(api.reservationGroupId).replace(/-/g, '').slice(-4).toUpperCase()) : null);\nconst totalPrice = Number(api.totalPrice || 0);\nconst isPartial = api.paymentStatus === 'partial' || payload.paymentOption === 'deposit';\n// Valor a cobrar ahora: lo que la API registro para la modalidad elegida\n// (deposit = 50% del total, full = 100% del total).\nlet amountToCharge = api.paidAmount != null ? Number(api.paidAmount) : (isPartial ? totalPrice / 2 : totalPrice);\nif (!(amountToCharge > 0)) amountToCharge = isPartial ? totalPrice / 2 : totalPrice;\nconst amountInCents = Math.round(amountToCharge * 100);\n\nconst enabled = String(env.WOMPI_ENABLED == null ? 'true' : env.WOMPI_ENABLED).toLowerCase() !== 'false';\nconst hasKey = Boolean(env.WOMPI_PRIVATE_KEY);\nconst hours = Math.max(1, Number(env.WOMPI_LINK_EXPIRATION_HOURS || 24));\nconst expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();\n\nconst optionLabel = isPartial ? 'Anticipo 50%' : 'Pago total 100%';\nconst stay = (payload.checkIn && payload.checkOut) ? ` (${payload.checkIn} a ${payload.checkOut})` : '';\nconst wompiRequest = {\n  name: `Reserva ${code || ''} - Torre Satori`.trim().slice(0, 60),\n  description: `${optionLabel} de la reserva ${code || ''}${stay}`.slice(0, 250),\n  single_use: true,\n  collect_shipping: false,\n  currency: 'COP',\n  amount_in_cents: amountInCents,\n  expires_at: expiresAt,\n  sku: String(code || '').slice(0, 36)\n};\nif (env.WOMPI_REDIRECT_URL) wompiRequest.redirect_url = env.WOMPI_REDIRECT_URL;\n\nlet skipReason = null;\nif (!confirmed) skipReason = 'reserva_no_confirmada';\nelse if (!enabled) skipReason = 'wompi_deshabilitado';\nelse if (!hasKey) skipReason = 'sin_llave_privada';\nelse if (!(amountInCents >= 150000)) skipReason = 'monto_invalido';\n\nreturn [{\n  json: {\n    wa_id: source.wa_id || payload.waId || '',\n    sender_name: source.sender_name || payload.guestName || 'Huésped',\n    reservation_code: code,\n    payment_option: isPartial ? 'deposit' : 'full',\n    total_price: totalPrice,\n    amount_to_charge: amountInCents / 100,\n    amount_in_cents: amountInCents,\n    expires_at: expiresAt,\n    wompi_should_charge: skipReason === null,\n    wompi_skip_reason: skipReason,\n    wompi_request: wompiRequest\n  }\n}];"
+        "jsCode": "// V9 · Prepara el cobro de la reserva en Wompi segun la modalidad elegida (50% o 100%).\nconst api = $input.first().json || {};\nconst env = (typeof $env !== 'undefined' && $env) ? $env : {};\n\nconst source = (() => {\n  try { return $('H Procesar Reserva Paso').first().json; } catch (e) {}\n  try { return $('H Normalizar IA').first().json; } catch (e) {}\n  return {};\n})();\nconst payload = source.payload || {};\n\nconst confirmed = Boolean(api.reservationGroupId);\nconst code = api.code || (confirmed ? ('TS-' + String(api.reservationGroupId).replace(/-/g, '').slice(-4).toUpperCase()) : null);\nconst totalPrice = Number(api.totalPrice || 0);\nconst isPartial = api.paymentStatus === 'partial' || payload.paymentOption === 'deposit' || payload.paymentOption === 'wompi_deposit';\n// Valor a cobrar ahora: lo que la API registro para la modalidad elegida\n// (deposit = 50% del total, full = 100% del total).\nlet amountToCharge = (api.paidAmount != null && Number(api.paidAmount) > 0) ? Number(api.paidAmount) : (isPartial ? totalPrice / 2 : totalPrice);\nif (!(amountToCharge > 0)) amountToCharge = isPartial ? totalPrice / 2 : totalPrice;\nconst amountInCents = Math.round(amountToCharge * 100);\n\nconst enabled = String(env.WOMPI_ENABLED == null ? 'true' : env.WOMPI_ENABLED).toLowerCase() !== 'false';\nconst hasKey = Boolean(env.WOMPI_PRIVATE_KEY);\nconst hours = Math.max(1, Number(env.WOMPI_LINK_EXPIRATION_HOURS || 24));\nconst expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();\n\nconst optionLabel = isPartial ? 'Anticipo 50%' : 'Pago total 100%';\nconst stay = (payload.checkIn && payload.checkOut) ? ` (${payload.checkIn} a ${payload.checkOut})` : '';\nconst wompiRequest = {\n  name: `Reserva ${code || ''} - Torre Satori`.trim().slice(0, 60),\n  description: `${optionLabel} de la reserva ${code || ''}${stay}`.slice(0, 250),\n  single_use: true,\n  collect_shipping: false,\n  currency: 'COP',\n  amount_in_cents: amountInCents,\n  expires_at: expiresAt,\n  sku: String(code || '').slice(0, 36)\n};\nif (env.WOMPI_REDIRECT_URL) wompiRequest.redirect_url = env.WOMPI_REDIRECT_URL;\n\nlet skipReason = null;\nif (!confirmed) skipReason = 'reserva_no_confirmada';\nelse if (!enabled) skipReason = 'wompi_deshabilitado';\nelse if (!hasKey) skipReason = 'sin_llave_privada';\nelse if (!(amountInCents >= 150000)) skipReason = 'monto_invalido';\n\nreturn [{\n  json: {\n    wa_id: source.wa_id || payload.waId || '',\n    sender_name: source.sender_name || payload.guestName || 'Huésped',\n    reservation_code: code,\n    payment_option: isPartial ? 'deposit' : 'full',\n    total_price: totalPrice,\n    amount_to_charge: amountInCents / 100,\n    amount_in_cents: amountInCents,\n    expires_at: expiresAt,\n    wompi_should_charge: skipReason === null,\n    wompi_skip_reason: skipReason,\n    wompi_request: wompiRequest\n  }\n}];"
       },
       "id": "677f6a9d-1599-5675-8186-0dd1a694c07f",
       "name": "H Preparar Cobro Wompi",
@@ -2202,6 +2202,11 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.wompi_request) }}",
         "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
           "timeout": 20000
         }
       },
@@ -2259,7 +2264,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5456,
+        5408,
         2800
       ]
     },
@@ -2277,8 +2282,8 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        5680,
-        2704
+        5648,
+        2800
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -2379,7 +2384,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// V9 · Mensaje al huesped segun el estado final de la transaccion Wompi.\nconst ev = $('H Verificar Evento Wompi').first().json;\nconst raw = $input.first().json || {};\nlet link = {};\ntry { link = typeof raw.value === 'string' ? JSON.parse(raw.value) : (raw.value || {}); } catch (e) { link = {}; }\n\nconst cop = (n) => '$' + Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 });\nconst amount = cop(ev.amount_in_cents / 100);\nconst code = link.reservation_code || 'de tu reserva';\nconst METHODS = { CARD: 'tarjeta', NEQUI: 'Nequi', PSE: 'PSE', BANCOLOMBIA_TRANSFER: 'Bancolombia', BANCOLOMBIA_QR: 'QR Bancolombia', DAVIPLATA: 'Daviplata' };\nconst method = METHODS[ev.payment_method_type] || ev.payment_method_type || '';\n\nlet text = '';\nif (ev.status === 'APPROVED') {\n  text = `*¡Pago recibido!*\\n\\n` +\n         `Confirmamos el pago de *${amount}*${method ? ' con ' + method : ''} para la reserva *${code}*.\\n` +\n         `• Transacción Wompi: ${ev.transaction_id}\\n` +\n         (link.payment_option === 'deposit' ? `• Recuerda que el saldo restante se paga al momento del check-in.\\n` : `• Tu estadía quedó pagada en su totalidad.\\n`) +\n         `\\n¡Te esperamos en *Torre Satori*! Escribe *menú* si necesitas algo más.`;\n} else {\n  const estados = { DECLINED: 'rechazado', ERROR: 'no pudo procesarse', VOIDED: 'anulado' };\n  text = `Tu pago de *${amount}* para la reserva *${code}* fue *${estados[ev.status] || ev.status}*.\\n\\n` +\n         `Puedes intentarlo nuevamente con otro medio de pago o escribir *agente* para que recepción te ayude.`;\n}\n\nreturn [{\n  json: {\n    wa_id: link.wa_id || null,\n    notify: Boolean(link.wa_id),\n    status: ev.status,\n    reservation_code: link.reservation_code || null,\n    transaction_id: ev.transaction_id,\n    response_text: text\n  }\n}];"
+        "jsCode": "// V9 · Mensaje al huesped segun el estado final de la transaccion Wompi.\nconst ev = $('H Verificar Evento Wompi').first().json;\nconst raw = $input.first().json || {};\nlet link = {};\ntry { link = typeof raw.value === 'string' ? JSON.parse(raw.value) : (raw.value || {}); } catch (e) { link = {}; }\n\nconst cop = (n) => '$' + Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 });\nconst amount = cop(ev.amount_in_cents / 100);\nconst code = link.reservation_code || 'de tu reserva';\nconst METHODS = { CARD: 'tarjeta', NEQUI: 'Nequi', PSE: 'PSE', BANCOLOMBIA_TRANSFER: 'Bancolombia', BANCOLOMBIA_QR: 'QR Bancolombia', DAVIPLATA: 'Daviplata' };\nconst method = METHODS[ev.payment_method_type] || ev.payment_method_type || '';\n\nlet text = '';\nif (ev.status === 'APPROVED') {\n  text = `*¡Pago recibido!*\\n\\n` +\n         `Confirmamos el pago de *${amount}*${method ? ' con ' + method : ''} para la reserva *${code}*.\\n` +\n         `• Transacción Wompi: ${ev.transaction_id}\\n` +\n         (link.payment_option === 'deposit' ? `• Recuerda que el saldo restante se paga al momento del check-in.\\n` : `• Tu estadía quedó pagada en su totalidad.\\n`) +\n         `\\n¡Te esperamos en *Torre Satori*! Escribe *menú* si necesitas algo más.`;\n} else {\n  const estados = { DECLINED: 'rechazado', ERROR: 'no pudo procesarse', VOIDED: 'anulado' };\n  text = `Tu pago de *${amount}* para la reserva *${code}* fue *${estados[ev.status] || ev.status}*.\\n\\n` +\n         `Puedes intentarlo nuevamente con otro medio de pago o escribir *agente* para que recepción te ayude.`;\n}\n\nconst confirmBody = {\n  amountPaid: Number(ev.amount_in_cents || 0) / 100,\n  paymentOption: link.payment_option || 'deposit',\n  transactionId: ev.transaction_id || '',\n  paymentMethod: ev.payment_method_type || 'WOMPI'\n};\nconst confirmExternal = Boolean(link.wa_id && ev.status === 'APPROVED' && link.reservation_code);\nreturn [{\n  json: {\n    wa_id: link.wa_id || null,\n    notify: Boolean(link.wa_id),\n    confirm_external: confirmExternal,\n    confirm_body: confirmBody,\n    status: ev.status,\n    reservation_code: link.reservation_code || null,\n    transaction_id: ev.transaction_id,\n    response_text: text\n  }\n}];"
       },
       "id": "0b80ad61-ec2e-5a74-890e-37ca645ec08a",
       "name": "H Mensaje Estado Pago Wompi",
@@ -2440,7 +2445,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: $json.wa_id, type: 'text', text: { body: $json.response_text, preview_url: false } }) }}",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: $('H Mensaje Estado Pago Wompi').first().json.wa_id, type: 'text', text: { body: $('H Mensaje Estado Pago Wompi').first().json.response_text, preview_url: false } }) }}",
         "options": {
           "timeout": 20000
         }
@@ -2450,8 +2455,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2768,
-        -384
+        3104,
+        -352
       ],
       "onError": "continueRegularOutput"
     },
@@ -2545,6 +2550,136 @@
       "position": [
         4768,
         3360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "hubo-reserva-previa-cond",
+              "leftValue": "={{ Boolean($('API Confirmar Reserva').first().json && $('API Confirmar Reserva').first().json.reservationGroupId) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "hubo-reserva-previa-if-v9",
+      "name": "¿Hubo Reserva Previa?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5408,
+        3056
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/group/' + $('H Preparar Cobro Wompi').first().json.reservation_code + '/cancellation' }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "api-cancel-wompi-fail-v9",
+      "name": "API Cancelar por Fallo Wompi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5648,
+        2992
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const apiResponse = (() => { try { return $('API Confirmar Reserva').first().json || {}; } catch (e) { return {}; } })();\nconst prep = (() => { try { return $('H Preparar Cobro Wompi').first().json || {}; } catch (e) { return {}; } })();\nconst source = (() => {\n  try { return $('H Procesar Reserva Paso').first().json; } catch (e) {}\n  try { return $('H Normalizar IA').first().json; } catch (e) {}\n  return {};\n})();\n\nconst wa_id = source.wa_id || prep.wa_id || '';\nconst sender_name = source.sender_name || prep.sender_name || 'Huésped';\n\nlet text = '';\nif (apiResponse.reservationGroupId) {\n  text = `Lo sentimos, en este momento no fue posible generar el enlace de pago en Wompi, por lo que no se registró ninguna reserva.\\n\\n` +\n         `Por favor intenta nuevamente en unos minutos o escribe *agente* para recibir asistencia de recepción.\\n\\n` +\n         `Escribe *menú* para volver al inicio.`;\n} else {\n  let errorMsg = apiResponse.error || apiResponse.message || apiResponse.detail;\n  if (errorMsg && typeof errorMsg === 'object') errorMsg = errorMsg.message || JSON.stringify(errorMsg);\n  if (!errorMsg) errorMsg = 'Error al confirmar disponibilidad';\n  text = `Lo sentimos, no pudimos completar tu reserva.\\nMotivo: ${errorMsg}.\\n\\nSi el tiempo de 15 minutos expiró, las habitaciones se liberaron automáticamente. Escribe *menú* para intentar de nuevo.`;\n}\n\nreturn [{\n  json: {\n    wa_id,\n    sender_name,\n    response_text: text,\n    response_payload: { type: 'text', text: { body: text, preview_url: false } },\n    locks_confirmed: false,\n    session: {\n      state: 'menu',\n      step: 'esperando_opcion',\n      agent_active: false,\n      wa_id,\n      sender_name,\n      reservation_draft: {}\n    }\n  }\n}];"
+      },
+      "id": "h-fallo-cobro-reserva-v9",
+      "name": "H Fallo Cobro o Reserva",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5904,
+        3056
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "confirm-ext-pay-cond",
+              "leftValue": "={{ $json.confirm_external }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "if-confirm-ext-pay-v9",
+      "name": "¿Confirmar Pago en API?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2720,
+        -368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/group/' + $json.reservation_code + '/confirm-external-payment' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.confirm_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "api-confirm-ext-pay-v9",
+      "name": "API Confirmar Pago Externo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2928,
+        -480
       ]
     }
   ],
@@ -3574,7 +3709,7 @@
         ],
         [
           {
-            "node": "H Reserva Exitosa",
+            "node": "¿Hubo Reserva Previa?",
             "type": "main",
             "index": 0
           }
@@ -3603,7 +3738,7 @@
         ],
         [
           {
-            "node": "H Reserva Exitosa",
+            "node": "¿Hubo Reserva Previa?",
             "type": "main",
             "index": 0
           }
@@ -3692,7 +3827,7 @@
       "main": [
         [
           {
-            "node": "Enviar Estado Pago WhatsApp",
+            "node": "¿Confirmar Pago en API?",
             "type": "main",
             "index": 0
           }
@@ -3761,6 +3896,75 @@
           }
         ]
       ]
+    },
+    "¿Hubo Reserva Previa?": {
+      "main": [
+        [
+          {
+            "node": "API Cancelar por Fallo Wompi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "H Fallo Cobro o Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Cancelar por Fallo Wompi": {
+      "main": [
+        [
+          {
+            "node": "H Fallo Cobro o Reserva",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "H Fallo Cobro o Reserva": {
+      "main": [
+        [
+          {
+            "node": "Preparar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Confirmar Pago en API?": {
+      "main": [
+        [
+          {
+            "node": "API Confirmar Pago Externo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar Estado Pago WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Confirmar Pago Externo": {
+      "main": [
+        [
+          {
+            "node": "Enviar Estado Pago WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -3768,7 +3972,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "12ba2a9e-3839-4939-b04d-43703b10e4b9",
+  "versionId": "1a1404b6-b28d-4904-9b3e-ae5a43d062eb",
   "meta": {
     "instanceId": "1c47d3693687f728d0d716490d7251af1174190f3701b869f8b18c4476a8908b"
   },

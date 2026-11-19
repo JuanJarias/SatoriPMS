@@ -1328,6 +1328,79 @@ const TEST_CASES = [
       }
       return { passed: bad.length === 0 && total > 0, details: `${total} nodos Code compilados sin errores sintacticos${bad.length ? ' | Errores: ' + bad.join('; ') : ''}` };
     }
+  },
+  {
+    id: 'TC-62',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'Viajero solo (1 adulto, 0 ninos) omite la pregunta de acompanantes y pasa directo a pago',
+    description: 'Verifica que al responder mascota cuando adults=1 y children=0 se omita el paso acompanantes y se muestre el resumen de pago.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const node = V9.nodes.find(n => n.name === 'H Procesar Reserva Paso');
+      const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
+      const out = new Function('$input', '$', '$env', node.parameters.jsCode)(
+        wrap({
+          wa_id: '573001112233', sender_name: 'Solo', message_text: 'No',
+          session: {
+            step: 'mascota',
+            reservation_draft: {
+              checkIn: '2026-12-01', checkOut: '2026-12-03',
+              adults: 1, children: 0, extraGuests: 0, extraGuestPrice: 0,
+              guestName: 'Quehubo Hollywood', document: '1122334455',
+              room: { id: 1, number: '101', name: 'Estandar', pricePerNight: 120000, allowsPets: true }
+            }
+          }
+        }),
+        () => wrap({}), {}
+      )[0].json;
+      const ok = out.session?.step === 'pago' && /Resumen de tu Reserva/i.test(out.response_text);
+      return { passed: ok, details: `step=${out.session?.step}, resumen mostrado directo=${/Resumen de tu Reserva/i.test(out.response_text)}` };
+    }
+  },
+  {
+    id: 'TC-63',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'Validacion estricta de nombres de todos los acompanantes separados por coma',
+    description: 'Verifica que con 2 adultos y 1 nino (2 acompanantes) exija ambos nombres separados por coma antes de avanzar a pago.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const node = V9.nodes.find(n => n.name === 'H Procesar Reserva Paso');
+      const run = (step, msg) => {
+        const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
+        return new Function('$input', '$', '$env', node.parameters.jsCode)(
+          wrap({
+            wa_id: '573001112233', sender_name: 'Ana', message_text: msg,
+            session: {
+              step,
+              reservation_draft: {
+                checkIn: '2026-12-01', checkOut: '2026-12-03',
+                adults: 2, children: 1, extraGuests: 1, extraGuestPrice: 35000,
+                guestName: 'Ana Lopez', document: '1094555666', hasPet: false,
+                room: { id: 1, number: '101', name: 'Estandar', pricePerNight: 120000, allowsPets: true }
+              }
+            }
+          }),
+          () => wrap({}), {}
+        )[0].json;
+      };
+      const ask = run('mascota', 'No');
+      const rejectNone = run('acompanantes', 'ninguno');
+      const rejectOne = run('acompanantes', 'Maria Gomez');
+      const acceptTwo = run('acompanantes', 'Maria Gomez, Carlos Perez');
+      const ok = ask.session?.step === 'acompanantes'
+        && ask.response_text.includes('2 acompañantes')
+        && rejectNone.session?.step === 'acompanantes'
+        && rejectOne.session?.step === 'acompanantes'
+        && acceptTwo.session?.step === 'pago'
+        && acceptTwo.session?.reservation_draft?.companions === 'Maria Gomez, Carlos Perez';
+      return { passed: ok, details: `pregunta="${ask.session?.step}", rechazo_ninguno="${rejectNone.session?.step}", rechazo_1="${rejectOne.session?.step}", acepta_2="${acceptTwo.session?.step}"` };
+    }
   }
 ];
 
