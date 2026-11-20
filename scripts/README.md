@@ -114,7 +114,7 @@ Enlaces que muestra al finalizar:
 | :--- | :--- |
 | Aplicación web | `http://localhost:5173` |
 | Servidor central (API) | `http://localhost:8080` |
-| Documentación de la API | `http://localhost:8080/swagger-ui/index.html` |
+| Documentación de la API | `http://localhost:8080/docs` |
 | n8n (editor local) | `http://localhost:5678` |
 | n8n (público) y webhooks | `N8N_PUBLIC_URL`, con `/webhook/whatsapp-webhook` y `/webhook/wompi-events` |
 
@@ -151,10 +151,10 @@ Elimina contenedores y volúmenes. **Es destructivo:** antes de borrar muestra q
 | `--keep-n8n` | Conserva los datos de n8n; solo borra PostgreSQL y Redis. |
 | `--images` | Borra también la imagen construida del servidor central. |
 | `--start` | Vuelve a levantar todo al terminar. |
-| `--seed` | Implica `--start`: carga `db/seed/dev_seed.sql` y publica el flujo V9. |
+| `--seed` | Implica `--start` y publica el flujo V9. Las habitaciones y los usuarios de desarrollo los crea Alembic al arrancar la API. |
 | `-y`, `--yes` | No pide confirmación. |
 
-Los usuarios que crea `dev_seed.sql` son `admin` y `recepcion`, con la contraseña de desarrollo `SatoriDev2026`. Sin `--keep-n8n`, n8n queda sin cuenta propietaria y hay que crearla al abrir `http://localhost:5678`.
+Los usuarios de desarrollo que crea Alembic son `admin` (contraseña `admin123`) y `recepcion` (contraseña `recepcion123`). Sin `--keep-n8n`, n8n queda sin cuenta propietaria y hay que crearla al abrir `http://localhost:5678`.
 
 ### `status-dev.sh` — Diagnóstico de solo lectura
 
