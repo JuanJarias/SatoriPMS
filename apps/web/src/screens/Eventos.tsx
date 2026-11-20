@@ -30,25 +30,28 @@ export function Eventos() {
   const { events, addEvent, toggleEventActive, role } = useStore();
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const weekLaterIso = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+
   // Form State
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [startDate, setStartDate] = useState('2026-10-15');
-  const [endDate, setEndDate] = useState('2026-10-25');
+  const [startDate, setStartDate] = useState(todayIso);
+  const [endDate, setEndDate] = useState(weekLaterIso);
   const [percentage, setPercentage] = useState(15);
   const [eventType, setEventType] = useState<'discount' | 'surcharge'>('discount');
 
   const { show, node } = useToast();
   const isAdmin = role === 'admin';
 
-  const handleSaveEvent = () => {
+  const handleSaveEvent = async () => {
     if (!name.trim()) {
       show('Nombre obligatorio', 'Por favor ingresa un nombre para el evento', 'bad');
       return;
     }
     const finalPct = eventType === 'discount' ? Math.abs(percentage) : -Math.abs(percentage);
 
-    addEvent({
+    const res = await addEvent({
       name: name.trim(),
       description: description.trim() || undefined,
       startDate,
@@ -56,6 +59,10 @@ export function Eventos() {
       discountPercentage: finalPct,
       active: true,
     });
+    if (!res.success) {
+      show('Error al crear evento', res.message, 'bad');
+      return;
+    }
 
     show('Evento especial creado', `${name} activo del ${startDate} al ${endDate}`);
     setCreateModalOpen(false);

@@ -205,8 +205,8 @@ print_links() {
     echo -e "${BOLD}${GREEN}  SatoriPMS — Enlaces de acceso${NC}"
     echo -e "${BOLD}${GREEN}══════════════════════════════════════════════════════════════════${NC}"
     printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "Aplicación web")" "$WEB_URL" "$(status_label "$(http_code "$WEB_URL")")"
-    printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "Backend (API)")" "$API_URL" "$(status_label "$(http_code "$API_URL/api-docs")")"
-    printf "  %s ${CYAN}%s${NC}\n" "$(pad_label "Documentación API")" "$API_URL/swagger-ui/index.html"
+    printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "Backend (API)")" "$API_URL" "$(status_label "$(http_code "$API_URL/api/v1/health")")"
+    printf "  %s ${CYAN}%s${NC}\n" "$(pad_label "Documentación API")" "$API_URL/docs"
     if n8n_enabled; then
         printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "n8n (editor local)")" "$N8N_URL" "$(status_label "$(http_code "$N8N_URL/healthz")")"
         if [ -n "$public" ]; then

@@ -42,25 +42,38 @@ export function Admin({
   subview?: 'dash' | 'fin' | 'rep' | 'usr' | 'log';
   go: (view: string, param?: string) => void;
 }) {
-  const { role, expenses, addExpense, voidExpense, users, setUsers, audit, products, log } = useStore();
+  const {
+    role,
+    rooms,
+    bookings,
+    expenses,
+    financeSummary,
+    addExpense,
+    voidExpense,
+    users,
+    createUser,
+    toggleUserActive,
+    exportExcelReport,
+    audit,
+    products,
+  } = useStore();
   const { show, node } = useToast();
-
-  const [dateFrom, setDateFrom] = useState('2026-09-01');
-  const [dateTo, setDateTo] = useState('2026-09-30');
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   // Modal registrar egreso
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
-  const [expDate, setExpDate] = useState('2026-10-01');
+  const [expDate, setExpDate] = useState(todayIso);
   const [expAmount, setExpAmount] = useState('');
   const [expCat, setExpCat] = useState('Servicios públicos');
   const [expDesc, setExpDesc] = useState('');
   const [voidTarget, setVoidTarget] = useState<ExpenseItem | null>(null);
 
-  // Modal nuevo recepcionista
+  // Modal nuevo usuario / recepcionista
   const [userModalOpen, setUserModalOpen] = useState(false);
+  const [userUsername, setUserUsername] = useState('');
   const [userName, setUserName] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [userPhone, setUserPhone] = useState('');
+  const [userPassword, setUserPassword] = useState('');
+  const [userRole, setUserRole] = useState('Recepcionista');
   const [userToggleTarget, setUserToggleTarget] = useState<UserItem | null>(null);
 
   // Filtros de Auditoría
@@ -69,11 +82,16 @@ export function Admin({
 
   const isAdmin = role === 'admin';
 
-  // Cálculos financieros
+  // Cálculos financieros reales desde PostgreSQL (/api/v1/finance/summary)
   const activeExpenses = expenses.filter((e) => !e.voided);
-  const totalExpenses = activeExpenses.reduce((acc, e) => acc + e.amount, 0);
-  const totalIncome = 19800000; // Ingresos acumulados de hospedaje + Salgados Café
-  const netBalance = totalIncome - totalExpenses;
+  const totalExpenses = financeSummary?.totalExpenses ?? activeExpenses.reduce((acc, e) => acc + e.amount, 0);
+  const lodgingIncome = financeSummary?.lodgingIncome ?? 0;
+  const chargesIncome = financeSummary?.chargesIncome ?? 0;
+  const totalIncome = financeSummary?.totalIncome ?? lodgingIncome + chargesIncome;
+  const netBalance = financeSummary?.netBalance ?? totalIncome - totalExpenses;
+  const occupiedCount = rooms.filter((r) => r.status === 'ocupada').length;
+  const occupancyPct = rooms.length > 0 ? Math.round((occupiedCount / rooms.length) * 100) : 0;
+  const activeBookingsCount = bookings.filter((b) => b.status === 'confirmada' || b.status === 'enCurso').length;
 
   const lowStockProducts = products.filter((p) => p.stock <= 5);
 
@@ -87,55 +105,62 @@ export function Admin({
     'Otros',
   ];
 
-  const handleSaveExpense = () => {
+  const handleSaveExpense = async () => {
     const amt = Number(expAmount);
     if (!expDesc.trim() || isNaN(amt) || amt <= 0) {
       show('Datos inválidos', 'Por favor ingresa descripción y valor positivo', 'bad');
       return;
     }
-    addExpense({
+    const res = await addExpense({
       date: expDate,
       amount: amt,
       category: expCat,
       desc: expDesc.trim(),
     });
+    if (!res.success) {
+      show('No se pudo registrar el egreso', res.message || 'Error en servidor', 'bad');
+      return;
+    }
     show('Egreso registrado', `${expDesc} · ${formatCurrency(amt)}`);
     setExpenseModalOpen(false);
     setExpDesc('');
     setExpAmount('');
   };
 
-  const handleCreateUser = () => {
-    if (!userName.trim() || !userEmail.trim()) {
-      show('Faltan campos obligatorios', 'Ingresa nombre y correo', 'bad');
+  const handleCreateUser = async () => {
+    if (!userUsername.trim() || !userName.trim() || userPassword.length < 6) {
+      show(
+        'Faltan campos obligatorios',
+        'Ingresa usuario, nombre completo y contraseña (mínimo 6 caracteres)',
+        'bad'
+      );
       return;
     }
-    const newUser: UserItem = {
-      id: 'u' + Date.now().toString().slice(-4),
+    const res = await createUser({
+      username: userUsername.trim(),
       name: userName.trim(),
-      email: userEmail.trim(),
-      phone: userPhone.trim() || '+57 300 000 0000',
-      role: 'Recepcionista',
-      active: true,
-      last: 'Nunca',
-    };
-    setUsers((prev) => [...prev, newUser]);
-    log(`Creó nuevo usuario recepcionista: ${newUser.name}`, 'Usuarios');
-    show('Usuario creado', `${newUser.name} asignado como Recepcionista`);
+      password: userPassword,
+      role: userRole,
+    });
+    if (!res.success) {
+      show('No se pudo crear el usuario', res.message || 'Error creando cuenta', 'bad');
+      return;
+    }
+    show('Usuario creado', `${userName.trim()} asignado como ${userRole}`);
     setUserModalOpen(false);
+    setUserUsername('');
     setUserName('');
-    setUserEmail('');
-    setUserPhone('');
+    setUserPassword('');
+    setUserRole('Recepcionista');
   };
 
-  const handleToggleUserActive = () => {
+  const handleToggleUserActive = async () => {
     if (!userToggleTarget) return;
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === userToggleTarget.id ? { ...u, active: !u.active } : u
-      )
-    );
-    log(`${userToggleTarget.active ? 'Desactivó' : 'Reactivó'} al usuario ${userToggleTarget.name}`, 'Usuarios');
+    const res = await toggleUserActive(userToggleTarget.id, userToggleTarget.active);
+    if (!res.success) {
+      show('Error al actualizar usuario', res.message || 'No se pudo cambiar el estado', 'bad');
+      return;
+    }
     show(
       userToggleTarget.active ? 'Usuario desactivado' : 'Usuario reactivado',
       `Acceso de ${userToggleTarget.name} actualizado`
@@ -177,19 +202,21 @@ export function Admin({
 
         <div className="grid grid-cols-2 gap-4 min-[1100px]:grid-cols-4">
           <Card className="p-4">
-            <span className="text-xs font-medium text-ink-soft">Ocupación del Mes</span>
-            <p className="mt-2 font-display text-2xl font-bold text-forest-900">62%</p>
-            <span className="text-xs text-ink-soft">93 de 150 noches vendidas</span>
+            <span className="text-xs font-medium text-ink-soft">Ocupación Actual</span>
+            <p className="mt-2 font-display text-2xl font-bold text-forest-900">{occupancyPct}%</p>
+            <span className="text-xs text-ink-soft">
+              {occupiedCount} de {rooms.length} habitaciones · {activeBookingsCount} reserva(s) activa(s)
+            </span>
           </Card>
           <Card className="p-4">
             <span className="text-xs font-medium text-ink-soft">Ingresos Totales</span>
             <p className="mt-2 font-display text-2xl font-bold text-forest-900">{formatCurrency(totalIncome)}</p>
-            <span className="text-xs text-ink-soft">Hospedaje + Salgados Café</span>
+            <span className="text-xs text-ink-soft">Hospedaje + Consumos</span>
           </Card>
           <Card className="p-4">
             <span className="text-xs font-medium text-ink-soft">Egresos & Costos</span>
             <p className="mt-2 font-display text-2xl font-bold text-forest-900">{formatCurrency(totalExpenses)}</p>
-            <span className="text-xs text-ink-soft">Nómina, insumos y compras</span>
+            <span className="text-xs text-ink-soft">{activeExpenses.length} comprobante(s) vigentes</span>
           </Card>
           <Card className="p-4">
             <span className="text-xs font-medium text-ink-soft">Beneficio Neto</span>
@@ -203,27 +230,33 @@ export function Admin({
         <div className="mt-6 grid gap-6 min-[1100px]:grid-cols-[1.5fr_1fr]">
           <Card className="p-5">
             <CardHeader
-              title="Ingresos Semanales por Concepto"
-              hint="Comparativa: Hospedaje vs. Tienda & Salgados Café"
+              title="Desglose Financiero Real"
+              hint="Consolidado de hospedaje, cargos a habitación y canales registrados en PostgreSQL"
             />
-            <div className="space-y-3 pt-2">
-              {[
-                { sem: 'Semana 1 (Sep 01 - 07)', hosp: 4200000, cafe: 380000 },
-                { sem: 'Semana 2 (Sep 08 - 14)', hosp: 3600000, cafe: 310000 },
-                { sem: 'Semana 3 (Sep 15 - 21)', hosp: 4900000, cafe: 450000 },
-                { sem: 'Semana 4 (Sep 22 - 30)', hosp: 5100000, cafe: 420000 },
-              ].map((s) => (
-                <div key={s.sem} className="border-b border-sand-200 pb-2 text-sm">
+            <div className="space-y-3 pt-2 text-sm">
+              <div className="border-b border-sand-200 pb-2 flex justify-between">
+                <span className="font-semibold text-ink">Ingresos por Hospedaje (confirmadas / en curso)</span>
+                <span className="font-bold text-forest-900">{formatCurrency(lodgingIncome)}</span>
+              </div>
+              <div className="border-b border-sand-200 pb-2 flex justify-between">
+                <span className="font-semibold text-ink">Cargos a Habitación (Tienda & Salgados Café)</span>
+                <span className="font-bold text-terra-600">{formatCurrency(chargesIncome)}</span>
+              </div>
+              {(financeSummary?.channels ?? []).map((c) => (
+                <div key={c.channel} className="border-b border-sand-200 pb-2">
                   <div className="flex justify-between font-semibold text-ink">
-                    <span>{s.sem}</span>
-                    <span>{formatCurrency(s.hosp + s.cafe)}</span>
+                    <span>Canal: {c.channel}</span>
+                    <span>{c.pct}%</span>
                   </div>
                   <div className="flex justify-between text-xs text-ink-soft mt-1">
-                    <span>Hospedaje: {formatCurrency(s.hosp)}</span>
-                    <span className="text-terra-600 font-medium">Salgados Café: {formatCurrency(s.cafe)}</span>
+                    <span>{c.bookings} reserva(s)</span>
+                    <span>{formatCurrency(c.income)}</span>
                   </div>
                 </div>
               ))}
+              {(financeSummary?.channels ?? []).length === 0 && (
+                <p className="text-xs text-ink-soft">Aún no hay reservas confirmadas o en curso registradas.</p>
+              )}
             </div>
           </Card>
 
@@ -405,8 +438,12 @@ export function Admin({
             confirm="Confirmar anulación"
             danger
             onCancel={() => setVoidTarget(null)}
-            onConfirm={() => {
-              voidExpense(voidTarget.id);
+            onConfirm={async () => {
+              const res = await voidExpense(voidTarget.id);
+              if (!res.success) {
+                show('Error al anular egreso', res.message || 'Intenta nuevamente', 'bad');
+                return;
+              }
               show('Egreso anulado', `${voidTarget.desc} marcado como anulado`);
               setVoidTarget(null);
             }}
@@ -433,7 +470,14 @@ export function Admin({
             <Button
               variant="secondary"
               icon={<Download size={16} />}
-              onClick={() => show('Archivo generado', 'Reporte_TorreSatori_Sep2026.xlsx descargado')}
+              onClick={async () => {
+                const res = await exportExcelReport();
+                if (res.success) {
+                  show('Archivo generado', 'Reporte Excel descargado desde el servidor');
+                } else {
+                  show('Error al exportar', res.message || 'No se pudo descargar el Excel', 'bad');
+                }
+              }}
             >
               Exportar a Excel (.xlsx)
             </Button>
@@ -442,44 +486,45 @@ export function Admin({
 
         <div className="grid gap-6 min-[1100px]:grid-cols-2">
           <Card className="p-5">
-            <CardHeader title="Productos de Mayor Venta (Rotación Alta)" />
+            <CardHeader title="Catálogo Actual en Inventario" hint="Precios y stock en tiempo real desde base de datos" />
             <div className="space-y-3 pt-2 text-sm">
-              {[
-                { name: 'Salgados Café Origen Especial 250g', sales: 94, total: 2350000 },
-                { name: 'Agua Cristal 600 ml', sales: 86, total: 258000 },
-                { name: 'Gaseosa Postobón 400 ml', sales: 61, total: 244000 },
-                { name: 'Salgados Café Drip Bag (Pack x 5)', sales: 48, total: 768000 },
-              ].map((item) => (
-                <div key={item.name} className="flex justify-between items-center border-b border-sand-200 pb-2">
-                  <div>
-                    <p className="font-semibold text-ink">{item.name}</p>
-                    <p className="text-xs text-ink-soft">{item.sales} unidades vendidas</p>
+              {products.length === 0 ? (
+                <p className="text-xs text-ink-soft">No hay productos registrados en tienda.</p>
+              ) : (
+                products.slice(0, 8).map((item) => (
+                  <div key={item.id} className="flex justify-between items-center border-b border-sand-200 pb-2">
+                    <div>
+                      <p className="font-semibold text-ink">{item.name}</p>
+                      <p className="text-xs text-ink-soft">
+                        {item.category} · Stock: {item.stock} uds.
+                      </p>
+                    </div>
+                    <span className="font-bold text-forest-900">{formatCurrency(item.price)}</span>
                   </div>
-                  <span className="font-bold text-forest-900">{formatCurrency(item.total)}</span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </Card>
 
           <Card className="p-5">
-            <CardHeader title="Canales de Reserva (Desglose)" />
+            <CardHeader title="Canales de Reserva (Desglose Real)" />
             <div className="space-y-3 pt-2 text-sm">
-              {[
-                { channel: 'WhatsApp Oficial (Bot + Recepción)', pct: '64%', bookings: 56, income: 12672000 },
-                { channel: 'Recepción Directa (Walk-in)', pct: '24%', bookings: 21, income: 4752000 },
-                { channel: 'Reservas Telefónicas', pct: '12%', bookings: 10, income: 2376000 },
-              ].map((c) => (
-                <div key={c.channel} className="border-b border-sand-200 pb-2">
-                  <div className="flex justify-between font-semibold text-ink">
-                    <span>{c.channel}</span>
-                    <span className="text-forest-800">{c.pct}</span>
+              {(financeSummary?.channels ?? []).length === 0 ? (
+                <p className="text-xs text-ink-soft">Aún no hay reservas confirmadas para calcular participación por canal.</p>
+              ) : (
+                (financeSummary?.channels ?? []).map((c) => (
+                  <div key={c.channel} className="border-b border-sand-200 pb-2">
+                    <div className="flex justify-between font-semibold text-ink">
+                      <span>{c.channel}</span>
+                      <span className="text-forest-800">{c.pct}%</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-ink-soft mt-1">
+                      <span>{c.bookings} reserva(s) confirmada(s)</span>
+                      <span>{formatCurrency(c.income)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-xs text-ink-soft mt-1">
-                    <span>{c.bookings} reservas confirmadas</span>
-                    <span>{formatCurrency(c.income)}</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </Card>
         </div>
@@ -512,7 +557,7 @@ export function Admin({
             <thead className="bg-sand-50">
               <tr>
                 <TableHeader>Nombre</TableHeader>
-                <TableHeader>Correo</TableHeader>
+                <TableHeader>Usuario</TableHeader>
                 <TableHeader>Rol</TableHeader>
                 <TableHeader>Último acceso</TableHeader>
                 <TableHeader>Estado</TableHeader>
@@ -524,9 +569,8 @@ export function Admin({
                 <tr key={u.id} className="hover:bg-forest-50 transition-colors">
                   <td className="px-4 py-3 font-semibold text-ink">
                     {u.name}
-                    <span className="block text-xs font-normal text-ink-soft">{u.phone}</span>
                   </td>
-                  <td className="px-4 py-3 text-xs">{u.email}</td>
+                  <td className="px-4 py-3 text-xs font-mono text-ink-soft">@{u.username}</td>
                   <td className="px-4 py-3 text-xs font-medium">{u.role}</td>
                   <td className="px-4 py-3 text-xs text-ink-soft">{u.last}</td>
                   <td className="px-4 py-3">
@@ -549,10 +593,10 @@ export function Admin({
           </table>
         </Card>
 
-        {/* Modal: Crear Recepcionista */}
+        {/* Modal: Crear Recepcionista / Usuario */}
         {userModalOpen && (
           <Modal
-            title="Nuevo Recepcionista"
+            title="Nuevo Usuario PMS"
             onClose={() => setUserModalOpen(false)}
             footer={
               <>
@@ -565,6 +609,13 @@ export function Admin({
               </>
             }
           >
+            <Field label="Usuario (username para iniciar sesión) *">
+              <Input
+                value={userUsername}
+                onChange={(e) => setUserUsername(e.target.value)}
+                placeholder="Ej. julian.perez"
+              />
+            </Field>
             <Field label="Nombre completo *">
               <Input
                 value={userName}
@@ -572,19 +623,22 @@ export function Admin({
                 placeholder="Ej. Julián Pérez"
               />
             </Field>
-            <Field label="Correo electrónico institucional *">
+            <Field label="Contraseña inicial (mínimo 6 caracteres) *">
               <Input
-                type="email"
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                placeholder="julian@torresatori.co"
+                type="password"
+                value={userPassword}
+                onChange={(e) => setUserPassword(e.target.value)}
+                placeholder="••••••••"
               />
             </Field>
-            <Field label="Teléfono de contacto">
-              <Input
-                value={userPhone}
-                onChange={(e) => setUserPhone(e.target.value)}
-                placeholder="+57 311 000 0000"
+            <Field label="Rol asignado">
+              <Select
+                value={userRole}
+                onChange={setUserRole}
+                options={[
+                  { value: 'Recepcionista', label: 'Recepcionista' },
+                  { value: 'Administrador', label: 'Administrador' },
+                ]}
               />
             </Field>
           </Modal>

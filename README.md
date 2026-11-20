@@ -1,10 +1,10 @@
 # SatoriPMS — Sistema de Gestión Hotelera y Reservas Automatizadas
 
-[![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://www.oracle.com/java/) [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot) [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/) [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/) [![n8n](https://img.shields.io/badge/n8n-2.47.3-EA4B71?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io/) [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/) [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/) [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/) [![n8n](https://img.shields.io/badge/n8n-2.47.3-EA4B71?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io/) [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/) [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
 **SatoriPMS** es la plataforma integral de administración hotelera y atención automatizada diseñada para **Torre Satori** (Sevilla, Valle del Cauca). Su propósito es modernizar la operación diaria del hotel, ofreciendo atención continua a los huéspedes a través de WhatsApp y centralizando el control administrativo, financiero y de recepción en una aplicación web intuitiva.
 
-El sistema resuelve la pérdida de reservas fuera del horario laboral y el riesgo de sobreventa mediante un flujo conversacional inteligente conectado a WhatsApp y un mecanismo de doble candado de concurrencia (bloqueo temporal en memoria rápida y validación estricta de solapamiento en base de datos).
+El sistema resuelve la pérdida de reservas fuera del horario laboral y el riesgo de sobreventa mediante un flujo conversacional inteligente conectado a WhatsApp y un mecanismo de doble candado de concurrencia (bloqueo temporal de 15 minutos y validación estricta de solapamiento, ambos en PostgreSQL).
 
 ---
 
@@ -22,6 +22,9 @@ El sistema resuelve la pérdida de reservas fuera del horario laboral y el riesg
 - [Cómo Contribuir](#cómo-contribuir)
 - [Equipo de Desarrollo](#equipo-de-desarrollo)
 
+> [!NOTE]
+> **El servidor central migró de Java/Spring Boot a Python/FastAPI.** El código Java anterior sigue en el historial de git (rama `main` hasta el commit `3185c2b`) y las migraciones y plantillas de referencia están en [docs/legacy-ref/](docs/legacy-ref/README.md).
+
 ---
 
 ## Contextualización y Propósito
@@ -30,7 +33,7 @@ En la operación hotelera tradicional, la atención manual de mensajes por Whats
 
 **SatoriPMS** resuelve esta problemática mediante un sistema unificado que:
 - Atiende a los viajeros las 24 horas del día por WhatsApp, tanto mediante un menú guiado paso a paso como mediante un asistente con inteligencia artificial capaz de procesar solicitudes en lenguaje natural.
-- Garantiza que dos personas no puedan reservar la misma habitación en las mismas fechas mediante un bloqueo temporal de 15 minutos en Redis mientras el huésped completa sus datos y realiza su pago.
+- Garantiza que dos personas no puedan reservar la misma habitación en las mismas fechas mediante un bloqueo temporal de 15 minutos en la base de datos mientras el huésped completa sus datos y realiza su pago.
 - Permite abonar el 50% de anticipo o el 100% del valor de la estadía, liquidar saldos pendientes, cancelar reservas aplicando las políticas de reembolso del hotel sobre el dinero efectivamente pagado y dirigir a los huéspedes al perfil oficial del hotel en Google Reviews.
 - Brinda al personal de recepción y a la administración un panel web para gestionar el catálogo de habitaciones (referencia actual de 9 habitaciones configurables), tarifas por temporada o eventos especiales, llegadas y salidas de huéspedes, ventas de productos de vitrina, control de inventario y reportes financieros.
 
@@ -41,19 +44,19 @@ En la operación hotelera tradicional, la atención manual de mensajes por Whats
 ```text
 SatoriPMS/
 ├── apps/
-│   ├── api/                 # Servidor central (Java 21, Spring Boot, reglas de negocio y seguridad)
+│   ├── api/                 # Servidor central (Python 3.12, FastAPI, SQLAlchemy y migraciones Alembic)
 │   └── web/                 # Aplicación web de recepción y administración (React 18, Vite)
-├── db/
-│   └── seed/                # Scripts de desarrollo y datos iniciales auxiliares
 ├── docs/                    # Documentación técnica, manuales, diagramas y presupuestos
 │   ├── Diagramas/           # Diagramas de arquitectura, concurrencia, secuencia y procesos
 │   ├── Presupuesto/         # Modelo financiero, costos de operación y análisis de crisis
+│   ├── legacy-ref/          # Referencia del backend Java anterior (migraciones, diagramas y flujos históricos)
 │   └── modulos/             # Especificaciones funcionales y arquitectura por módulo
 ├── flows/
-│   └── n8n/                 # Flujo conversacional del chatbot (V9 activo; V8 de respaldo en pastVersions/)
+│   └── n8n/                 # Flujo conversacional del chatbot (V9 activo con Redis; V10 sin Redis en preparación)
 ├── scripts/                 # Scripts de desarrollo: levantar, detener, reiniciar, diagnosticar y publicar el flujo n8n
 └── tests/
-    └── chatbot/             # Suite integral de pruebas automatizadas y scripts de validación
+    ├── chatbot/             # Suite integral del chatbot y scripts de validación (Node.js y Python)
+    └── test_*.py            # Pruebas del servidor central (pytest, base aislada satoripms_test)
 ```
 
 ---
@@ -62,11 +65,11 @@ SatoriPMS/
 
 | Tecnología / Herramienta | Tipo / Rol | Versión / Estándar |
 | :--- | :--- | :--- |
-| **Java** | Lenguaje Backend | 21 (LTS) |
-| **Spring Boot** | Framework Backend | 3.3.5 |
+| **Python** | Lenguaje Backend | 3.12 |
+| **FastAPI** | Framework Backend | 0.115+ |
+| **SQLAlchemy / Alembic** | Acceso a datos y control de versiones de la BD | 2.0 / 1.14 |
 | **PostgreSQL** | Base de Datos Relacional | 16-alpine (extensión `btree_gist`) |
-| **Flyway** | Control de Versiones de BD | Integrado con Spring Boot |
-| **Redis** | Memoria Rápida y Bloqueos | 7-alpine (Scripts Lua) |
+| **Redis** | Sesiones del flujo n8n V9 (solo n8n, no la API) | 7-alpine |
 | **n8n** | Orquestador Conversacional | 2.47.3 |
 | **Google Gemini** | Inteligencia Artificial | Gemini Flash Lite |
 | **React** | Biblioteca de Frontend | 18 |
@@ -89,19 +92,19 @@ flowchart TB
     subgraph Orquestacion["Capa de Orquestación e Inteligencia"]
         N8N["n8n 2.47.3 (Flujo V9 + Wompi)"]
         AI["Google Gemini (Flash Lite)"]
+        REDIS["Redis 7 (sesión del chatbot)"]
         N8N <--> AI
+        N8N <--> REDIS
     end
 
     subgraph Backend["Capa de Negocio y Persistencia"]
-        API["Backend Central (Spring Boot 3.3.5 / Java 21)"]
-        REDIS["Redis 7 (Bloqueo 15 min / TTL)"]
-        DB[("PostgreSQL 16 (Doble Candado / Flyway)")]
+        API["Backend Central (FastAPI / Python 3.12)"]
+        DB[("PostgreSQL 16 (Doble Candado: EXCLUDE gist + expires_at / Alembic)")]
     end
 
     WA <--> N8N
     N8N <--> API
     WEB <--> API
-    API <--> REDIS
     API <--> DB
 ```
 
@@ -114,6 +117,7 @@ flowchart TB
 | **Docker Engine** | 24.0+ | Daemon en ejecución con soporte para contenedores |
 | **Docker Compose** | 2.20+ | Plugin `docker compose` o binario `docker-compose` |
 | **Node.js** | 20.0+ LTS | Gestor de paquetes npm configurado |
+| **Python** | 3.12+ | Solo para ejecutar `pytest` y el validador del flujo fuera de Docker |
 | **Git** | 2.30+ | Cliente Git con soporte para clonado de repositorios |
 
 ---
@@ -125,17 +129,10 @@ flowchart TB
    ```bash
    cp .env.example .env
    ```
-   Como mínimo defina `JWT_SECRET` (32 caracteres o más) y `SATORI_SERVICE_KEY` (la misma llave la usan la API y n8n). Para crear el primer usuario administrador, complete `SATORI_ADMIN_USERNAME` y `SATORI_ADMIN_PASSWORD` antes del primer arranque.
+   Como mínimo defina `JWT_SECRET` (32 caracteres o más) y `SATORI_SERVICE_KEY` (la misma llave la usan la API y n8n). Los usuarios del personal (administrador y recepción) los crean las migraciones; consulta [docs/Guia_Configuracion_Entorno.md](docs/Guia_Configuracion_Entorno.md).
 
-2. **Datos Iniciales del Hotel (Plantillas de Semilla):**
-   Para proteger la información comercial del hotel, las plantillas de habitaciones y productos vienen con extensión `.example`. Para cargar los datos de referencia (incluidas las 9 habitaciones de prueba), genera los archivos locales. Son migraciones repetibles (`R__`), así que pueden crearse en cualquier momento sin chocar con las migraciones versionadas:
-   ```bash
-   cp apps/api/src/main/resources/db/migration/R__seed_rooms.sql.example \
-      apps/api/src/main/resources/db/migration/R__seed_rooms.sql
-
-   cp apps/api/src/main/resources/db/migration/R__seed_products.sql.example \
-      apps/api/src/main/resources/db/migration/R__seed_products.sql
-   ```
+2. **Datos Iniciales del Hotel:**
+   Las migraciones de Alembic (`apps/api/alembic/versions/`) crean el esquema y cargan las 9 habitaciones de referencia al arrancar la API. Las plantillas de semilla del backend Java anterior se conservan solo como referencia en [docs/legacy-ref/db-migrations/](docs/legacy-ref/README.md).
 
 ---
 
@@ -151,7 +148,7 @@ flowchart TB
    ```bash
    ./scripts/start-dev.sh
    ```
-   Levanta PostgreSQL, Redis, la API y n8n, espera a que cada servicio responda, abre el túnel público `zrok2` de n8n (si `N8N_PUBLIC_URL` es de zrok) e inicia la aplicación web en segundo plano. Al terminar muestra los enlaces de acceso.
+   Levanta PostgreSQL, la API FastAPI (aplica las migraciones de Alembic), Redis (solo para n8n) y n8n, espera a que cada servicio responda, abre el túnel público `zrok2` de n8n (si `N8N_PUBLIC_URL` es de zrok) e inicia la aplicación web en segundo plano. Al terminar muestra los enlaces de acceso.
 
    | Script | Para qué sirve |
    | :--- | :--- |
@@ -164,10 +161,10 @@ flowchart TB
    Todos los scripts aceptan `--help`. Los registros de la web y del túnel quedan en `.dev/`. La referencia completa está en [scripts/README.md](scripts/README.md).
 
 3. **Servicios disponibles en el entorno local:**
-   - **Servidor Principal (API):** `http://localhost:8080` (Documentación Swagger / OpenAPI: `http://localhost:8080/swagger-ui/index.html`)
-   - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (flujo activo con pasarela de pago Wompi: [V9_ChatbotReservas.json](flows/n8n/V9_ChatbotReservas.json); versiones anteriores en [pastVersions/](flows/n8n/pastVersions/)).
+   - **Servidor Principal (API FastAPI):** `http://localhost:8080` (documentación OpenAPI: `http://localhost:8080/docs`)
+   - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (flujo activo con pasarela de pago Wompi: [V9_ChatbotReservas.json](flows/n8n/V9_ChatbotReservas.json); el [V10](flows/n8n/V10_ChatbotReservas.json) guarda la sesión en PostgreSQL y aún no incorpora la llave de servicio ni el documento del titular).
    - **Base de Datos (PostgreSQL 16):** Puerto local `5432`.
-   - **Gestor de Bloqueos y Sesiones (Redis 7):** Puerto local `6379`.
+   - **Sesiones del chatbot (Redis 7):** Puerto local `6379`, usado únicamente por n8n.
    - **Aplicación Web:** `http://localhost:5173`.
 
 ---
@@ -187,9 +184,9 @@ node tests/chatbot/suite_pruebas_chatbot.js --flow 1
 node tests/chatbot/test_pago_wompi_v9.js
 python3 tests/chatbot/verify_n8n_flow_integrity.py
 
-# Pruebas del servidor central (seguridad, tarifas por noche); con Docker activo,
-# ENABLE_DOCKER_TESTS=true agrega la prueba de persistencia sobre PostgreSQL real
-cd apps/api && mvn test
+# Pruebas del servidor central (pytest; crea y migra la base aislada satoripms_test).
+# Requiere PostgreSQL levantado (./scripts/start-dev.sh) y las dependencias de apps/api/requirements.txt
+pytest
 ```
 
 ---

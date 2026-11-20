@@ -29,14 +29,14 @@ import {
 } from '../ui';
 
 export function Restaurante({ go }: { go: (view: string, param?: string) => void }) {
-  const { menu, orders, rooms, addRestaurantOrder, updateOrderStatus, log } = useStore();
+  const { menu, orders, rooms, addRestaurantOrder, updateOrderStatus } = useStore();
   const [selectedCat, setSelectedCat] = useState<string>('todas');
   const [activeTab, setActiveTab] = useState<'menu' | 'comandas'>('menu');
 
   // Carrito de comanda
   const [orderItems, setOrderItems] = useState<{ menuItemId: string | number; name: string; qty: number; price: number }[]>([]);
   const [orderDestination, setOrderDestination] = useState<'room' | 'table'>('room');
-  const [selectedRoomNum, setSelectedRoomNum] = useState<string>('101');
+  const [selectedRoomNum, setSelectedRoomNum] = useState<string>('');
   const [tableNumber, setTableNumber] = useState<string>('Mesa 1');
 
   const { show, node } = useToast();
@@ -88,24 +88,28 @@ export function Restaurante({ go }: { go: (view: string, param?: string) => void
 
   const orderTotal = orderItems.reduce((acc, i) => acc + i.price * i.qty, 0);
 
-  const handleSendOrder = () => {
+  const handleSendOrder = async () => {
     if (orderItems.length === 0) return;
 
-    const guestRoomObj = rooms.find((r) => r.number === selectedRoomNum);
+    const targetRoomNum = selectedRoomNum || occupiedRooms[0]?.number || rooms[0]?.number || '1';
+    const guestRoomObj = rooms.find((r) => r.number === targetRoomNum);
 
-    addRestaurantOrder({
-      roomNumber: orderDestination === 'room' ? selectedRoomNum : undefined,
+    const res = await addRestaurantOrder({
+      roomNumber: orderDestination === 'room' ? targetRoomNum : undefined,
       tableNumber: orderDestination === 'table' ? tableNumber : undefined,
       guestName: orderDestination === 'room' ? guestRoomObj?.guest || 'Huésped' : undefined,
       items: orderItems,
-      total: orderTotal,
       status: orderDestination === 'room' ? 'charged_to_room' : 'pending',
     });
+    if (!res.success) {
+      show('Error al registrar comanda', res.message, 'bad');
+      return;
+    }
 
     if (orderDestination === 'room') {
       show(
         'Comanda enviada con cargo a habitación',
-        `Hab. ${selectedRoomNum} (${guestRoomObj?.guest || ''}) · Total: ${formatCurrency(orderTotal)}`
+        `Hab. ${targetRoomNum} (${guestRoomObj?.guest || ''}) · Total: ${formatCurrency(orderTotal)}`
       );
     } else {
       show(

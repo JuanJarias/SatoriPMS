@@ -25,7 +25,8 @@ Opciones:
   --keep-n8n     Conserva los datos de n8n (cuenta, credenciales y flujos); solo borra PostgreSQL y Redis.
   --images       Borra también la imagen construida de la API (fuerza recompilación completa).
   --start        Vuelve a levantar todo al terminar (start-dev.sh).
-  --seed         Con --start: carga datos de prueba (db/seed/dev_seed.sql) y publica el flujo V9.
+  --seed         Con --start: además publica el flujo V9 en n8n (las habitaciones y los usuarios de
+                 desarrollo los crea Alembic al arrancar la API).
   -y, --yes      No pide confirmación.
   -h, --help     Muestra esta ayuda.
 EOF
@@ -91,10 +92,7 @@ if $START_AFTER; then
     $SEED && start_args+=(--sync-flow)
     "$SCRIPTS_DIR/start-dev.sh" "${start_args[@]}"
     if $SEED; then
-        log_step "Cargando datos de prueba (db/seed/dev_seed.sql)"
-        compose exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-            < "$ROOT_DIR/db/seed/dev_seed.sql"
-        log_success "Datos de prueba cargados. Usuarios: admin / recepcion — contraseña: SatoriDev2026"
+        log_success "Datos de prueba creados por Alembic. Usuarios de desarrollo: admin / admin123 y recepcion / recepcion123."
         if ! $KEEP_N8N && n8n_enabled; then
             log_warn "n8n quedó sin cuenta ni credenciales: abre $N8N_URL para crear el usuario propietario."
         fi

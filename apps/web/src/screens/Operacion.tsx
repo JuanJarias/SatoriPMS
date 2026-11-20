@@ -43,23 +43,23 @@ export function Operacion({
   code?: string;
   go: (view: string, param?: string) => void;
 }) {
-  const { rooms, bookings, charges, clearCharges, patchBooking, setBookingStatus, setRoomStatus, log } = useStore();
+  const { rooms, bookings, charges, setBookingStatus, setRoomStatus } = useStore();
   const { show, node } = useToast();
 
-  const todayStr = '2026-10-01';
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  // --- SUBVIEW: LLEGADAS (Check-in hoy) ---
+  // --- SUBVIEW: LLEGADAS (Check-in hoy y confirmadas pendientes) ---
   if (subview === 'llegadas') {
     const todayArrivals = bookings.filter(
-      (b) => b.checkIn === todayStr && b.status !== 'cancelada'
+      (b) => (b.status === 'confirmada' || b.status === 'bloqueada' || b.status === 'pendiente')
     );
 
     return (
       <div>
         <PageHeader
-          eyebrow="Operación de Recepción · Jueves 1 de oct"
+          eyebrow={`Operación de Recepción · ${todayStr}`}
           title="Llegadas & Check-in"
-          desc="Huéspedes con reserva para ingresar hoy. Verifica su identidad y entrega de llaves."
+          desc="Huéspedes con reserva pendiente de ingreso. Verifica su identidad y entrega llaves."
         />
 
         <Card className="overflow-hidden">
@@ -83,7 +83,7 @@ export function Operacion({
                 </thead>
                 <tbody className="divide-y divide-sand-200">
                   {todayArrivals.map((b) => {
-                    const roomObj = rooms.find((r) => r.number === b.room || r.id === b.room);
+                    const roomObj = rooms.find((r) => r.number === b.room || r.id === b.roomId);
                     const isPending = b.status === 'pendiente' || b.status === 'bloqueada';
                     const balance = b.total - b.paid;
 
@@ -141,12 +141,12 @@ export function Operacion({
 
   // --- SUBVIEW: CHECK-IN ASISTIDO ---
   if (subview === 'checkin') {
-    const booking = bookings.find((b) => b.code === code) || bookings.find((b) => b.code === 'TS-2047');
-    const roomObj = rooms.find((r) => r.number === booking?.room || r.id === booking?.room);
+    const booking = bookings.find((b) => b.code === code) || bookings.find((b) => b.status === 'confirmada');
+    const roomObj = rooms.find((r) => r.id === booking?.roomId || r.number === booking?.room);
 
     const [ciStep, setCiStep] = useState(0);
     const [docType, setDocType] = useState('CC');
-    const [docNumber, setDocNumber] = useState(booking?.doc?.replace(/^\w+ /, '') || '94.333.712');
+    const [docNumber, setDocNumber] = useState(booking?.doc?.replace(/^\w+ /, '') || '');
     const [verifiedDoc, setVerifiedDoc] = useState(false);
     const [actualGuests, setActualGuests] = useState(booking?.guests || 2);
     const [paymentOption, setPaymentOption] = useState<'efectivo' | 'datafono' | 'transferencia' | 'pendiente'>('efectivo');
@@ -165,18 +165,12 @@ export function Operacion({
 
     const pendingBalance = booking.total - booking.paid;
 
-    const handleFinishCheckIn = () => {
-      patchBooking(booking.code, {
-        doc: `${docType} ${docNumber}`,
-        guests: actualGuests,
-        paid: paymentOption === 'pendiente' ? booking.paid : booking.total,
-      });
-      setBookingStatus(booking.code, 'enCurso');
-      setRoomStatus(roomObj.id, 'ocupada', {
-        guest: booking.guest,
-        until: `Sale ${booking.checkOut}, 11:00 am`,
-      });
-      log(`Registró check-in de ${booking.guest} (Hab. ${roomObj.number})`, 'Check-in');
+    const handleFinishCheckIn = async () => {
+      const res = await setBookingStatus(booking.code, 'enCurso');
+      if (!res.success) {
+        show('Error en check-in', res.message, 'bad');
+        return;
+      }
       setCompleted(true);
     };
 
@@ -410,7 +404,7 @@ export function Operacion({
     return (
       <div>
         <PageHeader
-          eyebrow="Operación de Recepción · Jueves 1 de oct"
+          eyebrow={`Operación de Recepción · ${todayStr}`}
           title="Salidas & Check-out"
           desc="Huéspedes que finalizan su estancia. Liquida consumos de tienda y restaurante Salgados Café."
         />
@@ -436,7 +430,7 @@ export function Operacion({
                 </thead>
                 <tbody className="divide-y divide-sand-200">
                   {activeDepartures.map((b) => {
-                    const roomObj = rooms.find((r) => r.number === b.room || r.id === b.room);
+                    const roomObj = rooms.find((r) => r.number === b.room || r.id === b.roomId);
                     const roomCharges = charges[b.room] || [];
                     const chargesTotal = roomCharges.reduce((acc, c) => acc + c.amount, 0);
 
@@ -485,7 +479,7 @@ export function Operacion({
   // --- SUBVIEW: CHECK-OUT ASISTIDO CON CONSOLIDACIÓN DE CONSUMOS ---
   if (subview === 'checkout') {
     const booking = bookings.find((b) => b.code === code && b.status === 'enCurso') || bookings.find((b) => b.status === 'enCurso');
-    const roomObj = rooms.find((r) => r.number === booking?.room || r.id === booking?.room);
+    const roomObj = rooms.find((r) => r.number === booking?.room || r.id === booking?.roomId);
 
     const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'datafono' | 'transferencia'>('efectivo');
     const [targetRoomStatus, setTargetRoomStatus] = useState<RoomStatusKey>('limpieza');
@@ -507,19 +501,15 @@ export function Operacion({
     const roomBalance = booking.total - booking.paid;
     const grandTotal = roomBalance + chargesTotal;
 
-    const handleExecuteCheckout = () => {
-      patchBooking(booking.code, { paid: booking.total });
-      setBookingStatus(booking.code, 'finalizada');
-      clearCharges(booking.room);
-      setRoomStatus(roomObj.id, targetRoomStatus, {
-        guest: undefined,
-        until: undefined,
-        note: targetRoomStatus === 'limpieza' ? 'Aseo de salida iniciado' : undefined,
-      });
-      log(
-        `Registró check-out de ${booking.guest} (Hab. ${roomObj.number}). Total liquidado: ${formatCurrency(grandTotal)}`,
-        'Check-out'
-      );
+    const handleExecuteCheckout = async () => {
+      const res = await setBookingStatus(booking.code, 'finalizada');
+      if (!res.success) {
+        show('Error al registrar check-out', res.message, 'bad');
+        return;
+      }
+      if (targetRoomStatus !== 'limpieza') {
+        await setRoomStatus(roomObj.id, targetRoomStatus);
+      }
       setCheckoutCompleted(true);
     };
 

@@ -1,0 +1,462 @@
+"""Pruebas de operación web con RBAC JWT, check-in/out auditado, CRUD habitaciones (TC-02), Salgados Café (TC-03), Eventos (TC-04) y Reseñas."""
+
+from httpx import ASGITransport, AsyncClient
+import pytest
+from sqlalchemy import delete, select
+
+from apps.api.core.config import settings
+from apps.api.core.database import AsyncSessionLocal
+from apps.api.main import app
+from apps.api.models import (
+    AuditLog,
+    Booking,
+    BookingStatus,
+    CafeOrder,
+    Expense,
+    FolioCharge,
+    Room,
+    SpecialEvent,
+    User,
+)
+from apps.api.services.reviews_service import clear_reviews_cache
+
+
+async def _login_headers(client: AsyncClient, username: str, password: str) -> dict[str, str]:
+    res = await client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": password},
+    )
+    assert res.status_code == 200
+    return {"Authorization": f"Bearer {res.json()['access_token']}"}
+
+
+@pytest.mark.asyncio
+async def test_web_booking_creation_checkin_en_curso_and_checkout_with_audit() -> None:
+    """Verifica creación de reserva manual con JWT, transición a EN_CURSO en check-in con audit_log y liquidación en check-out."""
+    async with AsyncSessionLocal() as session:
+        room_res = await session.execute(select(Room).where(Room.number == "4"))
+        room = room_res.scalar_one()
+        room.status = "available"
+        room.active = True
+        await session.execute(delete(Booking).where(Booking.room_id == room.id))
+        await session.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 0. Endpoints demo abiertos deben estar retirados (404) y las rutas operativas exigen JWT (401)
+        removed_res = await client.post("/api/bookings/test-paid", json={})
+        assert removed_res.status_code == 404
+        unauth_res = await client.get("/api/v1/bookings")
+        assert unauth_res.status_code == 401
+
+        recep_headers = await _login_headers(client, "recepcion", "recepcion123")
+
+        # 1. Crear reserva desde recepción web autenticada (POST /api/v1/bookings/manual)
+        create_res = await client.post(
+            "/api/v1/bookings/manual",
+            headers=recep_headers,
+            json={
+                "rooms": [
+                    {
+                        "roomId": room.id,
+                        "checkIn": "2026-12-10",
+                        "checkOut": "2026-12-12",
+                    }
+                ],
+                "guest": {
+                    "name": "Laura Gómez",
+                    "phone": "+573105551122",
+                    "documentNumber": "1090807060",
+                },
+                "companions": "TS-2041",
+            },
+        )
+        assert create_res.status_code == 200
+        booking_id = create_res.json()["bookingIds"][0]
+        assert create_res.json()["status"] == BookingStatus.CONFIRMADA.value
+
+        # 2. Check-in manual en mostrador -> pasa a EN_CURSO y registra actor real en audit_log
+        checkin_res = await client.post(
+            f"/api/v1/bookings/{booking_id}/check-in",
+            headers=recep_headers,
+        )
+        assert checkin_res.status_code == 200
+        assert checkin_res.json()["status"] == BookingStatus.EN_CURSO.value
+
+        # 3. Check-out manual -> liquida cuenta y marca habitación en limpieza
+        checkout_res = await client.post(
+            f"/api/v1/bookings/{booking_id}/check-out",
+            headers=recep_headers,
+        )
+        assert checkout_res.status_code == 200
+        assert checkout_res.json()["paymentStatus"] == "paid"
+
+        # Recepción sí puede restaurar estado operativo vía PATCH /status
+        patch_res = await client.patch(
+            f"/api/v1/rooms/{room.id}/status",
+            headers=recep_headers,
+            json={"status": "available"},
+        )
+        assert patch_res.status_code == 200
+
+    async with AsyncSessionLocal() as session:
+        audit_res = await session.execute(
+            select(AuditLog)
+            .where(AuditLog.action == "BOOKING_CHECK_IN")
+            .order_by(AuditLog.id.desc())
+        )
+        latest = audit_res.scalars().first()
+        assert latest is not None
+        assert latest.actor_username == "recepcion"
+
+
+@pytest.mark.asyncio
+async def test_room_crud_and_delete_protection_when_booking_active_tc02() -> None:
+    """Verifica RBAC Admin vs Recepción, actualización dinámica de tarifa y bloqueo HTTP 409 al borrar con reserva activa (TC-02)."""
+    async with AsyncSessionLocal() as session:
+        room_res = await session.execute(select(Room).where(Room.number == "5"))
+        room = room_res.scalar_one()
+        room.active = True
+        await session.execute(delete(Booking).where(Booking.room_id == room.id))
+        await session.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        recep_headers = await _login_headers(client, "recepcion", "recepcion123")
+        admin_headers = await _login_headers(client, "admin", "admin123")
+
+        # 0. Recepcionista no puede editar tarifas ni eliminar habitaciones -> 403 Forbidden
+        forbidden_upd = await client.put(
+            f"/api/v1/rooms/{room.id}",
+            headers=recep_headers,
+            json={"pricePerNight": 385000},
+        )
+        assert forbidden_upd.status_code == 403
+        forbidden_del = await client.delete(
+            f"/api/v1/rooms/{room.id}",
+            headers=recep_headers,
+        )
+        assert forbidden_del.status_code == 403
+
+        # 1. Administrador sí actualiza tarifa de Hab 5 (Suite Satori)
+        upd_res = await client.put(
+            f"/api/v1/rooms/{room.id}",
+            headers=admin_headers,
+            json={"pricePerNight": 385000, "status": "available"},
+        )
+        assert upd_res.status_code == 200
+        assert upd_res.json()["pricePerNight"] == 385000.0
+
+        # 2. Crear una reserva activa en Hab 5
+        await client.post(
+            "/api/v1/bookings/manual",
+            headers=recep_headers,
+            json={
+                "rooms": [{"roomId": room.id, "checkIn": "2026-12-15", "checkOut": "2026-12-17"}],
+                "guest": {"name": "Huésped Activo TC02"},
+            },
+        )
+
+        # 3. Intentar eliminar Hab 5 mientras tiene reserva activa -> 409 Conflict (candado de borrado TC-02)
+        del_res = await client.delete(f"/api/v1/rooms/{room.id}", headers=admin_headers)
+        assert del_res.status_code == 409
+        assert "TC-02" in del_res.json()["detail"]
+
+        # Restaurar precio original de Hab 5
+        await client.put(
+            f"/api/v1/rooms/{room.id}",
+            headers=admin_headers,
+            json={"pricePerNight": 380000},
+        )
+
+
+@pytest.mark.asyncio
+async def test_room_number_editable_without_id_collision_and_post_create() -> None:
+    """Verifica creación POST /api/v1/rooms, edición segura de room.number por Room.id y rechazo 409 si duplica (P3)."""
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(Room).where(Room.number == "10"))
+        await session.commit()
+        r1 = (await session.execute(select(Room).where(Room.number == "1"))).scalar_one()
+        r2 = (await session.execute(select(Room).where(Room.number == "2"))).scalar_one()
+        r1_id, r2_id = r1.id, r2.id
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        recep_headers = await _login_headers(client, "recepcion", "recepcion123")
+        admin_headers = await _login_headers(client, "admin", "admin123")
+
+        # 1. Recepción no puede crear habitaciones (403); Admin sí (201) y duplicado -> 409
+        forb_post = await client.post(
+            "/api/v1/rooms",
+            headers=recep_headers,
+            json={"number": "10", "name": "Mirador Norte", "pricePerNight": 230000},
+        )
+        assert forb_post.status_code == 403
+
+        ok_post = await client.post(
+            "/api/v1/rooms",
+            headers=admin_headers,
+            json={"number": "10", "name": "Mirador Norte", "pricePerNight": 230000},
+        )
+        assert ok_post.status_code == 201
+        created_id = ok_post.json()["id"]
+
+        dup_post = await client.post(
+            "/api/v1/rooms",
+            headers=admin_headers,
+            json={"number": "10", "name": "Duplicada", "pricePerNight": 230000},
+        )
+        assert dup_post.status_code == 409
+
+        # 2. Ordenamiento numérico (1..9, 10 -> "10" va al final, no después de "1")
+        list_res = await client.get("/api/v1/rooms", headers=admin_headers)
+        assert list_res.status_code == 200
+        nums = [r["number"] for r in list_res.json()]
+        assert nums[-1] == "10"
+
+        # 3. Intentar cambiar número de r1 a "2" (ocupado por r2) -> 409 Conflict
+        dup_upd = await client.put(
+            f"/api/v1/rooms/{r1_id}",
+            headers=admin_headers,
+            json={"number": "2"},
+        )
+        assert dup_upd.status_code == 409
+
+        # 4. Cambiar número de r1 ("1" -> "99") y verificar que PUT /rooms/{r2_id} solo toca r2 sin colisión
+        ok_upd = await client.put(
+            f"/api/v1/rooms/{r1_id}",
+            headers=admin_headers,
+            json={"number": "99"},
+        )
+        assert ok_upd.status_code == 200
+        assert ok_upd.json()["number"] == "99"
+
+        r2_check = await client.put(
+            f"/api/v1/rooms/{r2_id}",
+            headers=admin_headers,
+            json={"name": "Familiar"},
+        )
+        assert r2_check.status_code == 200
+        assert r2_check.json()["id"] == r2_id
+        assert r2_check.json()["number"] == "2"
+
+        # Restaurar número "1" de r1 y limpiar habitación temporal "10"
+        await client.put(
+            f"/api/v1/rooms/{r1_id}",
+            headers=admin_headers,
+            json={"number": "1"},
+        )
+
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(Room).where(Room.id == created_id))
+        await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_salgados_cafe_order_to_folio_tc03_events_tc04_and_reviews() -> None:
+    """Verifica TC-03 (Salgados Café al folio), TC-04 (eventos solo Admin con 10% descuento) y resumen de reseñas."""
+    async with AsyncSessionLocal() as session:
+        room_res = await session.execute(select(Room).where(Room.number == "6"))
+        room = room_res.scalar_one()
+        await session.execute(delete(Booking).where(Booking.room_id == room.id))
+        await session.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        recep_headers = await _login_headers(client, "recepcion", "recepcion123")
+        admin_headers = await _login_headers(client, "admin", "admin123")
+
+        # Crear reserva activa en Hab 6 Cafetal (2 noches x $220.000 = $440.000)
+        b_res = await client.post(
+            "/api/v1/bookings/manual",
+            headers=recep_headers,
+            json={
+                "rooms": [{"roomId": room.id, "checkIn": "2026-12-18", "checkOut": "2026-12-20"}],
+                "guest": {"name": "Huésped Salgados TC03"},
+            },
+        )
+        assert b_res.status_code == 200
+        booking_id = b_res.json()["bookingIds"][0]
+
+        # 1. TC-03: Cargar pedido de Salgados Café ($18.000 x 2 = $36.000) al folio de Hab 6 -> consolidado $476.000
+        order_res = await client.post(
+            "/api/v1/restaurant/orders",
+            headers=recep_headers,
+            json={
+                "roomNumber": "6",
+                "bookingId": booking_id,
+                "items": [{"name": "Desayuno Típico Vallecaucano", "price": 18000, "qty": 2}],
+            },
+        )
+        assert order_res.status_code == 200
+        assert order_res.json()["orderTotal"] == 36000.0
+        assert order_res.json()["consolidatedFolioTotal"] == 476000.0
+
+        # 2. TC-04: Recepcionista no puede crear eventos (403); Administrador sí (200)
+        forbidden_ev = await client.post(
+            "/api/v1/events",
+            headers=recep_headers,
+            json={"name": "No autorizado", "discountPercentage": 10},
+        )
+        assert forbidden_ev.status_code == 403
+
+        ev_res = await client.post(
+            "/api/v1/events",
+            headers=admin_headers,
+            json={
+                "name": "Feria del Café Sevilla",
+                "discountPercentage": 10,
+                "baseAmount": 240000,
+            },
+        )
+        assert ev_res.status_code == 200
+        assert ev_res.json()["discountedTotal"] == 216000.0
+
+        # 3. Resumen de reseñas sin GOOGLE_PLACES_API_KEY: nunca inventa reseñas falsas
+        clear_reviews_cache()
+        old_key = settings.GOOGLE_PLACES_API_KEY
+        settings.GOOGLE_PLACES_API_KEY = ""
+        try:
+            rev_unauth = await client.get("/api/v1/reviews/summary")
+            assert rev_unauth.status_code == 401
+            rev_res = await client.get("/api/v1/reviews/summary", headers=recep_headers)
+            assert rev_res.status_code == 200
+            assert rev_res.json()["placesApiConfigured"] is False
+            assert rev_res.json()["reviews"] == []
+        finally:
+            settings.GOOGLE_PLACES_API_KEY = old_key
+
+
+@pytest.mark.asyncio
+async def test_store_expenses_users_google_places_and_excel_export_p5(monkeypatch) -> None:
+    """Verifica persistencia DB de Tienda, Egresos, Usuarios, Google Places HTTP real y Excel openpyxl (P5)."""
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(FolioCharge))
+        await session.execute(delete(CafeOrder))
+        await session.execute(delete(Expense))
+        await session.execute(delete(SpecialEvent))
+        await session.execute(delete(User).where(User.username == "recep_temp_p5"))
+        await session.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        recep_headers = await _login_headers(client, "recepcion", "recepcion123")
+        admin_headers = await _login_headers(client, "admin", "admin123")
+
+        # 1. Tienda: listar catálogo sembrado y registrar venta descontando stock
+        prods = (await client.get("/api/v1/store/products", headers=recep_headers)).json()
+        assert len(prods) >= 9
+        p1 = prods[0]
+        sale_res = await client.post(
+            "/api/v1/store/sales",
+            headers=recep_headers,
+            json={"items": [{"productId": p1["code"], "qty": 1}], "chargeToRoom": False},
+        )
+        assert sale_res.status_code == 200
+        assert sale_res.json()["total"] == p1["price"]
+
+        # Restaurar stock de p1 como Admin
+        await client.put(
+            f"/api/v1/store/products/{p1['code']}",
+            headers=admin_headers,
+            json={"stock": p1["stock"]},
+        )
+
+        # 2. Egresos y Reporte Excel (.xlsx) solo para Administrador
+        assert (
+            await client.post(
+                "/api/v1/expenses",
+                headers=recep_headers,
+                json={"desc": "Intento recepción", "amount": 10000},
+            )
+        ).status_code == 403
+
+        exp_res = await client.post(
+            "/api/v1/expenses",
+            headers=admin_headers,
+            json={"date": "2026-11-19", "amount": 55000, "category": "Insumos", "desc": "Detergente P5"},
+        )
+        assert exp_res.status_code == 201
+        exp_id = exp_res.json()["numericId"]
+
+        void_res = await client.post(f"/api/v1/expenses/{exp_id}/void", headers=admin_headers)
+        assert void_res.status_code == 200
+        assert void_res.json()["voided"] is True
+
+        fin_res = await client.get("/api/v1/finance/summary", headers=admin_headers)
+        assert fin_res.status_code == 200
+        assert "totalIncome" in fin_res.json()
+
+        xlsx_res = await client.get("/api/v1/reports/export.xlsx", headers=admin_headers)
+        assert xlsx_res.status_code == 200
+        assert xlsx_res.content[:2] == b"PK"
+
+        # 3. Usuarios CRUD (solo Admin)
+        usr_res = await client.post(
+            "/api/v1/auth/users",
+            headers=admin_headers,
+            json={
+                "username": "recep_temp_p5",
+                "name": "Recep Temporal P5",
+                "password": "clave_segura_123",
+                "role": "Recepcionista",
+            },
+        )
+        assert usr_res.status_code == 201
+        new_uid = usr_res.json()["id"]
+        patch_usr = await client.patch(
+            f"/api/v1/auth/users/{new_uid}",
+            headers=admin_headers,
+            json={"active": False},
+        )
+        assert patch_usr.status_code == 200
+        assert patch_usr.json()["active"] is False
+
+        # 4. Google Places API mock HTTP (verifica parseo real sin datos inventados)
+        class _FakePlacesResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {
+                    "displayName": {"text": "Hotel Torre Satori"},
+                    "rating": 4.9,
+                    "userRatingCount": 42,
+                    "reviews": [
+                        {
+                            "rating": 5,
+                            "text": {"text": "Excelente café y atención en Sevilla."},
+                            "relativePublishTimeDescription": "Hace 2 días",
+                            "publishTime": "2026-11-17T12:00:00Z",
+                            "authorAttribution": {"displayName": "Huésped Verificado"},
+                        }
+                    ],
+                }
+
+        orig_get = AsyncClient.get
+
+        async def _fake_places_get(self, url, **kwargs):
+            if "places.googleapis.com" in str(url):
+                return _FakePlacesResponse()
+            return await orig_get(self, url, **kwargs)
+
+        monkeypatch.setattr("httpx.AsyncClient.get", _fake_places_get)
+        clear_reviews_cache()
+        old_key = settings.GOOGLE_PLACES_API_KEY
+        settings.GOOGLE_PLACES_API_KEY = "fake_google_key_test"
+        try:
+            g_res = await client.get("/api/v1/reviews/summary?refresh=true", headers=recep_headers)
+            assert g_res.status_code == 200
+            g_data = g_res.json()
+            assert g_data["placesApiConfigured"] is True
+            assert g_data["average"] == 4.9
+            assert g_data["total"] == 42
+            assert g_data["reviews"][0]["authorName"] == "Huésped Verificado"
+        finally:
+            settings.GOOGLE_PLACES_API_KEY = old_key
+            clear_reviews_cache()
+
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(User).where(User.username == "recep_temp_p5"))
+        await session.execute(delete(Expense))
+        await session.commit()

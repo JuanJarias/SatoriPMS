@@ -63,7 +63,7 @@ export function AccountSettingsModal({ isOpen, onClose }: AccountSettingsModalPr
     setTimeout(() => setPhotoMsg(null), 3000);
   };
 
-  const handleChangePasswordSubmit = (e: React.FormEvent) => {
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordMsg(null);
 
@@ -72,7 +72,7 @@ export function AccountSettingsModal({ isOpen, onClose }: AccountSettingsModalPr
       return;
     }
 
-    const res = changePassword(currentPassword, newPassword);
+    const res = await changePassword(currentPassword, newPassword);
     if (res.success) {
       setPasswordMsg({ type: 'ok', text: res.message });
       setCurrentPassword('');

@@ -1,18 +1,17 @@
-# Stage 1: Build backend JAR inside container (no host Java/Maven needed)
-FROM maven:3.9.9-eclipse-temurin-21 AS build
+FROM python:3.12-slim
+
 WORKDIR /app
 
-# Cache dependencies
-COPY pom.xml .
-RUN mvn dependency:go-offline -B || true
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
-# Build application
-COPY src ./src
-RUN mvn clean package -DskipTests -B
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Stage 2: Minimal runtime image
-FROM eclipse-temurin:21-jre
-WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
+COPY . .
+
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]

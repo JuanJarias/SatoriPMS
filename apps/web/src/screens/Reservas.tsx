@@ -39,7 +39,7 @@ import {
 } from '../ui';
 
 export function Reservas({ go, initialCode }: { go: (view: string, param?: string) => void; initialCode?: string }) {
-  const { rooms, bookings, addBooking, patchBooking, setBookingStatus, setRoomStatus, charges, log } = useStore();
+  const { rooms, bookings, addBooking, setBookingStatus, payRemainingBooking, charges } = useStore();
   const [selectedCode, setSelectedCode] = useState<string | null>(initialCode || null);
   const [newBookingModalOpen, setNewBookingModalOpen] = useState(false);
 
@@ -73,7 +73,7 @@ export function Reservas({ go, initialCode }: { go: (view: string, param?: strin
   // Calculo de reembolso según regla RN-03 (+72h: 100%, 24h-72h: 50%, <24h: 0%) sobre lo pagado
   const calculateRefund = (b: BookingItem) => {
     const checkInDate = new Date(`${b.checkIn}T15:00:00`);
-    const now = new Date('2026-10-01T10:00:00'); // Fecha de contexto SatoriPMS
+    const now = new Date(); // Hora real actual para cálculo RN-03
     const diffHours = (checkInDate.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     let pct = 0;
@@ -93,15 +93,14 @@ export function Reservas({ go, initialCode }: { go: (view: string, param?: strin
     return { pct, desc, refundAmount };
   };
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = async () => {
     if (!cancelModalBooking) return;
     const { refundAmount } = calculateRefund(cancelModalBooking);
-    setBookingStatus(cancelModalBooking.code, 'cancelada');
-    setRoomStatus(cancelModalBooking.room, 'libre');
-    log(
-      `Canceló la reserva ${cancelModalBooking.code} (Huésped: ${cancelModalBooking.guest}, Reembolso: ${formatCurrency(refundAmount)})`,
-      'Reservas'
-    );
+    const res = await setBookingStatus(cancelModalBooking.code, 'cancelada');
+    if (!res.success) {
+      show('Error al cancelar', res.message, 'bad');
+      return;
+    }
     show(
       'Reserva cancelada exitosamente',
       `Habitación ${cancelModalBooking.room} liberada. Reembolso: ${formatCurrency(refundAmount)}`
@@ -109,12 +108,15 @@ export function Reservas({ go, initialCode }: { go: (view: string, param?: strin
     setCancelModalBooking(null);
   };
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const tomorrowIso = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
   // State para asistente de Nueva Reserva
   const [step, setStep] = useState(0);
-  const [nbCheckIn, setNbCheckIn] = useState('2026-10-03');
-  const [nbCheckOut, setNbCheckOut] = useState('2026-10-05');
+  const [nbCheckIn, setNbCheckIn] = useState(todayIso);
+  const [nbCheckOut, setNbCheckOut] = useState(tomorrowIso);
   const [nbGuests, setNbGuests] = useState(2);
-  const [nbRoomId, setNbRoomId] = useState('102');
+  const [nbRoomId, setNbRoomId] = useState('');
   const [nbGuestName, setNbGuestName] = useState('');
   const [nbGuestPhone, setNbGuestPhone] = useState('');
   const [nbGuestDoc, setNbGuestDoc] = useState('');
@@ -122,36 +124,37 @@ export function Reservas({ go, initialCode }: { go: (view: string, param?: strin
   const [nbPaymentMethod, setNbPaymentMethod] = useState<'efectivo' | 'transferencia' | 'datafono' | 'pendiente'>('transferencia');
   const [nbDepositType, setNbDepositType] = useState<'full' | 'half' | 'none'>('half');
 
-  const selectedRoomObj = rooms.find((r) => r.number === nbRoomId || r.id === nbRoomId);
+  const selectedRoomObj =
+    rooms.find((r) => String(r.id) === nbRoomId || r.number === nbRoomId) || rooms[0];
   const nights = Math.max(1, Math.round((new Date(nbCheckOut).getTime() - new Date(nbCheckIn).getTime()) / (1000 * 60 * 60 * 24)));
   const roomPricePerNight = selectedRoomObj ? selectedRoomObj.rate : 200000;
   const rawTotal = roomPricePerNight * nights;
   const calculatedDeposit = nbDepositType === 'full' ? rawTotal : nbDepositType === 'half' ? Math.round(rawTotal / 2) : 0;
 
-  const handleCreateBooking = () => {
-    if (!nbGuestName.trim() || !nbGuestPhone.trim()) {
-      show('Faltan datos obligatorios', 'Por favor ingresa nombre y teléfono del huésped', 'bad');
+  const handleCreateBooking = async () => {
+    if (!nbGuestName.trim() || !nbGuestPhone.trim() || !selectedRoomObj) {
+      show('Faltan datos obligatorios', 'Por favor ingresa habitación, nombre y teléfono del huésped', 'bad');
       return;
     }
-    const newCode = 'TS-' + Math.floor(1000 + Math.random() * 9000);
-    const newB: BookingItem = {
-      code: newCode,
-      guest: nbGuestName.trim(),
-      room: selectedRoomObj ? selectedRoomObj.number : '102',
+    const res = await addBooking({
+      roomId: selectedRoomObj.id,
       checkIn: nbCheckIn,
       checkOut: nbCheckOut,
-      guests: nbGuests,
-      channel: nbChannel,
+      adults: nbGuests,
+      guestName: nbGuestName.trim(),
       phone: nbGuestPhone.trim(),
       doc: nbGuestDoc.trim() || undefined,
-      total: rawTotal,
-      paid: calculatedDeposit,
-      status: calculatedDeposit > 0 ? 'confirmada' : 'pendiente',
-    };
-    addBooking(newB);
-    show('Reserva creada exitosamente', `Código: ${newCode} (${newB.guest})`);
+      paymentOption: nbDepositType,
+      source: nbChannel === 'WhatsApp' ? 'chatbot' : 'web',
+    });
+    if (!res.success) {
+      show('No se pudo crear la reserva', res.message, 'bad');
+      return;
+    }
+    const createdCode = (res.data as { code?: string } | undefined)?.code || '';
+    show('Reserva creada exitosamente', `Código: ${createdCode} (${nbGuestName.trim()})`);
     setNewBookingModalOpen(false);
-    setSelectedCode(newCode);
+    if (createdCode) setSelectedCode(createdCode);
     setStep(0);
     setNbGuestName('');
     setNbGuestPhone('');
@@ -288,9 +291,13 @@ export function Reservas({ go, initialCode }: { go: (view: string, param?: strin
                   <Button
                     variant="secondary"
                     className="w-full text-xs"
-                    onClick={() => {
-                      patchBooking(selectedBooking.code, { paid: selectedBooking.total });
-                      show('Pago liquidado', `Saldo de ${selectedBooking.code} saldado al 100%`);
+                    onClick={async () => {
+                      const res = await payRemainingBooking(selectedBooking.code);
+                      if (res.success) {
+                        show('Pago liquidado', `Saldo de ${selectedBooking.code} saldado al 100%`);
+                      } else {
+                        show('Error al registrar pago', res.message, 'bad');
+                      }
                     }}
                   >
                     Registrar pago de saldo restante
@@ -466,10 +473,10 @@ export function Reservas({ go, initialCode }: { go: (view: string, param?: strin
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Habitación a reservar">
                   <Select
-                    value={nbRoomId}
+                    value={nbRoomId || (rooms[0] ? String(rooms[0].id) : '')}
                     onChange={setNbRoomId}
                     options={rooms.map((r) => ({
-                      value: r.number,
+                      value: String(r.id),
                       label: `Hab. ${r.number} ${r.name} (${formatCurrency(r.rate)}/noche)`,
                     }))}
                   />

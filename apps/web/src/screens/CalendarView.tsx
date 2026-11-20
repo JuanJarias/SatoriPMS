@@ -15,14 +15,13 @@ import {
   Users,
   Tag
 } from 'lucide-react';
-import { useStore, RoomItem, BookingItem } from '../store';
+import { useStore } from '../store';
 import {
   PageHeader,
   Card,
   Button,
   BadgeStatus,
   Alert,
-  useToast,
   formatCurrency,
   cn
 } from '../ui';
@@ -66,98 +65,66 @@ const EVENT_STYLES = {
   },
 };
 
-const WEEK_DAYS = [
-  { key: 'lun', label: 'Lun', n: 28, m: 'sep' },
-  { key: 'mar', label: 'Mar', n: 29, m: 'sep' },
-  { key: 'mie', label: 'Mié', n: 30, m: 'sep' },
-  { key: 'jue', label: 'Jue', n: 1, m: 'oct', today: true },
-  { key: 'vie', label: 'Vie', n: 2, m: 'oct' },
-  { key: 'sab', label: 'Sáb', n: 3, m: 'oct' },
-  { key: 'dom', label: 'Dom', n: 4, m: 'oct' },
-];
-
 export function CalendarView({ go }: { go: (view: string, param?: string) => void }) {
-  const { rooms, bookings, events, log } = useStore();
+  const { rooms, bookings, events } = useStore();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const { show, node } = useToast();
+  const [weekOffset, setWeekOffset] = useState(0);
 
-  const calendarEvents: CalendarEvent[] = [
-    {
-      id: 'ce1',
-      roomNumber: '101',
-      guest: 'Laura Gómez',
-      startDay: 1, // mar 29
-      endDay: 4, // vie 2
-      kind: 'enCasa',
-      code: 'TS-2041',
-      guests: 2,
-      total: 540000,
-      paid: 540000,
-      phone: '+57 310 555 0142',
-      channel: 'WhatsApp',
-      note: 'Viaja con mascota. Desayuno 8:00 am.',
-    },
-    {
-      id: 'ce2',
-      roomNumber: '102',
-      guest: 'Andrés Martínez',
-      startDay: 3, // jue 1
-      endDay: 6, // dom 4
-      kind: 'confirmada',
-      code: 'TS-2047',
-      guests: 4,
-      total: 870000,
-      paid: 435000,
-      phone: '+57 315 555 0187',
-      channel: 'WhatsApp',
-      note: 'Viaja con 2 niños. Solicita cuna.',
-    },
-    {
-      id: 'ce3',
-      roomNumber: '103',
-      guest: 'Mantenimiento Ducha',
-      startDay: 2, // mie 30
-      endDay: 5, // sab 3
-      kind: 'mantenimiento',
-      code: 'MN-0092',
-      guests: 0,
-      total: 0,
-      paid: 0,
-      phone: '—',
-      channel: 'Interno',
-      note: 'Reparación de plomería.',
-    },
-    {
-      id: 'ce4',
-      roomNumber: '201',
-      guest: 'Camilo Herrera',
-      startDay: 5, // sab 3
-      endDay: 7, // dom 4+
-      kind: 'confirmada',
-      code: 'TS-2052',
-      guests: 3,
-      total: 420000,
-      paid: 100000,
-      phone: '+57 320 555 0119',
-      channel: 'Teléfono',
-    },
-    {
-      id: 'ce5',
-      roomNumber: '202',
-      guest: 'María Fernanda Rojas',
-      startDay: 3, // jue 1
-      endDay: 5, // sab 3
-      kind: 'bloqueo',
-      code: 'BL-0318',
-      guests: 2,
-      total: 760000,
-      paid: 0,
-      phone: '+57 300 555 0164',
-      channel: 'WhatsApp',
-      note: 'Retención vence hoy 6:00 pm sin anticipo.',
-    },
-  ];
+  // Construir ventana de 7 días desde hoy + desplazamiento semanal
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  const startOfWindow = new Date(todayMidnight);
+  startOfWindow.setDate(todayMidnight.getDate() + weekOffset * 7);
 
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWindow);
+    d.setDate(startOfWindow.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    return {
+      key: iso,
+      iso,
+      label: dayNames[d.getDay()],
+      n: d.getDate(),
+      m: monthNames[d.getMonth()],
+      today: d.getTime() === todayMidnight.getTime(),
+    };
+  });
+
+  const rangeLabel = `${weekDays[0].n} ${weekDays[0].m} – ${weekDays[6].n} ${weekDays[6].m} ${startOfWindow.getFullYear()}`;
+  const windowStartIso = weekDays[0].iso;
+  const windowEndIso = new Date(startOfWindow.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+
+  const dayDiff = (isoA: string, isoB: string) =>
+    Math.round((new Date(isoA + 'T00:00:00').getTime() - new Date(isoB + 'T00:00:00').getTime()) / 86400000);
+
+  const calendarEvents: CalendarEvent[] = bookings
+    .filter((b) => b.status !== 'cancelada' && b.checkOut > windowStartIso && b.checkIn < windowEndIso)
+    .map((b) => {
+      const startDay = Math.max(0, dayDiff(b.checkIn, windowStartIso));
+      const endDay = Math.min(7, Math.max(startDay + 1, dayDiff(b.checkOut, windowStartIso)));
+      const kind: CalendarEvent['kind'] =
+        b.status === 'enCurso' ? 'enCasa' : b.status === 'bloqueada' || b.status === 'pendiente' ? 'bloqueo' : 'confirmada';
+      return {
+        id: b.code,
+        roomNumber: b.room,
+        guest: b.guest,
+        startDay,
+        endDay,
+        kind,
+        code: b.code,
+        guests: b.guests,
+        total: b.total,
+        paid: b.paid,
+        phone: b.phone || '—',
+        channel: b.channel,
+        note: b.note,
+      };
+    });
+
+  const activeLocks = calendarEvents.filter((ev) => ev.kind === 'bloqueo');
   const colWidth = '160px';
 
   return (
@@ -166,7 +133,7 @@ export function CalendarView({ go }: { go: (view: string, param?: string) => voi
         <PageHeader
           eyebrow="Ocupación & Planificación"
           title="Calendario Semanal"
-          desc="Grilla de reservas por habitación en tiempo real. Previene sobreventas concurrentes."
+          desc="Grilla de reservas por habitación en tiempo real desde PostgreSQL 16 (GiST RN-02)."
           actions={
             <Button
               variant="primary"
@@ -194,16 +161,16 @@ export function CalendarView({ go }: { go: (view: string, param?: string) => voi
         {/* Date Selector & Legend */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Button variant="secondary" className="w-10 px-0" aria-label="Semana anterior">
+            <Button variant="secondary" className="w-10 px-0" aria-label="Semana anterior" onClick={() => setWeekOffset((w) => w - 1)}>
               <ChevronLeft size={16} />
             </Button>
-            <Button variant="secondary" className="w-10 px-0" aria-label="Semana siguiente">
+            <Button variant="secondary" className="w-10 px-0" aria-label="Semana siguiente" onClick={() => setWeekOffset((w) => w + 1)}>
               <ChevronRight size={16} />
             </Button>
             <span className="ml-2 font-display text-lg font-semibold text-forest-900">
-              28 sep – 4 oct 2026
+              {rangeLabel}
             </span>
-            <Button variant="ghost" className="ml-1 h-8 px-3">
+            <Button variant="ghost" className="ml-1 h-8 px-3" onClick={() => setWeekOffset(0)}>
               Hoy
             </Button>
           </div>
@@ -239,7 +206,7 @@ export function CalendarView({ go }: { go: (view: string, param?: string) => voi
               <div className="p-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">
                 Habitación
               </div>
-              {WEEK_DAYS.map((d) => (
+              {weekDays.map((d) => (
                 <div
                   key={d.key}
                   className={cn(
@@ -291,7 +258,7 @@ export function CalendarView({ go }: { go: (view: string, param?: string) => voi
                   </div>
 
                   {/* Day background columns */}
-                  {WEEK_DAYS.map((d, idx) => (
+                  {weekDays.map((d, idx) => (
                     <div
                       key={d.key}
                       style={{ gridColumn: idx + 2, gridRow: 1 }}
@@ -328,9 +295,7 @@ export function CalendarView({ go }: { go: (view: string, param?: string) => voi
                         </span>
                         <span className="truncate text-[11px] opacity-85">
                           {ev.kind === 'bloqueo'
-                            ? 'Vence hoy 6:00 pm'
-                            : ev.kind === 'mantenimiento'
-                            ? 'Fuera de servicio'
+                            ? 'Bloqueo 15 min'
                             : `${ev.guests} huésp. · ${ev.code}`}
                         </span>
                       </button>
@@ -342,14 +307,16 @@ export function CalendarView({ go }: { go: (view: string, param?: string) => voi
           </div>
         </Card>
 
-        <div className="mt-4">
-          <Alert
-            tone="warn"
-            title="Suite Satori (202): Bloqueo temporal activo"
-          >
-            Las fechas de jue a vie se encuentran bloqueadas temporalmente mientras se verifica el comprobante de anticipo de María Fernanda Rojas.
-          </Alert>
-        </div>
+        {activeLocks.length > 0 && (
+          <div className="mt-4">
+            <Alert
+              tone="warn"
+              title={`${activeLocks.length} bloqueo(s) temporal(es) activo(s) en esta semana`}
+            >
+              Los bloqueos temporales de 15 minutos sin pago confirmado se liberan automáticamente por APScheduler (RN-02).
+            </Alert>
+          </div>
+        )}
       </div>
 
       {/* Slide-in Sidebar for Event Details */}
@@ -440,8 +407,6 @@ export function CalendarView({ go }: { go: (view: string, param?: string) => voi
           </div>
         </aside>
       )}
-
-      {node}
     </div>
   );
 }

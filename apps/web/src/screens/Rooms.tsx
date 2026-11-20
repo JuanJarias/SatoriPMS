@@ -39,7 +39,7 @@ export function Rooms() {
   const [filterStatus, setFilterStatus] = useState<string>('todas');
   const [filterType, setFilterType] = useState<string>('todos');
   const [search, setSearch] = useState<string>('');
-  const [filterDate, setFilterDate] = useState<string>('2026-10-01');
+  const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
   // Modales
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -104,14 +104,16 @@ export function Rooms() {
     setEditRoom(room);
   };
 
-  const handleSaveRoom = () => {
+  const handleSaveRoom = async () => {
     if (!formNumber.trim() || !formName.trim()) {
       show('Faltan campos obligatorios', 'Por favor ingresa número y nombre', 'bad');
       return;
     }
 
     if (editRoom) {
-      const res = updateRoom(editRoom.id, {
+      const nextNum = formNumber.trim();
+      const res = await updateRoom(editRoom.id, {
+        number: nextNum,
         name: formName.trim(),
         type: formType,
         capacity: Number(formCapacity),
@@ -123,13 +125,13 @@ export function Rooms() {
         allowsPets: formAllowsPets,
       });
       if (res.success) {
-        show('Habitación actualizada', `Hab. ${editRoom.number} modificada por Administrador`);
+        show('Habitación actualizada', `Hab. ${nextNum} guardada en PostgreSQL`);
         setEditRoom(null);
       } else {
         show('Error al actualizar', res.message, 'bad');
       }
     } else {
-      const res = addRoom({
+      const res = await addRoom({
         number: formNumber.trim(),
         name: formName.trim(),
         type: formType,
@@ -151,9 +153,9 @@ export function Rooms() {
     }
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
-    const res = deleteRoom(deleteTarget.id);
+    const res = await deleteRoom(deleteTarget.id);
     if (res.success) {
       show('Habitación eliminada', `Hab. ${deleteTarget.number} retirada del inventario`);
       setDeleteTarget(null);
@@ -163,12 +165,13 @@ export function Rooms() {
     }
   };
 
-  const handleApplyStatusChange = () => {
+  const handleApplyStatusChange = async () => {
     if (!statusModalTarget) return;
-    setRoomStatus(statusModalTarget.id, newStatusValue, {
-      note: statusNote.trim() ? statusNote.trim() : undefined,
-    });
-    log(`Cambió estado de Hab. ${statusModalTarget.number} a ${ROOM_STATUS_META[newStatusValue].label}`, 'Habitaciones');
+    const res = await setRoomStatus(statusModalTarget.id, newStatusValue);
+    if (!res.success) {
+      show('Error al actualizar estado', res.message, 'bad');
+      return;
+    }
     show(`Hab. ${statusModalTarget.number} actualizada`, `Estado: ${ROOM_STATUS_META[newStatusValue].label}`);
     setStatusModalTarget(null);
     setStatusNote('');
@@ -453,8 +456,7 @@ export function Rooms() {
               <Input
                 value={formNumber}
                 onChange={(e) => setFormNumber(e.target.value)}
-                placeholder="Ej. 104, 204"
-                disabled={!!editRoom}
+                placeholder="Ej. 1, 2, 10"
               />
             </Field>
             <Field label="Nombre comercial *">

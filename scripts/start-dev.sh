@@ -3,7 +3,7 @@
 # SatoriPMS - Levantar el entorno de desarrollo completo
 #
 # 1. Verifica herramientas y el archivo .env (secretos obligatorios).
-# 2. Levanta PostgreSQL, Redis, API y n8n con Docker Compose y espera a que
+# 2. Levanta PostgreSQL, API (FastAPI), Redis (solo n8n) y n8n con Docker Compose y espera a que
 #    cada servicio responda.
 # 3. Abre el túnel público zrok2 para n8n (WhatsApp y Wompi), si aplica.
 # 4. Inicia la aplicación web (Vite) en segundo plano.
@@ -117,7 +117,7 @@ if $START_INFRA; then
     fi
     log_success "Contenedores en ejecución."
 
-    wait_for_http "$API_URL/api-docs" 120 "Backend (API)" || {
+    wait_for_http "$API_URL/api/v1/health" 120 "Backend (API)" || {
         log_info "Últimas líneas de la API:"; compose logs --tail 20 api || true; exit 1; }
     if n8n_enabled; then
         wait_for_http "$N8N_URL/healthz" 120 "n8n" || {
