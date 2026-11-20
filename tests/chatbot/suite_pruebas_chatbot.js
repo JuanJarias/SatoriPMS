@@ -14,8 +14,8 @@
  * Novedades Flujo V9: Wompi, acompanantes, llave de servicio y documento del titular (TC-56 a TC-65)
  *
  * Interfaz de Ejecución para Agente de Inteligencia Artificial (AI Runner):
- *   - CLI: node suite_pruebas_chatbot_v8.js [--all] [--flow <1-5|itil>] [--test <TC-XX>] [--json]
- *   - Programático: require('./suite_pruebas_chatbot_v8.js').runTestSuite({ ... })
+ *   - CLI: node suite_pruebas_chatbot.js [--all] [--flow <1-5|itil>] [--test <TC-XX>] [--json]
+ *   - Programático: require('./suite_pruebas_chatbot.js').runTestSuite({ ... })
  *
  * Convenciones:
  *   - Prefijo de reserva unificado: TS-XXXX (Torre Satori)
@@ -1601,11 +1601,11 @@ if (require.main === module) {
     } else if (args[i] === '--prompt') {
       console.log(`AI-AGENT RUNNER PROMPT:
 Para ejecutar pruebas puntuales o flujos completos desde un script o agente de IA:
-1. Toda la suite: node tests/chatbot/suite_pruebas_chatbot_v8.js --json
-2. Por flujo (1, 2, 3, 4, 5, itil): node tests/chatbot/suite_pruebas_chatbot_v8.js --flow 2 --json
-3. Por caso unitario (TC-01 a TC-65): node tests/chatbot/suite_pruebas_chatbot_v8.js --test TC-65 --json
+1. Toda la suite: node tests/chatbot/suite_pruebas_chatbot.js --json
+2. Por flujo (1, 2, 3, 4, 5, itil): node tests/chatbot/suite_pruebas_chatbot.js --flow 2 --json
+3. Por caso unitario (TC-01 a TC-65): node tests/chatbot/suite_pruebas_chatbot.js --test TC-65 --json
 4. De manera programatica en Node.js:
-   const { runTestSuite } = require('./tests/chatbot/suite_pruebas_chatbot_v8.js');
+   const { runTestSuite } = require('./tests/chatbot/suite_pruebas_chatbot.js');
    const report = await runTestSuite({ flow: '4' });
 `);
       process.exit(0);

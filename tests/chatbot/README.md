@@ -10,7 +10,7 @@ El propósito principal de este conjunto de pruebas es validar de manera determi
 
 ```text
 tests/chatbot/
-├── suite_pruebas_chatbot_v8.js      # Suite integral de 65 casos (incluye bloque V9 TC-56 a TC-65)
+├── suite_pruebas_chatbot.js      # Suite integral de 65 casos (incluye bloque V9 TC-56 a TC-65)
 ├── verify_n8n_flow_integrity.py     # Validador de topologia: 0 enlaces rotos, 0 huerfanos, 0 switch errors
 ├── test_pago_wompi_v9.js            # Suite de pruebas de cobro Wompi (11 en memoria, 5 en vivo)
 ├── test_e2e_v9_completo.js          # Prueba E2E en vivo de 9 pasos (fechas en 1 mensaje, mascota y aislamiento Redis)
@@ -53,7 +53,7 @@ flowchart TD
         CI["Tuberias CI/CD"]
     end
 
-    subgraph Orquestador ["2. Motor de Pruebas (suite_pruebas_chatbot_v8.js)"]
+    subgraph Orquestador ["2. Motor de Pruebas (suite_pruebas_chatbot.js)"]
         Parser["Analizador de Argumentos\n(--flow, --test, --json)"]
         Engine["Motor de Reglas y\nSimulacion In-Memory"]
         Runner["Ejecutor de Pruebas\n(runTestCase / runTestSuite)"]
@@ -188,7 +188,7 @@ Valida el código real de los nodos del flujo V9: integración con Wompi, fechas
 Ejecuta los 65 casos de prueba con salida formateada para terminal:
 
 ```bash
-node tests/chatbot/suite_pruebas_chatbot_v8.js
+node tests/chatbot/suite_pruebas_chatbot.js
 ```
 
 ### Ejecución Filtrada por Flujo o Caso Unitario
@@ -196,20 +196,20 @@ node tests/chatbot/suite_pruebas_chatbot_v8.js
 Para ejecutar exclusivamente un flujo funcional específico:
 ```bash
 # Ejecutar solo Flujo 2 (Reserva con IA):
-node tests/chatbot/suite_pruebas_chatbot_v8.js --flow 2
+node tests/chatbot/suite_pruebas_chatbot.js --flow 2
 
 # Ejecutar solo Bloque ITIL 4:
-node tests/chatbot/suite_pruebas_chatbot_v8.js --flow itil
+node tests/chatbot/suite_pruebas_chatbot.js --flow itil
 ```
 
 Para ejecutar un caso de prueba individual:
 ```bash
-node tests/chatbot/suite_pruebas_chatbot_v8.js --test TC-55
+node tests/chatbot/suite_pruebas_chatbot.js --test TC-55
 ```
 
 Para generar salida estructurada en formato JSON (ideal para tuberías CI/CD o subagentes):
 ```bash
-node tests/chatbot/suite_pruebas_chatbot_v8.js --flow 4 --json
+node tests/chatbot/suite_pruebas_chatbot.js --flow 4 --json
 ```
 
 ### Integración Programática para Agentes de IA
@@ -217,7 +217,7 @@ node tests/chatbot/suite_pruebas_chatbot_v8.js --flow 4 --json
 Cualquier script o agente autónomo puede importar la suite y evaluar resultados en memoria:
 
 ```javascript
-const { runTestSuite, runTestCase } = require('./tests/chatbot/suite_pruebas_chatbot_v8.js');
+const { runTestSuite, runTestCase } = require('./tests/chatbot/suite_pruebas_chatbot.js');
 
 async function evaluarCalidad() {
   // Ejecutar el flujo de cancelacion y reembolso
@@ -284,4 +284,4 @@ node tests/chatbot/test_cancelacion_reembolso.js
 
 ## Integración Continua
 
-El flujo de GitHub Actions (`.github/workflows/ci.yml`) ejecuta sin necesidad de servicios externos: `verify_n8n_flow_integrity.py`, `suite_pruebas_chatbot_v8.js` y `test_pago_wompi_v9.js`. Las pruebas `test_*.js` en vivo no se ejecutan en CI porque necesitan n8n, Redis y la API.
+El flujo de GitHub Actions (`.github/workflows/ci.yml`) ejecuta sin necesidad de servicios externos: `verify_n8n_flow_integrity.py`, `suite_pruebas_chatbot.js` y `test_pago_wompi_v9.js`. Las pruebas `test_*.js` en vivo no se ejecutan en CI porque necesitan n8n, Redis y la API.

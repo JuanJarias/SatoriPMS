@@ -178,10 +178,10 @@ El proyecto cuenta con una suite integral de 65 pruebas automatizadas que valida
 
 ```bash
 # Suite completa del chatbot (65 pruebas)
-node tests/chatbot/suite_pruebas_chatbot_v8.js
+node tests/chatbot/suite_pruebas_chatbot.js
 
 # Únicamente un flujo específico (ejemplo: Flujo 1 Reserva Guiada)
-node tests/chatbot/suite_pruebas_chatbot_v8.js --flow 1
+node tests/chatbot/suite_pruebas_chatbot.js --flow 1
 
 # Pruebas de cobro Wompi e integridad estructural del flujo n8n
 node tests/chatbot/test_pago_wompi_v9.js
@@ -203,7 +203,7 @@ Toda la documentación funcional, de diseño, diagramas y presupuesto del proyec
 ## Cómo Contribuir
 
 1. Crea una rama descriptiva a partir de la rama de trabajo vigente (`feat/nombre-funcionalidad` o `fix/nombre-correccion`).
-2. Realiza tus cambios verificando que los contenedores levanten sin errores y que las pruebas en `tests/chatbot/` se ejecuten satisfactoriamente (`node tests/chatbot/suite_pruebas_chatbot_v8.js`).
+2. Realiza tus cambios verificando que los contenedores levanten sin errores y que las pruebas en `tests/chatbot/` se ejecuten satisfactoriamente (`node tests/chatbot/suite_pruebas_chatbot.js`).
 3. Actualiza la documentación técnica correspondiente en [docs/](docs/README.md).
 4. Abre una solicitud de integración (Pull Request) describiendo el propósito y alcance de los cambios realizados.
 

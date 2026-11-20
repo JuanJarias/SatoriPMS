@@ -46,7 +46,7 @@ jobs:
         run: python3 tests/chatbot/verify_n8n_flow_integrity.py flows/n8n/V9_ChatbotReservas.json
 
       - name: Suite integral del chatbot (en memoria)
-        run: node tests/chatbot/suite_pruebas_chatbot_v8.js
+        run: node tests/chatbot/suite_pruebas_chatbot.js
 
       - name: Pruebas de cobro Wompi (en memoria)
         run: node tests/chatbot/test_pago_wompi_v9.js
