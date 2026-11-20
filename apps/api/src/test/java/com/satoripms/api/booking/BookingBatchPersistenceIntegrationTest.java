@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -108,6 +109,16 @@ class BookingBatchPersistenceIntegrationTest {
                 assertThat(booking.getGuestId()).isEqualTo(savedGuest.getId());
             });
             assertThat(response.totalPrice()).isEqualByComparingTo("682500.00");
+            assertThat(response.code()).matches("TS-[A-Z0-9]{4}");
+            assertThat(saved).allSatisfy(booking -> assertThat(booking.getBookingCode()).isEqualTo(response.code()));
+
+            // Búsqueda exacta por código y verificación del documento del titular
+            assertThat(bookingService.getReservationDetailsByCode(response.code(), "1234567890", true).getGuestDocument())
+                    .isEqualTo("******7890");
+            assertThatThrownBy(() -> bookingService.getReservationDetailsByCode(response.code(), "999999", true))
+                    .isInstanceOf(java.util.NoSuchElementException.class);
+            assertThatThrownBy(() -> bookingService.getReservationDetailsByCode(response.code().substring(0, 5), null, false))
+                    .isInstanceOf(java.util.NoSuchElementException.class);
             assertThat(savedGuest.getName()).isEqualTo("Huésped de prueba");
             assertThat(savedGuest.getDocumentNumber()).isEqualTo("1234567890");
             assertThat(response.bookingIds()).hasSize(2);

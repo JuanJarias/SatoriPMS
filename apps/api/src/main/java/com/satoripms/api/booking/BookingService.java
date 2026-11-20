@@ -11,14 +11,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.HashSet;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Servicio central de la lógica de negocio para la gestión de reservas en SatoriPMS.
@@ -26,30 +30,32 @@ import java.util.UUID;
  * Responsabilidades:
  * - Consulta y validación de disponibilidad en PostgreSQL y en caché concurrente Redis.
  * - Bloqueos temporales distribuidos (15 min) anti-doble reserva (RN-02).
- * - Confirmación y persistencia atómica por lote con cálculo proporcional de tarifas y abonos (50% / 100%).
- * - Consulta de información y estado de reservas mediante código de reserva.
- * - Cancelación de reservas grupales y aplicación de la regla de reembolso hotelera (RN-03).
- * - Pago de saldo restante para reservas garantizadas con abono inicial.
+ * - Confirmación y persistencia atómica por lote con cálculo de tarifas por noche
+ *   (eventos especiales) y abonos (50% / 100%).
+ * - Consulta, pago de saldo y cancelación por código público TS-XXXX, con verificación
+ *   opcional del documento del titular.
+ * - Aplicación de la regla de reembolso hotelera sobre lo efectivamente pagado (RN-03).
  */
 @Service
 public class BookingService {
+
+    /** Mensaje único para "no existe" y "documento no coincide", para no revelar qué códigos existen. */
+    static final String NOT_FOUND_MESSAGE = "No se encontró una reserva con ese código y documento";
+
+    private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final int CODE_LENGTH = 4;
+    private static final Pattern UUID_PATTERN =
+            Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
     private final GuestRepository guestRepository;
     private final RedisLockService redisLockService;
+    private final SecureRandom random = new SecureRandom();
 
     @Autowired(required = false)
     private SpecialEventRepository specialEventRepository;
 
-    /**
-     * Constructor con inyección de dependencias.
-     *
-     * @param bookingRepository Repositorio JPA de reservas
-     * @param roomRepository    Repositorio JPA de habitaciones
-     * @param guestRepository   Repositorio JPA de huéspedes
-     * @param redisLockService  Servicio de bloqueos distribuidos en Redis
-     */
     public BookingService(BookingRepository bookingRepository,
                           RoomRepository roomRepository,
                           GuestRepository guestRepository,
@@ -60,61 +66,34 @@ public class BookingService {
         this.redisLockService = redisLockService;
     }
 
-    public void setSpecialEventRepository(SpecialEventRepository specialEventRepository) {
-        this.specialEventRepository = specialEventRepository;
-    }
+    // ───────────────────────────── Disponibilidad y bloqueos ─────────────────────────────
 
     /**
-     * Verifica si una habitación se encuentra completamente libre en un rango de fechas.
-     * Valida tanto la ausencia de reservas reales en base de datos como la ausencia
-     * de un bloqueo temporal activo en Redis.
-     *
-     * @param roomId   Identificador único de la habitación
-     * @param checkIn  Fecha de llegada
-     * @param checkOut Fecha de salida
-     * @return true si la habitación está disponible en ambas capas, false si hay conflicto
+     * Verifica si una habitación está libre en un rango de fechas, tanto en PostgreSQL
+     * (reservas reales) como en Redis (bloqueos temporales).
      */
     public boolean isAvailable(Long roomId, LocalDate checkIn, LocalDate checkOut) {
-        // 1. Verifica en SQL (reservas reales)
         boolean dbAvailable = bookingRepository.countConflictingBookings(roomId, checkIn, checkOut) == 0;
-        
-        // 2. Verifica en Redis (bloqueos temporales)
         return dbAvailable && !redisLockService.isLocked(roomId, checkIn, checkOut);
     }
 
     /**
-     * Consulta y filtra el catálogo de habitaciones disponibles según fechas, capacidad
-     * de adultos, niños y admisión de mascotas.
-     * Excluye automáticamente cualquier habitación con un bloqueo temporal activo en Redis.
-     *
-     * @param checkIn  Fecha de check-in
-     * @param checkOut Fecha de check-out
-     * @param adults   Número de adultos
-     * @param children Número de niños
-     * @param pet      Si el huésped viaja con mascota
-     * @return Lista de habitaciones que cumplen los criterios y no están bloqueadas
+     * Habitaciones disponibles según fechas, capacidad y mascotas, excluyendo las que tienen
+     * un bloqueo temporal activo en Redis.
      */
     public List<Room> listAvailableRooms(LocalDate checkIn, LocalDate checkOut,
-                                          Integer adults, Integer children, Boolean pet) {
-        // 1. Trae las habitaciones libres según PostgreSQL
+                                         Integer adults, Integer children, Boolean pet) {
         List<Room> dbRooms = roomRepository.findAvailableRooms(checkIn, checkOut, adults, children, pet);
-        
-        // 2. Excluye de la lista las que están bloqueadas actualmente en Redis
         return dbRooms.stream()
                 .filter(room -> !redisLockService.isLocked(room.getId(), checkIn, checkOut))
                 .toList();
     }
 
     /**
-     * Crea un bloqueo temporal atómico en Redis para una habitación y rango de fechas.
-     * Permite al usuario tener 15 minutos exclusivos para ingresar sus datos o procesar el pago.
+     * Crea un bloqueo temporal atómico en Redis (15 minutos) para una habitación y rango de fechas.
      *
-     * @param roomId   Identificador de la habitación
-     * @param checkIn  Fecha de llegada
-     * @param checkOut Fecha de salida
-     * @return Token de bloqueo (UUID) si fue exitoso
-     * @throws IllegalArgumentException Si el rango de fechas no es válido
-     * @throws IllegalStateException Si la habitación no existe, no está activa o ya está bloqueada
+     * @throws IllegalArgumentException si el rango de fechas no es válido o la habitación no existe
+     * @throws IllegalStateException    si la habitación no está disponible o ya está bloqueada
      */
     public String createTemporaryLock(Long roomId, LocalDate checkIn, LocalDate checkOut) {
         if (checkIn == null || checkOut == null || !checkIn.isBefore(checkOut)) {
@@ -136,13 +115,7 @@ public class BookingService {
         return token;
     }
 
-    /**
-     * Libera de forma inmediata uno o varios bloqueos temporales en Redis cuando el usuario
-     * cancela el proceso de reserva, reinicia la sesión en el chatbot o expira por inactividad.
-     *
-     * @param locks Lista de habitaciones con sus respectivos tokens de bloqueo a liberar
-     * @return Cantidad de bloqueos efectivamente liberados en Redis
-     */
+    /** Libera uno o varios bloqueos temporales en Redis. Devuelve cuántos se liberaron. */
     public int releaseTemporaryLocks(List<BookingRoomLockDto> locks) {
         if (locks == null || locks.isEmpty()) {
             return 0;
@@ -150,47 +123,40 @@ public class BookingService {
         int releasedCount = 0;
         for (BookingRoomLockDto lock : locks) {
             if (lock != null && lock.getRoomId() != null
-                    && lock.getLockToken() != null && !lock.getLockToken().isBlank()) {
-                if (redisLockService.release(lock.getRoomId(), lock.getLockToken().trim())) {
-                    releasedCount++;
-                }
+                    && lock.getLockToken() != null && !lock.getLockToken().isBlank()
+                    && redisLockService.release(lock.getRoomId(), lock.getLockToken().trim())) {
+                releasedCount++;
             }
         }
         return releasedCount;
     }
 
     /**
-     * Confirma una o varias habitaciones en estado de reserva pendiente de pago.
-     *
-     * @param request Datos de la reserva grupal o individual y tokens de bloqueo
-     * @return Resumen con ID de grupo, montos, IDs creados y estados
+     * Cotización del alojamiento de una habitación (sin personas adicionales), aplicando los
+     * eventos especiales noche a noche. Usada al bloquear una habitación.
      */
+    public BigDecimal quoteRoomStay(Room room, LocalDate checkIn, LocalDate checkOut) {
+        List<BigDecimal> multipliers = StayPricing.nightlyMultipliers(checkIn, checkOut, activeEvents(checkIn, checkOut));
+        return StayPricing.roomStayTotal(room.getPricePerNight(), multipliers);
+    }
+
+    // ───────────────────────────── Confirmación ─────────────────────────────
+
+    /** Registra las habitaciones como reserva pendiente de pago (o según la modalidad indicada). */
     @Transactional
     public BookingBatchResponseDto confirmPendingBookings(BookingBatchRequestDto request) {
         return saveBookings(request, "pending_payment", "pending");
     }
 
-    /**
-     * Confirma una o varias habitaciones con registro de pago confirmado.
-     *
-     * @param request Datos de la reserva y tokens de bloqueo
-     * @return Resumen con ID de grupo, montos pagados, IDs creados y estados
-     */
+    /** Registra las habitaciones como reserva pagada (entornos de prueba). */
     @Transactional
     public BookingBatchResponseDto confirmPaidBookings(BookingBatchRequestDto request) {
         return saveBookings(request, "confirmed", "paid");
     }
 
     /**
-     * Valida, calcula tarifas y persiste de manera transaccional un lote de reservas.
-     * Asocia las habitaciones a un único UUID de grupo de reserva (reservationGroupId),
-     * vincula o actualiza el perfil del huésped, calcula el abono (50% o 100%) y libera
-     * los bloqueos temporales en Redis.
-     *
-     * @param request       Datos de la solicitud de reserva
-     * @param status        Estado inicial de la reserva ('confirmed' o 'pending_payment')
-     * @param paymentStatus Estado inicial del pago ('paid', 'partial' o 'pending')
-     * @return DTO con el resultado de la reserva agrupada
+     * Valida, calcula tarifas y persiste de manera transaccional un lote de reservas bajo un
+     * único grupo (reservationGroupId) y un único código público TS-XXXX.
      */
     private BookingBatchResponseDto saveBookings(BookingBatchRequestDto request, String status, String paymentStatus) {
         if (request == null || request.getRooms() == null || request.getRooms().isEmpty()) {
@@ -226,13 +192,11 @@ public class BookingService {
             }
             Room room = roomRepository.findById(roomLock.getRoomId())
                     .orElseThrow(() -> new IllegalArgumentException("La habitación no existe"));
-            // Solo verificamos en PostgreSQL (reservas reales). NO verificamos Redis
-            // porque el lock ya fue validado via isValid() arriba — el usuario YA
-            // posee ese lock, así que isLocked() retornaría true y se auto-rechazaría.
+            // Solo se verifica PostgreSQL: el lock de Redis ya fue validado arriba y pertenece
+            // a este mismo solicitante (isLocked() lo rechazaría a sí mismo).
             boolean dbAvailable = bookingRepository.countConflictingBookings(
                     room.getId(), request.getCheckIn(), request.getCheckOut()) == 0;
-            if (!Boolean.TRUE.equals(room.getActive()) || !"available".equals(room.getStatus())
-                    || !dbAvailable) {
+            if (!Boolean.TRUE.equals(room.getActive()) || !"available".equals(room.getStatus()) || !dbAvailable) {
                 throw new IllegalStateException("Una habitación ya no está disponible");
             }
             if (Boolean.TRUE.equals(request.getHasPet()) && !Boolean.TRUE.equals(room.getAllowsPets())) {
@@ -259,70 +223,68 @@ public class BookingService {
         guest.setDocumentNumber(request.getGuestDocument().trim());
         Guest savedGuest = guestRepository.save(guest);
 
-        long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
-        BigDecimal baseTotal = selectedRooms.stream()
-                .map(room -> room.getPricePerNight().multiply(BigDecimal.valueOf(nights)))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Tarifas por noche con eventos especiales (regla provisional, ver StayPricing).
+        List<BigDecimal> multipliers = StayPricing.nightlyMultipliers(
+                request.getCheckIn(), request.getCheckOut(), activeEvents(request.getCheckIn(), request.getCheckOut()));
         int extraGuests = Math.max(0, guests - baseCapacity);
         BigDecimal averageExtraPrice = selectedRooms.stream()
                 .map(Room::getExtraGuestPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .divide(BigDecimal.valueOf(selectedRooms.size()), 2, java.math.RoundingMode.HALF_UP);
-        BigDecimal extraTotal = averageExtraPrice.multiply(BigDecimal.valueOf(extraGuests));
-        BigDecimal rawTotal = baseTotal.add(extraTotal);
+                .divide(BigDecimal.valueOf(selectedRooms.size()), 2, RoundingMode.HALF_UP);
+        BigDecimal extraTotal = averageExtraPrice.multiply(BigDecimal.valueOf(extraGuests))
+                .multiply(StayPricing.averageMultiplier(multipliers))
+                .setScale(2, RoundingMode.HALF_UP);
 
-        // Aplicación de eventos especiales (descuento o recargo estacional)
-        BigDecimal eventMultiplier = BigDecimal.ONE;
-        if (specialEventRepository != null) {
-            List<SpecialEvent> activeEvents = specialEventRepository.findActiveEventsInDateRange(request.getCheckIn(), request.getCheckOut());
-            if (!activeEvents.isEmpty()) {
-                SpecialEvent event = activeEvents.get(0);
-                if (event.getDiscountPercentage() != null && event.getDiscountPercentage().compareTo(BigDecimal.ZERO) != 0) {
-                    BigDecimal pctFraction = event.getDiscountPercentage()
-                            .divide(BigDecimal.valueOf(100), 4, java.math.RoundingMode.HALF_UP);
-                    eventMultiplier = BigDecimal.ONE.subtract(pctFraction);
-                    if (eventMultiplier.compareTo(BigDecimal.ZERO) < 0) {
-                        eventMultiplier = BigDecimal.ZERO;
-                    }
-                }
+        List<BigDecimal> roomTotals = new ArrayList<>();
+        for (int index = 0; index < selectedRooms.size(); index++) {
+            BigDecimal roomTotal = StayPricing.roomStayTotal(selectedRooms.get(index).getPricePerNight(), multipliers);
+            if (index == 0) {
+                roomTotal = roomTotal.add(extraTotal);
             }
+            roomTotals.add(roomTotal);
         }
-        BigDecimal totalPrice = rawTotal.multiply(eventMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal totalPrice = roomTotals.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Determinación de importes de pago según opción elegida (abono 50% vs total 100%)
+        // Modalidad de pago (abono 50% vs total 100% vs pendiente de pasarela)
         BigDecimal paidAmount;
         String finalPaymentStatus;
         String finalStatus;
-        if ("deposit".equalsIgnoreCase(request.getPaymentOption())) {
-            paidAmount = totalPrice.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
-            finalPaymentStatus = "partial";
-            finalStatus = "confirmed";
-        } else if ("full".equalsIgnoreCase(request.getPaymentOption())) {
-            paidAmount = totalPrice;
-            finalPaymentStatus = "paid";
-            finalStatus = "confirmed";
-        } else if ("wompi_deposit".equalsIgnoreCase(request.getPaymentOption())
-                || "pending_deposit".equalsIgnoreCase(request.getPaymentOption())) {
-            paidAmount = BigDecimal.ZERO;
-            finalPaymentStatus = "pending";
-            finalStatus = "pending_payment";
-        } else if ("wompi_full".equalsIgnoreCase(request.getPaymentOption())
-                || "pending_full".equalsIgnoreCase(request.getPaymentOption())
-                || "pending".equalsIgnoreCase(request.getPaymentOption())) {
-            paidAmount = BigDecimal.ZERO;
-            finalPaymentStatus = "pending";
-            finalStatus = "pending_payment";
-        } else {
-            paidAmount = paymentStatus.equalsIgnoreCase("paid") ? totalPrice : BigDecimal.ZERO;
-            finalPaymentStatus = paymentStatus;
-            finalStatus = status;
+        String option = request.getPaymentOption() == null ? "" : request.getPaymentOption().trim().toLowerCase();
+        switch (option) {
+            case "deposit" -> {
+                paidAmount = totalPrice.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+                finalPaymentStatus = "partial";
+                finalStatus = "confirmed";
+            }
+            case "full" -> {
+                paidAmount = totalPrice;
+                finalPaymentStatus = "paid";
+                finalStatus = "confirmed";
+            }
+            case "wompi_deposit", "pending_deposit", "wompi_full", "pending_full", "pending" -> {
+                paidAmount = BigDecimal.ZERO;
+                finalPaymentStatus = "pending";
+                finalStatus = "pending_payment";
+            }
+            default -> {
+                paidAmount = "paid".equalsIgnoreCase(paymentStatus) ? totalPrice : BigDecimal.ZERO;
+                finalPaymentStatus = paymentStatus;
+                finalStatus = status;
+            }
         }
 
         UUID reservationGroupId = UUID.randomUUID();
-        List<Booking> bookings = new ArrayList<>();
+        String bookingCode = generateBookingCode();
+        String companions = request.getCompanions() == null || request.getCompanions().isBlank()
+                ? null : request.getCompanions().trim();
+        String resolvedSource = (request.getSource() != null && !request.getSource().isBlank())
+                ? request.getSource().trim().toLowerCase()
+                : "chatbot";
 
+        List<Booking> bookings = new ArrayList<>();
         for (int index = 0; index < selectedRooms.size(); index++) {
             Room room = selectedRooms.get(index);
+            BigDecimal roomTotal = roomTotals.get(index);
             Booking booking = new Booking();
             booking.setGuestId(savedGuest.getId());
             booking.setRoomId(room.getId());
@@ -333,40 +295,19 @@ public class BookingService {
             booking.setAdults(request.getAdults());
             booking.setChildren(request.getChildren());
             booking.setWithPet(request.getHasPet());
-            BigDecimal roomTotal = room.getPricePerNight().multiply(BigDecimal.valueOf(nights));
-            if (index == 0) roomTotal = roomTotal.add(extraTotal);
-            roomTotal = roomTotal.multiply(eventMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
             booking.setTotalPrice(roomTotal);
-
-            // Asignar importe pagado proporcional a cada habitación
-            BigDecimal roomPaidAmount;
-            if (selectedRooms.size() == 1) {
-                roomPaidAmount = paidAmount;
-            } else {
-                BigDecimal roomFraction = roomTotal.divide(totalPrice, 10, java.math.RoundingMode.HALF_UP);
-                roomPaidAmount = paidAmount.multiply(roomFraction).setScale(2, java.math.RoundingMode.HALF_UP);
-            }
-            booking.setPaidAmount(roomPaidAmount);
-            String resolvedSource = (request.getSource() != null && !request.getSource().isBlank())
-                    ? request.getSource().trim().toLowerCase()
-                    : "chatbot";
+            booking.setPaidAmount(proportionalShare(paidAmount, roomTotal, totalPrice, selectedRooms.size()));
             booking.setSource(resolvedSource);
             booking.setLockId(request.getRooms().get(index).getLockToken());
             booking.setReservationGroupId(reservationGroupId);
-
-            String resolvedCode = request.getCompanions();
-            if (resolvedCode == null || (!resolvedCode.startsWith("TS-") && !resolvedCode.startsWith("BL-"))) {
-                String sub = reservationGroupId.toString().replace("-", "");
-                resolvedCode = "TS-" + sub.substring(Math.max(0, sub.length() - 4)).toUpperCase();
-            }
-            booking.setCompanions(resolvedCode);
+            booking.setBookingCode(bookingCode);
+            booking.setCompanions(companions);
             bookings.add(booking);
         }
 
         List<Booking> savedBookings = bookingRepository.saveAll(bookings);
         bookingRepository.flush();
 
-        // Liberación de bloqueos temporales en Redis
         for (BookingRoomLockDto roomLock : request.getRooms()) {
             redisLockService.release(roomLock.getRoomId(), roomLock.getLockToken());
         }
@@ -379,87 +320,47 @@ public class BookingService {
                 finalStatus,
                 finalPaymentStatus,
                 paidAmount,
-                totalPrice.subtract(paidAmount));
+                totalPrice.subtract(paidAmount),
+                bookingCode);
     }
 
-    /**
-     * Consulta la información detallada de una reserva mediante su prefijo de código (8 caracteres)
-     * o UUID completo.
-     * Retorna datos del huésped, habitaciones reservadas, desglose financiero (total, pagado, saldo pendiente)
-     * y el cálculo de la política de reembolso (RN-03).
-     *
-     * @param code Código o prefijo de reserva
-     * @return DTO con los detalles completos de la reserva
-     * @throws NoSuchElementException Si el código no coincide con ninguna reserva
-     */
-    public ReservationDetailsDto getReservationDetailsByCode(String code) {
-        if (code == null || code.trim().isBlank()) {
-            throw new IllegalArgumentException("El código de reserva es obligatorio");
-        }
-        String cleanCode = code.trim().toLowerCase();
-        List<Booking> bookings = bookingRepository.findByReservationGroupCodePrefix(cleanCode);
-        if (bookings.isEmpty()) {
-            throw new java.util.NoSuchElementException("No se encontró ninguna reserva con el código: " + code.trim());
-        }
+    // ───────────────────────────── Consulta, pago y cancelación ─────────────────────────────
 
+    /**
+     * Detalle de una reserva por su código público (TS-XXXX) o UUID de grupo.
+     *
+     * @param code           código público o UUID del grupo
+     * @param holderDocument documento del titular a verificar; null omite la verificación (personal del hotel)
+     * @param maskDocument   true para no exponer el documento completo en la respuesta
+     */
+    public ReservationDetailsDto getReservationDetailsByCode(String code, String holderDocument, boolean maskDocument) {
+        List<Booking> bookings = resolveGroup(code);
         Booking first = bookings.get(0);
         Guest guest = guestRepository.findById(first.getGuestId()).orElse(null);
+        verifyHolderDocument(guest, holderDocument);
 
         List<ReservationDetailsDto.RoomSummaryDto> roomSummaries = new ArrayList<>();
         BigDecimal totalGroupPrice = BigDecimal.ZERO;
-
         for (Booking b : bookings) {
-            Room room = roomRepository.findById(b.getRoomId()).orElse(null);
-            totalGroupPrice = totalGroupPrice.add(b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
-            if (room != null) {
-                roomSummaries.add(ReservationDetailsDto.RoomSummaryDto.builder()
-                        .id(room.getId())
-                        .number(room.getNumber())
-                        .name(room.getName())
-                        .type(room.getType())
-                        .pricePerNight(room.getPricePerNight())
-                        .build());
-            }
+            totalGroupPrice = totalGroupPrice.add(nonNull(b.getTotalPrice()));
+            roomRepository.findById(b.getRoomId()).ifPresent(room -> roomSummaries.add(
+                    ReservationDetailsDto.RoomSummaryDto.builder()
+                            .id(room.getId())
+                            .number(room.getNumber())
+                            .name(room.getName())
+                            .type(room.getType())
+                            .pricePerNight(room.getPricePerNight())
+                            .build()));
         }
 
         long nights = ChronoUnit.DAYS.between(first.getCheckIn(), first.getCheckOut());
-        String codePrefix;
-        if (first.getCompanions() != null && (first.getCompanions().startsWith("TS-") || first.getCompanions().startsWith("BL-"))) {
-            codePrefix = first.getCompanions().trim();
-        } else if (first.getReservationGroupId() != null) {
-            String sub = first.getReservationGroupId().toString().replace("-", "");
-            codePrefix = "TS-" + sub.substring(Math.max(0, sub.length() - 4)).toUpperCase();
-        } else {
-            codePrefix = "TS-" + first.getId();
-        }
-
         BigDecimal totalPaidAmount = bookings.stream()
-                .map(b -> b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO)
+                .map(b -> nonNull(b.getPaidAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal pendingBalance = totalGroupPrice.subtract(totalPaidAmount);
 
-        // Política de reembolso RN-03:
-        // Check-in se toma a las 15:00 del día de llegada
-        LocalDateTime checkInDateTime = first.getCheckIn().atTime(15, 0);
-        LocalDateTime now = LocalDateTime.now();
-        long hoursUntilCheckIn = ChronoUnit.HOURS.between(now, checkInDateTime);
-
-        int refundPct;
-        String policyDesc;
-        if (hoursUntilCheckIn > 72) {
-            refundPct = 100;
-            policyDesc = "Reembolso del 100% de lo abonado (+72h antes del check-in)";
-        } else if (hoursUntilCheckIn >= 24) {
-            refundPct = 50;
-            policyDesc = "Reembolso del 50% de lo abonado (entre 24h y 72h antes del check-in)";
-        } else {
-            refundPct = 0;
-            policyDesc = "Sin reembolso (menos de 24h antes del check-in)";
-        }
-
-        // El reembolso se calcula estrictamente sobre el monto efectivamente pagado (totalPaidAmount)
-        BigDecimal estimatedRefund = totalPaidAmount.multiply(BigDecimal.valueOf(refundPct))
-                .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+        RefundRule refund = RefundRule.forCheckIn(first.getCheckIn());
+        BigDecimal estimatedRefund = refund.applyTo(totalPaidAmount);
 
         boolean isActive = "confirmed".equalsIgnoreCase(first.getStatus()) || "pending_payment".equalsIgnoreCase(first.getStatus());
         boolean canCancel = isActive && LocalDate.now().isBefore(first.getCheckOut());
@@ -473,23 +374,21 @@ public class BookingService {
             case "finished" -> "Finalizada";
             default -> first.getStatus();
         };
-
         String paymentStatusLabel = switch (first.getPaymentStatus().toLowerCase()) {
             case "paid" -> "Pagada";
+            case "partial" -> "Abono parcial";
             case "pending" -> "Pendiente de pago";
             case "refunded" -> "Reembolsada";
-            case "refund_pending" -> "Reembolso en trámite";
-            case "cancelled" -> "Cancelada";
-            case "no_refund" -> "Sin reembolso";
             default -> first.getPaymentStatus();
         };
 
+        String document = guest != null ? guest.getDocumentNumber() : null;
         return ReservationDetailsDto.builder()
-                .code(codePrefix)
+                .code(first.getBookingCode())
                 .reservationGroupId(first.getReservationGroupId())
                 .guestName(guest != null ? guest.getName() : null)
                 .guestPhone(guest != null ? guest.getWhatsappPhone() : null)
-                .guestDocument(guest != null ? guest.getDocumentNumber() : null)
+                .guestDocument(maskDocument ? maskDocument(document) : document)
                 .checkIn(first.getCheckIn())
                 .checkOut(first.getCheckOut())
                 .nights(nights)
@@ -508,112 +407,64 @@ public class BookingService {
                 .canCancel(canCancel)
                 .canPayRemaining(canPayRemaining)
                 .refundPolicy(ReservationDetailsDto.RefundPolicyDto.builder()
-                        .hoursUntilCheckin(hoursUntilCheckIn)
-                        .refundPercentage(refundPct)
+                        .hoursUntilCheckin(refund.hoursUntilCheckIn())
+                        .refundPercentage(refund.percentage())
                         .estimatedRefund(estimatedRefund)
-                        .policyDescription(policyDesc)
+                        .policyDescription(refund.description())
                         .build())
                 .build();
     }
 
     /**
-     * Cancela todas las habitaciones asociadas a un código de reserva grupal,
-     * liberando la disponibilidad en base de datos para nuevas reservas y calculando
-     * el reembolso aplicable según las horas de antelación al check-in (RN-03).
+     * Cancela todas las habitaciones de una reserva y calcula el reembolso sobre lo pagado (RN-03).
      *
-     * @param code Código o prefijo de reserva
-     * @return DTO con el resultado de la cancelación y montos a reembolsar
-     * @throws NoSuchElementException Si el código no existe
-     * @throws IllegalStateException Si la reserva ya fue cancelada previamente
+     * @param holderDocument documento del titular a verificar; null omite la verificación (personal del hotel)
      */
     @Transactional
-    public CancellationResponseDto cancelReservationGroupByCode(String code) {
-        if (code == null || code.trim().isBlank()) {
-            throw new IllegalArgumentException("El código de reserva es obligatorio");
-        }
-        String cleanCode = code.trim().toLowerCase();
-        List<Booking> bookings = bookingRepository.findByReservationGroupCodePrefix(cleanCode);
-        if (bookings.isEmpty()) {
-            throw new java.util.NoSuchElementException("No se encontró ninguna reserva con el código: " + code.trim());
-        }
-
+    public CancellationResponseDto cancelReservationGroupByCode(String code, String holderDocument) {
+        List<Booking> bookings = resolveGroup(code);
         Booking first = bookings.get(0);
+        verifyHolderDocument(guestRepository.findById(first.getGuestId()).orElse(null), holderDocument);
         if ("cancelled".equalsIgnoreCase(first.getStatus())) {
             throw new IllegalStateException("Esta reserva ya se encuentra cancelada");
         }
 
-        // Calcular política de reembolso RN-03 (15:00 del día de llegada)
-        LocalDateTime checkInDateTime = first.getCheckIn().atTime(15, 0);
-        LocalDateTime now = LocalDateTime.now();
-        long hoursUntilCheckIn = ChronoUnit.HOURS.between(now, checkInDateTime);
-
-        int refundPct;
-        String policyDesc;
-        if (hoursUntilCheckIn > 72) {
-            refundPct = 100;
-            policyDesc = "Reembolso del 100% de lo abonado (+72h antes del check-in)";
-        } else if (hoursUntilCheckIn >= 24) {
-            refundPct = 50;
-            policyDesc = "Reembolso del 50% de lo abonado (entre 24h y 72h antes del check-in)";
-        } else {
-            refundPct = 0;
-            policyDesc = "Sin reembolso (menos de 24h antes del check-in)";
-        }
-
+        RefundRule refund = RefundRule.forCheckIn(first.getCheckIn());
         BigDecimal totalGroupPrice = BigDecimal.ZERO;
         BigDecimal totalPaidForGroup = BigDecimal.ZERO;
-        List<Long> cancelledIds = new ArrayList<>();
-        List<String> roomNumbers = new ArrayList<>();
-
         for (Booking b : bookings) {
-            totalGroupPrice = totalGroupPrice.add(b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
-            totalPaidForGroup = totalPaidForGroup.add(b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO);
+            totalGroupPrice = totalGroupPrice.add(nonNull(b.getTotalPrice()));
+            totalPaidForGroup = totalPaidForGroup.add(nonNull(b.getPaidAmount()));
         }
 
         String newPaymentStatus;
         if ("partial".equalsIgnoreCase(first.getPaymentStatus()) || "paid".equalsIgnoreCase(first.getPaymentStatus())) {
-            newPaymentStatus = refundPct > 0 ? "refunded" : "paid";
+            newPaymentStatus = refund.percentage() > 0 ? "refunded" : "paid";
         } else {
             newPaymentStatus = "pending";
         }
 
+        List<Long> cancelledIds = new ArrayList<>();
+        List<String> roomNumbers = new ArrayList<>();
         for (Booking b : bookings) {
             b.setStatus("cancelled");
             b.setPaymentStatus(newPaymentStatus);
             cancelledIds.add(b.getId());
-
-            Room room = roomRepository.findById(b.getRoomId()).orElse(null);
-            if (room != null) {
-                roomNumbers.add(room.getNumber());
-            }
+            roomRepository.findById(b.getRoomId()).ifPresent(room -> roomNumbers.add(room.getNumber()));
         }
-
         bookingRepository.saveAll(bookings);
         bookingRepository.flush();
 
-        BigDecimal refundAmount = totalPaidForGroup.multiply(BigDecimal.valueOf(refundPct))
-                .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
-
-        String codePrefix;
-        if (first.getCompanions() != null && (first.getCompanions().startsWith("TS-") || first.getCompanions().startsWith("BL-"))) {
-            codePrefix = first.getCompanions().trim();
-        } else if (first.getReservationGroupId() != null) {
-            String sub = first.getReservationGroupId().toString().replace("-", "");
-            codePrefix = "TS-" + sub.substring(Math.max(0, sub.length() - 4)).toUpperCase();
-        } else {
-            codePrefix = "TS-" + first.getId();
-        }
-
         return CancellationResponseDto.builder()
-                .code(codePrefix)
+                .code(first.getBookingCode())
                 .reservationGroupId(first.getReservationGroupId())
                 .status("cancelled")
                 .paymentStatus(newPaymentStatus)
                 .totalPrice(totalGroupPrice)
                 .paidAmount(totalPaidForGroup)
-                .refundPercentage(refundPct)
-                .refundAmount(refundAmount)
-                .policyDescription(policyDesc)
+                .refundPercentage(refund.percentage())
+                .refundAmount(refund.applyTo(totalPaidForGroup))
+                .policyDescription(refund.description())
                 .cancelledBookingIds(cancelledIds)
                 .freedRoomNumbers(roomNumbers)
                 .cancelledAt(LocalDateTime.now())
@@ -622,36 +473,26 @@ public class BookingService {
     }
 
     /**
-     * Liquida el saldo pendiente de una reserva que pagó inicialmente el 50% de abono.
-     * Actualiza el estado de pago a 'paid' y el monto pagado al total de la reserva.
+     * Liquida el saldo pendiente de una reserva abonada al 50%.
      *
-     * @param code Código o prefijo de reserva
-     * @return DTO con la confirmación de la actualización del saldo a cero
-     * @throws NoSuchElementException Si la reserva no existe
-     * @throws IllegalStateException Si la reserva está cancelada o no tiene saldo pendiente
+     * @param holderDocument documento del titular a verificar; null omite la verificación (personal del hotel)
      */
     @Transactional
-    public BookingBatchResponseDto payRemainingBalance(String code) {
-        if (code == null || code.trim().isBlank()) {
-            throw new IllegalArgumentException("El código de reserva es obligatorio");
-        }
-        String cleanCode = code.trim().toLowerCase();
-        List<Booking> bookings = bookingRepository.findByReservationGroupCodePrefix(cleanCode);
-        if (bookings.isEmpty()) {
-            throw new java.util.NoSuchElementException("No se encontró ninguna reserva con el código: " + code.trim());
-        }
+    public BookingBatchResponseDto payRemainingBalance(String code, String holderDocument) {
+        List<Booking> bookings = resolveGroup(code);
         Booking first = bookings.get(0);
-        if (!"partial".equalsIgnoreCase(first.getPaymentStatus())) {
-            throw new IllegalStateException("Esta reserva no tiene un saldo pendiente o ya fue pagada completamente");
-        }
+        verifyHolderDocument(guestRepository.findById(first.getGuestId()).orElse(null), holderDocument);
         if ("cancelled".equalsIgnoreCase(first.getStatus())) {
             throw new IllegalStateException("Esta reserva está cancelada");
+        }
+        if (!"partial".equalsIgnoreCase(first.getPaymentStatus())) {
+            throw new IllegalStateException("Esta reserva no tiene un saldo pendiente o ya fue pagada completamente");
         }
         BigDecimal totalGroupPrice = BigDecimal.ZERO;
         for (Booking b : bookings) {
             b.setPaymentStatus("paid");
-            b.setPaidAmount(b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
-            totalGroupPrice = totalGroupPrice.add(b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
+            b.setPaidAmount(nonNull(b.getTotalPrice()));
+            totalGroupPrice = totalGroupPrice.add(nonNull(b.getTotalPrice()));
         }
         bookingRepository.saveAll(bookings);
         bookingRepository.flush();
@@ -663,42 +504,29 @@ public class BookingService {
                 first.getStatus(),
                 "paid",
                 totalGroupPrice,
-                BigDecimal.ZERO);
+                BigDecimal.ZERO,
+                first.getBookingCode());
     }
 
     /**
-     * Confirma asíncronamente el pago de una reserva tras la notificación exitosa de una pasarela externa (ej. Wompi APPROVED).
-     * Transiciona el estado de la reserva de 'pending_payment' a 'confirmed' y actualiza payment_status
-     * a 'partial' (para abono del 50%) o 'paid' (para pago total del 100%), registrando el monto efectivamente pagado.
-     *
-     * @param code Código oficial de reserva (TS-XXXX) o UUID de grupo
-     * @param confirmation DTO con datos de la transacción, monto y modalidad
-     * @return DTO con la reserva actualizada y conciliada
+     * Confirma el pago reportado por una pasarela externa (ej. Wompi APPROVED): pasa la reserva
+     * de 'pending_payment' a 'confirmed' con abono parcial (50%) o total (100%).
      */
     @Transactional
     public BookingBatchResponseDto confirmExternalPayment(String code, ExternalPaymentConfirmationDto confirmation) {
-        if (code == null || code.trim().isBlank()) {
-            throw new IllegalArgumentException("El código de reserva es obligatorio");
-        }
-        String cleanCode = code.trim().toLowerCase();
-        List<Booking> bookings = bookingRepository.findByReservationGroupCodePrefix(cleanCode);
-        if (bookings.isEmpty()) {
-            throw new java.util.NoSuchElementException("No se encontró ninguna reserva con el código: " + code.trim());
-        }
+        List<Booking> bookings = resolveGroup(code);
         Booking first = bookings.get(0);
         if ("cancelled".equalsIgnoreCase(first.getStatus())) {
             throw new IllegalStateException("No se puede registrar pago para una reserva cancelada");
         }
 
         BigDecimal totalGroupPrice = bookings.stream()
-                .map(b -> b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO)
+                .map(b -> nonNull(b.getTotalPrice()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Determinación de la modalidad y monto a abonar
         String targetPaymentOption = confirmation != null && confirmation.getPaymentOption() != null
                 ? confirmation.getPaymentOption().trim().toLowerCase()
                 : null;
-
         BigDecimal incomingAmount = confirmation != null ? confirmation.getAmount() : null;
 
         boolean isFullPayment;
@@ -709,7 +537,6 @@ public class BookingService {
         } else if (incomingAmount != null && incomingAmount.compareTo(totalGroupPrice.multiply(new BigDecimal("0.75"))) >= 0) {
             isFullPayment = true;
         } else {
-            // Por defecto, si el saldo ya estaba parcial o la modalidad era anticipo
             isFullPayment = "partial".equalsIgnoreCase(first.getPaymentStatus());
         }
 
@@ -718,30 +545,18 @@ public class BookingService {
                 ? totalGroupPrice
                 : (incomingAmount != null && incomingAmount.compareTo(BigDecimal.ZERO) > 0
                     ? incomingAmount
-                    : totalGroupPrice.divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP));
+                    : totalGroupPrice.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP));
 
-        for (int i = 0; i < bookings.size(); i++) {
-            Booking b = bookings.get(i);
+        for (Booking b : bookings) {
             b.setStatus("confirmed");
             b.setPaymentStatus(newPaymentStatus);
-            if (isFullPayment) {
-                b.setPaidAmount(b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
-            } else {
-                if (bookings.size() == 1) {
-                    b.setPaidAmount(newTotalPaid);
-                } else {
-                    BigDecimal roomTotal = b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO;
-                    BigDecimal fraction = totalGroupPrice.compareTo(BigDecimal.ZERO) > 0
-                            ? roomTotal.divide(totalGroupPrice, 10, java.math.RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
-                    b.setPaidAmount(newTotalPaid.multiply(fraction).setScale(2, java.math.RoundingMode.HALF_UP));
-                }
-            }
+            b.setPaidAmount(isFullPayment
+                    ? nonNull(b.getTotalPrice())
+                    : proportionalShare(newTotalPaid, nonNull(b.getTotalPrice()), totalGroupPrice, bookings.size()));
         }
         bookingRepository.saveAll(bookings);
         bookingRepository.flush();
 
-        BigDecimal pendingBalance = totalGroupPrice.subtract(newTotalPaid).max(BigDecimal.ZERO);
         return new BookingBatchResponseDto(
                 first.getReservationGroupId(),
                 totalGroupPrice,
@@ -750,6 +565,120 @@ public class BookingService {
                 "confirmed",
                 newPaymentStatus,
                 newTotalPaid,
-                pendingBalance);
+                totalGroupPrice.subtract(newTotalPaid).max(BigDecimal.ZERO),
+                first.getBookingCode());
+    }
+
+    // ───────────────────────────── Utilidades ─────────────────────────────
+
+    /**
+     * Resuelve las reservas de un grupo por código público exacto (TS-XXXX) o UUID completo.
+     * Si un código histórico estuviera repetido, se toma el grupo más reciente.
+     */
+    List<Booking> resolveGroup(String code) {
+        if (code == null || code.trim().isBlank()) {
+            throw new IllegalArgumentException("El código de reserva es obligatorio");
+        }
+        String clean = code.trim();
+        List<Booking> bookings;
+        if (UUID_PATTERN.matcher(clean).matches()) {
+            bookings = bookingRepository.findByReservationGroupId(UUID.fromString(clean));
+        } else {
+            List<Booking> matches = bookingRepository.findByBookingCodeIgnoreCaseOrderByCreatedAtDesc(clean);
+            UUID newestGroup = matches.isEmpty() ? null : matches.get(0).getReservationGroupId();
+            bookings = newestGroup == null
+                    ? matches
+                    : matches.stream().filter(b -> newestGroup.equals(b.getReservationGroupId())).toList();
+        }
+        if (bookings.isEmpty()) {
+            throw new NoSuchElementException(NOT_FOUND_MESSAGE);
+        }
+        return bookings;
+    }
+
+    /**
+     * Verifica que el documento indicado coincida con el del titular (solo dígitos).
+     * Si no coincide responde igual que si la reserva no existiera.
+     */
+    static void verifyHolderDocument(Guest guest, String holderDocument) {
+        if (holderDocument == null) {
+            return;
+        }
+        String expected = guest == null ? "" : digitsOnly(guest.getDocumentNumber());
+        String provided = digitsOnly(holderDocument);
+        if (expected.isEmpty() || !expected.equals(provided)) {
+            throw new NoSuchElementException(NOT_FOUND_MESSAGE);
+        }
+    }
+
+    /** Deja visibles solo los últimos 4 dígitos del documento. */
+    static String maskDocument(String document) {
+        String digits = digitsOnly(document);
+        if (digits.isEmpty()) {
+            return null;
+        }
+        int visible = Math.min(4, digits.length());
+        return "*".repeat(digits.length() - visible) + digits.substring(digits.length() - visible);
+    }
+
+    private static String digitsOnly(String value) {
+        return value == null ? "" : value.replaceAll("\\D", "");
+    }
+
+    /** Genera un código TS-XXXX que no esté en uso. */
+    private String generateBookingCode() {
+        for (int attempt = 0; attempt < 50; attempt++) {
+            StringBuilder sb = new StringBuilder("TS-");
+            for (int i = 0; i < CODE_LENGTH; i++) {
+                sb.append(CODE_ALPHABET.charAt(random.nextInt(CODE_ALPHABET.length())));
+            }
+            String candidate = sb.toString();
+            if (!bookingRepository.existsByBookingCodeIgnoreCase(candidate)) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("No fue posible generar un código de reserva único");
+    }
+
+    private List<SpecialEvent> activeEvents(LocalDate checkIn, LocalDate checkOut) {
+        if (specialEventRepository == null) {
+            return List.of();
+        }
+        return specialEventRepository.findActiveEventsInDateRange(checkIn, checkOut);
+    }
+
+    private static BigDecimal proportionalShare(BigDecimal amount, BigDecimal part, BigDecimal whole, int parts) {
+        if (parts == 1) {
+            return amount;
+        }
+        if (whole.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal fraction = part.divide(whole, 10, RoundingMode.HALF_UP);
+        return amount.multiply(fraction).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal nonNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    /** Regla de reembolso RN-03, con el check-in tomado a las 15:00 del día de llegada. */
+    record RefundRule(long hoursUntilCheckIn, int percentage, String description) {
+
+        static RefundRule forCheckIn(LocalDate checkIn) {
+            long hours = ChronoUnit.HOURS.between(LocalDateTime.now(), checkIn.atTime(15, 0));
+            if (hours > 72) {
+                return new RefundRule(hours, 100, "Reembolso del 100% de lo abonado (+72h antes del check-in)");
+            }
+            if (hours >= 24) {
+                return new RefundRule(hours, 50, "Reembolso del 50% de lo abonado (entre 24h y 72h antes del check-in)");
+            }
+            return new RefundRule(hours, 0, "Sin reembolso (menos de 24h antes del check-in)");
+        }
+
+        BigDecimal applyTo(BigDecimal paidAmount) {
+            return paidAmount.multiply(BigDecimal.valueOf(percentage))
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        }
     }
 }

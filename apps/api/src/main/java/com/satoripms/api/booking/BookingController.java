@@ -4,6 +4,7 @@ import com.satoripms.api.guest.Guest;
 import com.satoripms.api.guest.GuestRepository;
 import com.satoripms.api.room.Room;
 import com.satoripms.api.room.RoomRepository;
+import com.satoripms.api.security.Roles;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,7 +24,7 @@ import java.util.Map;
  * 1. Consulta de disponibilidad con filtros de fechas, capacidad y mascotas.
  * 2. Bloqueo temporal en Redis (anti-doble reserva con TTL de 15 minutos) y liberación inmediata.
  * 3. Confirmación atómica por lote con soporte de abono parcial (50%) o total (100%).
- * 4. Consulta de detalles de reserva por código de grupo de 8 caracteres o UUID.
+ * 4. Consulta de detalles de reserva por código público TS-XXXX o UUID (con verificación de documento para el chatbot).
  * 5. Liquidación de saldo restante para reservas parciales.
  * 6. Cancelación con cálculo de política de reembolso proporcional sobre lo pagado (RN-03).
  * 7. Vista administrativa de depuración en tiempo real.
@@ -87,8 +87,7 @@ public class BookingController {
         try {
             String token = bookingService.createTemporaryLock(request.getRoomId(), request.getCheckIn(), request.getCheckOut());
             Room room = roomRepository.findById(request.getRoomId()).orElseThrow();
-            long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
-            BigDecimal totalPrice = room.getPricePerNight().multiply(BigDecimal.valueOf(nights));
+            BigDecimal totalPrice = bookingService.quoteRoomStay(room, request.getCheckIn(), request.getCheckOut());
 
             return ResponseEntity.ok(Map.of(
                     "lockToken", token,
@@ -183,17 +182,26 @@ public class BookingController {
     }
 
     /**
-     * Consulta la información completa de una reserva grupal por su código de 8 caracteres
-     * (prefijo del UUID) o el UUID completo. Incluye desglose de habitaciones, huésped,
-     * total, monto pagado a la fecha, saldo pendiente y políticas de cancelación (RN-03).
+     * Consulta la información completa de una reserva por su código público exacto (TS-XXXX)
+     * o el UUID del grupo. Incluye habitaciones, huésped, total, monto pagado, saldo pendiente
+     * y política de cancelación (RN-03).
      *
-     * @param code Código alfanumérico o UUID de la reserva
+     * Cuando llama el chatbot (rol SERVICE) es obligatorio el encabezado X-Guest-Document con el
+     * documento del titular; si no coincide se responde 404 como si la reserva no existiera, y el
+     * documento se devuelve enmascarado. El personal del hotel no necesita el documento.
+     *
+     * @param code     Código público o UUID de la reserva
+     * @param document Documento del titular (obligatorio para el chatbot)
      * @return DTO con todos los detalles de la reserva y elegibilidad de acciones
      */
     @GetMapping("/bookings/group/{code}")
-    public ResponseEntity<?> getReservationDetails(@PathVariable String code) {
+    public ResponseEntity<?> getReservationDetails(
+            @PathVariable String code,
+            @RequestHeader(value = "X-Guest-Document", required = false) String document) {
         try {
-            return ResponseEntity.ok(bookingService.getReservationDetailsByCode(code));
+            boolean isService = Roles.currentCallerIsService();
+            return ResponseEntity.ok(bookingService.getReservationDetailsByCode(
+                    code, requiredDocumentFor(isService, document), isService));
         } catch (java.util.NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         } catch (IllegalArgumentException e) {
@@ -210,13 +218,19 @@ public class BookingController {
      * - < 24h o no-show: 0% de reembolso.
      * Libera de inmediato las fechas en PostgreSQL al cambiar el estado a 'cancelled'.
      *
+     * Cuando llama el chatbot (rol SERVICE) el cuerpo debe incluir {"document": "..."} con el
+     * documento del titular.
+     *
      * @param code Código de la reserva de grupo
+     * @param body Cuerpo opcional con el documento del titular
      * @return DTO de cancelación con porcentaje y monto devuelto estimado
      */
     @PostMapping("/bookings/group/{code}/cancellation")
-    public ResponseEntity<?> cancelReservationGroup(@PathVariable String code) {
+    public ResponseEntity<?> cancelReservationGroup(@PathVariable String code,
+                                                    @RequestBody(required = false) GuestVerificationDto body) {
         try {
-            return ResponseEntity.ok(bookingService.cancelReservationGroupByCode(code));
+            return ResponseEntity.ok(bookingService.cancelReservationGroupByCode(
+                    code, requiredDocumentFor(Roles.currentCallerIsService(), body == null ? null : body.document())));
         } catch (java.util.NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         } catch (IllegalStateException e) {
@@ -231,13 +245,19 @@ public class BookingController {
      * Actualiza payment_status a 'paid', paid_amount al valor total de la estancia
      * y fija el saldo pendiente en $0.00.
      *
+     * Cuando llama el chatbot (rol SERVICE) el cuerpo debe incluir {"document": "..."} con el
+     * documento del titular.
+     *
      * @param code Código de la reserva de grupo
+     * @param body Cuerpo opcional con el documento del titular
      * @return DTO de respuesta con la reserva completamente pagada
      */
     @PostMapping("/bookings/group/{code}/pay-remaining")
-    public ResponseEntity<?> payRemainingBalance(@PathVariable String code) {
+    public ResponseEntity<?> payRemainingBalance(@PathVariable String code,
+                                                 @RequestBody(required = false) GuestVerificationDto body) {
         try {
-            return ResponseEntity.ok(bookingService.payRemainingBalance(code));
+            return ResponseEntity.ok(bookingService.payRemainingBalance(
+                    code, requiredDocumentFor(Roles.currentCallerIsService(), body == null ? null : body.document())));
         } catch (java.util.NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         } catch (IllegalStateException e) {
@@ -314,16 +334,7 @@ public class BookingController {
             row.put("id", booking.getId());
             row.put("reservationGroupId", booking.getReservationGroupId());
 
-            String bookingCode;
-            if (booking.getCompanions() != null && (booking.getCompanions().startsWith("TS-") || booking.getCompanions().startsWith("BL-"))) {
-                bookingCode = booking.getCompanions().trim();
-            } else if (booking.getReservationGroupId() != null) {
-                String sub = booking.getReservationGroupId().toString().replace("-", "");
-                bookingCode = "TS-" + sub.substring(Math.max(0, sub.length() - 4)).toUpperCase();
-            } else {
-                bookingCode = "TS-" + booking.getId();
-            }
-            row.put("bookingCode", bookingCode);
+            row.put("bookingCode", booking.getBookingCode());
 
             row.put("status", booking.getStatus());
             row.put("paymentStatus", booking.getPaymentStatus());
@@ -349,5 +360,21 @@ public class BookingController {
         }
 
         return ResponseEntity.ok(rows);
+    }
+
+    /**
+     * Documento a verificar: obligatorio para el chatbot; el personal del hotel puede omitirlo
+     * (se verifica solo si lo envía).
+     */
+    private static String requiredDocumentFor(boolean isService, String document) {
+        boolean missing = document == null || document.isBlank();
+        if (isService && missing) {
+            throw new IllegalArgumentException("El documento del titular es obligatorio");
+        }
+        return missing ? null : document;
+    }
+
+    /** Cuerpo con el documento del titular para operaciones sobre una reserva existente. */
+    public record GuestVerificationDto(String document) {
     }
 }

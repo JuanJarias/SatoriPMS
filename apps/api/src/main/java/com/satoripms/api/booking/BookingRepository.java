@@ -26,14 +26,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findByReservationGroupId(UUID reservationGroupId);
 
-    @Query("""
-        SELECT b FROM Booking b 
-        WHERE LOWER(CAST(b.reservationGroupId AS string)) LIKE LOWER(CONCAT('%', :code, '%'))
-           OR LOWER(b.companions) LIKE LOWER(CONCAT('%', :code, '%'))
-           OR CAST(b.id AS string) = :code
-        ORDER BY b.createdAt DESC
-    """)
-    List<Booking> findByReservationGroupCodePrefix(@Param("code") String code);
+    /** Busca por coincidencia exacta del código público (sin distinguir mayúsculas). */
+    List<Booking> findByBookingCodeIgnoreCaseOrderByCreatedAtDesc(String bookingCode);
+
+    boolean existsByBookingCodeIgnoreCase(String bookingCode);
 
     @Query("""
         SELECT COUNT(b) FROM Booking b 

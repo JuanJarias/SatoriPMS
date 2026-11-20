@@ -15,6 +15,7 @@ import java.util.UUID;
  * @param paymentStatus      Estado de pago ('paid', 'partial', 'pending')
  * @param paidAmount         Monto pagado o abonado hasta el momento
  * @param pendingBalance     Saldo pendiente por liquidar (totalPrice - paidAmount)
+ * @param code               Código público de la reserva (ej. TS-7K4Q)
  */
 public record BookingBatchResponseDto(
         UUID reservationGroupId,
@@ -24,24 +25,6 @@ public record BookingBatchResponseDto(
         String status,
         String paymentStatus,
         BigDecimal paidAmount,
-        BigDecimal pendingBalance) {
-
-    /**
-     * Constructor de conveniencia compatible hacia atrás que infiere paidAmount y pendingBalance.
-     */
-    public BookingBatchResponseDto(UUID reservationGroupId,
-                                  BigDecimal totalPrice,
-                                  List<Long> bookingIds,
-                                  List<Long> roomIds,
-                                  String status,
-                                  String paymentStatus) {
-        this(reservationGroupId,
-             totalPrice,
-             bookingIds,
-             roomIds,
-             status,
-             paymentStatus,
-             "paid".equalsIgnoreCase(paymentStatus) ? totalPrice : BigDecimal.ZERO,
-             "paid".equalsIgnoreCase(paymentStatus) ? BigDecimal.ZERO : totalPrice);
-    }
+        BigDecimal pendingBalance,
+        String code) {
 }

@@ -5,11 +5,13 @@
 --   docker compose exec postgres psql -U satori -d satoripms -f /seed/dev_seed.sql
 
 -- 1. Usuarios del Sistema (Admin y Recepción)
+--    SOLO DESARROLLO LOCAL. Contraseña de los tres usuarios: SatoriDev2026
+--    (hash BCrypt). Nunca ejecute este archivo en producción.
 INSERT INTO system_users (username, password_hash, role, name) VALUES
-('admin', '$2a$12$Uy2lw7y1LED32eVFbbxvvO/96LQIj30HMF8LWpauAeqok7nrMaJS.', 'admin', 'Frank Arias Salgado - Administrador'),
-('admin@gmail.com', '$2a$12$Uy2lw7y1LED32eVFbbxvvO/96LQIj30HMF8LWpauAeqok7nrMaJS.', 'admin', 'Frank Arias Salgado - Administrador'),
-('recepcion', '$2a$12$Uy2lw7y1LED32eVFbbxvvO/96LQIj30HMF8LWpauAeqok7nrMaJS.', 'receptionist', 'Sofía Valencia - Recepcionista')
-ON CONFLICT (username) DO UPDATE SET role = EXCLUDED.role, name = EXCLUDED.name;
+('admin', '$2a$12$ubmyBqDClQu9LfB47xZ32ehvCHC/lT/rI4gtREgFhl1EOfRR8IzJu', 'admin', 'Frank Arias Salgado - Administrador'),
+('admin@gmail.com', '$2a$12$ubmyBqDClQu9LfB47xZ32ehvCHC/lT/rI4gtREgFhl1EOfRR8IzJu', 'admin', 'Frank Arias Salgado - Administrador'),
+('recepcion', '$2a$12$ubmyBqDClQu9LfB47xZ32ehvCHC/lT/rI4gtREgFhl1EOfRR8IzJu', 'receptionist', 'Sofía Valencia - Recepcionista')
+ON CONFLICT (username) DO UPDATE SET role = EXCLUDED.role, name = EXCLUDED.name, password_hash = EXCLUDED.password_hash;
 
 -- 2. Las 9 Habitaciones de Referencia (Pisos 1, 2 y 3)
 INSERT INTO room (number, name, type, base_adults_capacity, max_adults_capacity, children_capacity, extra_guest_price, allows_pets, price_per_night, status, active) VALUES
@@ -65,49 +67,49 @@ ON CONFLICT (whatsapp_phone) DO UPDATE SET
 
 -- 6. Reservas de Referencia de Figma (TS-2391, TS-2041, TS-2047, BL-0318, TS-2052, TS-2036, TS-2033, TS-2029)
 -- Se asocian usando identificadores de habitación y huésped
-INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, companions)
+INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, booking_code)
 SELECT 
     g.id, r.id, '2026-10-03', '2026-10-08', 'confirmed', 'paid', 2, 0, FALSE, 850000.00, 850000.00, 'web', '00002391-0000-0000-0000-000000002391', 'TS-2391'
 FROM guest g, room r 
 WHERE g.document_number = '222222' AND r.number = '103'
 AND NOT EXISTS (SELECT 1 FROM booking WHERE reservation_group_id = '00002391-0000-0000-0000-000000002391');
 
-INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, companions)
+INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, booking_code)
 SELECT 
     g.id, r.id, '2026-09-29', '2026-10-02', 'confirmed', 'paid', 2, 0, TRUE, 540000.00, 540000.00, 'chatbot', '00002041-0000-0000-0000-000000002041', 'TS-2041'
 FROM guest g, room r 
 WHERE g.document_number = 'CC 1.113.555.201' AND r.number = '101'
 AND NOT EXISTS (SELECT 1 FROM booking WHERE reservation_group_id = '00002041-0000-0000-0000-000000002041');
 
-INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, companions)
+INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, booking_code)
 SELECT 
     g.id, r.id, '2026-10-01', '2026-10-04', 'confirmed', 'partial', 4, 1, FALSE, 870000.00, 435000.00, 'chatbot', '00002047-0000-0000-0000-000000002047', 'TS-2047'
 FROM guest g, room r 
 WHERE g.document_number = 'CC 94.333.712' AND r.number = '102'
 AND NOT EXISTS (SELECT 1 FROM booking WHERE reservation_group_id = '00002047-0000-0000-0000-000000002047');
 
-INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, companions)
+INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, booking_code)
 SELECT 
     g.id, r.id, '2026-10-03', '2026-10-05', 'pending_payment', 'partial', 3, 0, FALSE, 420000.00, 100000.00, 'web', '00002052-0000-0000-0000-000000002052', 'TS-2052'
 FROM guest g, room r 
 WHERE g.document_number = 'CC 16.280.944' AND r.number = '201'
 AND NOT EXISTS (SELECT 1 FROM booking WHERE reservation_group_id = '00002052-0000-0000-0000-000000002052');
 
-INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, companions)
+INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, booking_code)
 SELECT 
     g.id, r.id, '2026-09-28', '2026-10-01', 'finished', 'paid', 2, 0, FALSE, 630000.00, 630000.00, 'web', '00002036-0000-0000-0000-000000002036', 'TS-2036'
 FROM guest g, room r 
 WHERE g.document_number = 'CC 66.812.430' AND r.number = '201'
 AND NOT EXISTS (SELECT 1 FROM booking WHERE reservation_group_id = '00002036-0000-0000-0000-000000002036');
 
-INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, companions)
+INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, booking_code)
 SELECT 
     g.id, r.id, '2026-09-12', '2026-09-14', 'finished', 'paid', 2, 0, FALSE, 760000.00, 760000.00, 'chatbot', '00002033-0000-0000-0000-000000002033', 'TS-2033'
 FROM guest g, room r 
 WHERE g.document_number = 'CC 1.113.555.201' AND r.number = '202'
 AND NOT EXISTS (SELECT 1 FROM booking WHERE reservation_group_id = '00002033-0000-0000-0000-000000002033');
 
-INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, companions)
+INSERT INTO booking (guest_id, room_id, check_in, check_out, status, payment_status, adults, children, with_pet, total_price, paid_amount, source, reservation_group_id, booking_code)
 SELECT 
     g.id, r.id, '2026-09-20', '2026-09-22', 'cancelled', 'refunded', 2, 0, FALSE, 360000.00, 0.00, 'chatbot', '00002029-0000-0000-0000-000000002029', 'TS-2029'
 FROM guest g, room r 

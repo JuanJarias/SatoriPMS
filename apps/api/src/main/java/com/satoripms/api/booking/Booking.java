@@ -81,6 +81,11 @@ public class Booking {
     private UUID reservationGroupId;
 
     /** Nombres de los acompañantes registrados */
+    /** Código público de la reserva (ej. TS-7K4Q), compartido por todas las habitaciones del grupo. */
+    @Column(name = "booking_code", nullable = false)
+    private String bookingCode;
+
+    /** Nombres de los acompañantes informados por el huésped. */
     @Column(name = "companions")
     private String companions;
 
