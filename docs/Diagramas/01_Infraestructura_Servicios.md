@@ -39,13 +39,13 @@ flowchart TB
         subgraph Orquestacion["Capa de Atención y Lógica Central"]
             direction LR
             N8N["Orquestador del Chatbot (satori_n8n)<br/>n8n 2.47 · Flujo V9 (96 nodos)<br/>Puerto: 5678"]:::core
-            API["Servidor Central (satori_api)<br/>Java 21 + Spring Boot 3.3.5<br/>Puerto: 8080"]:::core
+            API["Servidor Central (satori_api)<br/>Python 3.12 + FastAPI<br/>Puerto: 8080"]:::core
         end
 
-        subgraph Persistencia["Capa de Datos y Control de Concurrencia"]
+        subgraph Persistencia["Capa de Datos y Sesiones"]
             direction LR
-            Redis["Memoria Rápida (satori_redis)<br/>Redis 7 · Sesiones y Bloqueos 15 min<br/>Puerto: 6379"]:::data
-            Postgres["Base de Datos Principal (satori_postgres)<br/>PostgreSQL 16 + Migraciones Flyway<br/>Puerto local: 5433 -> 5432"]:::data
+            Redis["Sesiones del Chatbot (satori_redis)<br/>Redis 7 · solo para n8n V9<br/>Puerto: 6379"]:::data
+            Postgres["Base de Datos Principal (satori_postgres)<br/>PostgreSQL 16 + Migraciones Alembic<br/>Bloqueos de 15 min y reservas<br/>Puerto local: 5432"]:::data
         end
 
         subgraph Volumenes["Almacenamiento Permanente en Disco"]
@@ -69,8 +69,7 @@ flowchart TB
     %% Relaciones internas entre contenedores
     N8N <-->|"Lectura y guardado de sesión<br/>(session:{waId})"| Redis
     N8N <-->|"Disponibilidad, bloqueos, reservas,<br/>pagos, cancelaciones y reseñas"| API
-    API <-->|"Bloqueo atómico por intervalos (15 min)<br/>y liberación inmediata"| Redis
-    API <-->|"Transacciones y restricción<br/>contra sobreventa"| Postgres
+    API <-->|"Bloqueos de 15 min, transacciones<br/>y restricción contra sobreventa"| Postgres
 
     %% Persistencia en volúmenes
     N8N --- VolN8N
@@ -84,11 +83,11 @@ flowchart TB
 
 1. **Canal de Huéspedes (WhatsApp e Inteligencia Artificial):**
    - El viajero se comunica desde su teléfono con el número oficial de **Torre Satori**.
-   - La plataforma de WhatsApp entrega el mensaje al **Orquestador del Chatbot** (`Contenedor de n8n : "satori_n8n"`), el cual recupera en milisegundos el paso actual de la conversación desde la **Memoria Rápida** (`Contenedor de Redis : "satori_redis"`).
+   - La plataforma de WhatsApp entrega el mensaje al **Orquestador del Chatbot** (`Contenedor de n8n : "satori_n8n"`), el cual recupera en milisegundos el paso actual de la conversación desde la **memoria de sesiones** (`Contenedor de Redis : "satori_redis"`, que solo usa el orquestador; la versión V10 del flujo guarda la sesión en PostgreSQL y prescinde de Redis).
    - Cuando el huésped escribe una solicitud en lenguaje libre, el orquestador se apoya en el motor **Google Gemini Flash Lite** para interpretar las fechas, la cantidad de personas y las preferencias.
 2. **Canal de Recepción y Administración (Aplicación Web):**
    - El recepcionista y el administrador operan desde el navegador web conectándose directamente con el **Servidor Central** (`Contenedor del servidor : "satori_api"`).
    - A través de este canal se gestionan las 9 habitaciones de referencia (creación, edición y eliminación segura), los eventos especiales con descuentos, las llegadas y salidas de huéspedes, la tienda interna y los reportes contables.
 3. **Aislamiento y Respaldo de Datos:**
-   - Ni la base de datos (`Contenedor de PostgreSQL : "satori-postgres"`) ni la memoria rápida reciben conexiones directas desde internet; solo el servidor central y el orquestador interno pueden consultarlas.
+   - Ni la base de datos (`Contenedor de PostgreSQL : "satori-postgres"`) ni la memoria de sesiones reciben conexiones directas desde internet; solo el servidor central y el orquestador interno pueden consultarlas.
    - Los tres volúmenes de almacenamiento (`"postgres_data"`, `"redis_data"` y `"n8n_data"`) garantizan que toda la información permanezca intacta aunque el servidor se reinicie.

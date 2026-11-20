@@ -9,14 +9,14 @@ Este documento describe todos los estados por los que transita una reserva dentr
 ## 2. Diagrama de Estados de la Reserva y del Pago
 
 Los estados representados corresponden exactamente a los valores que gestiona el servidor y la base de datos del hotel:
-- **Estados de la reserva (`Estado de la reserva : "status"`):** `'pending_payment'`, `'confirmed'`, `'finished'`, `'cancelled'`.
+- **Estados de la reserva (`Estado de la reserva : "status"`):** en la base de datos están en español (`BLOQUEADA_TEMPORAL`, `PENDIENTE_PAGO`, `CONFIRMADA`, `EN_CURSO`, `EXPIRADA`, `CANCELADA`). Las respuestas al chatbot los traducen a `locked`, `pending_payment`, `confirmed`, `checked_in`, `expired` y `cancelled`; en el diagrama se muestran con esos nombres.
 - **Estados financieros (`Estado del pago : "payment_status"`):** `'pending'`, `'partial'`, `'paid'`, `'refunded'`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> BloqueoTemporal : Selección de habitación en WhatsApp o Web\n(Bloqueo en Redis por 15 minutos)
+    [*] --> BloqueoTemporal : Selección de habitación en WhatsApp o Web\n(Bloqueo en la base de datos por 15 minutos)
 
-    state "Bloqueo Temporal en Memoria (15 min)" as BloqueoTemporal
+    state "Bloqueo Temporal (15 min)\nstatus = 'locked'" as BloqueoTemporal
     state "Pendiente de Pago\nstatus = 'pending_payment'\npayment_status = 'pending'" as PendientePago
     state "Confirmada con Anticipo del 50%\nstatus = 'confirmed'\npayment_status = 'partial'\npaid_amount = 50%" as ConfirmadaParcial
     state "Confirmada y Pagada al 100%\nstatus = 'confirmed'\npayment_status = 'paid'\npaid_amount = 100%" as ConfirmadaTotal
@@ -24,12 +24,11 @@ stateDiagram-v2
     state "Reserva Cancelada\nstatus = 'cancelled'\npayment_status = 'refunded' o 'paid'" as Cancelada
 
     BloqueoTemporal --> [*] : Cancela en resumen, escribe "menú"\no inactividad (POST /api/bookings/unlock)
-    BloqueoTemporal --> PendientePago : Registro sin pago inmediato
-    BloqueoTemporal --> ConfirmadaParcial : Elige Opción 2 (Abono del 50%)\nPOST /api/bookings/confirm
-    BloqueoTemporal --> ConfirmadaTotal : Elige Opción 1 (Pago del 100%)\nPOST /api/bookings/confirm
+    BloqueoTemporal --> PendientePago : Elige modalidad de pago (50% o 100%)\nPOST /api/bookings/confirm\n(el chatbot recibe el enlace de Wompi)
+    BloqueoTemporal --> [*] : Pasan 15 minutos sin avanzar\n(status = 'expired')
 
-    PendientePago --> ConfirmadaParcial : Registra abono del 50%
-    PendientePago --> ConfirmadaTotal : Registra pago del 100%
+    PendientePago --> ConfirmadaParcial : Wompi aprueba el pago del 50%\nPOST .../confirm-external-payment
+    PendientePago --> ConfirmadaTotal : Wompi aprueba el pago del 100%\nPOST .../confirm-external-payment
     PendientePago --> Cancelada : Cancelación antes de abonar\n(Reembolso = $0)
 
     ConfirmadaParcial --> ConfirmadaTotal : Liquida el 50% restante en WhatsApp o Recepción\nPOST /api/bookings/group/{code}/pay-remaining

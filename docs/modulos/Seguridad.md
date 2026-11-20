@@ -8,11 +8,11 @@ El módulo de **Seguridad y Protección de Datos** define las medidas de resguar
 
 ## 2. Control de Acceso por Roles en la Aplicación Web
 
-El acceso a las funciones administrativas y operativas del panel web se protege mediante inicio de sesión con usuario y contraseña, validado contra las cuentas registradas del personal. Al ingresar, el servidor central emite una credencial digital firmada con vigencia controlada (`Credencial de sesión : "JWT"` configurada con `Clave secreta de firma : "JWT_SECRET"` y `Tiempo de expiración : "JWT_EXPIRATION_MS"`, por defecto 8 horas). Todas las operaciones del servidor central exigen esta credencial y verifican el perfil antes de ejecutarse: una operación exclusiva del Administrador se rechaza aunque se intente desde fuera de la aplicación web.
+El acceso a las funciones administrativas y operativas del panel web se protege mediante inicio de sesión con usuario y contraseña, validado contra las cuentas registradas del personal. Al ingresar, el servidor central emite una credencial digital firmada con vigencia controlada (`Credencial de sesión : "JWT"` configurada con `Clave secreta de firma : "JWT_SECRET"` y `Duración : "JWT_EXPIRES_MINUTES"`, por defecto 480 minutos, es decir, 8 horas). Todas las operaciones del servidor central exigen esta credencial y verifican el perfil antes de ejecutarse: una operación exclusiva del Administrador se rechaza aunque se intente desde fuera de la aplicación web.
 
 El sistema distingue estrictamente dos perfiles de usuario:
 
-| Funcionalidad del Sistema | Administrador (`"admin"`) | Recepcionista (`"receptionist"`) |
+| Funcionalidad del Sistema | Administrador (`"Administrador"`) | Recepcionista (`"Recepcionista"`) |
 |---|---|---|
 | Consultar calendario de ocupación y disponibilidad | Permitido | Permitido |
 | Registrar llegadas (Check-in), salidas (Check-out) y reservas manuales | Permitido | Permitido |
@@ -26,18 +26,18 @@ El sistema distingue estrictamente dos perfiles de usuario:
 | **Crear, editar o desactivar cuentas de usuarios del personal** | **Exclusivo Administrador** | No permitido |
 
 ### Reglas de Cuentas del Personal
-- **Almacenamiento seguro de contraseñas:** Ninguna contraseña se guarda en texto visible; el sistema almacena únicamente su huella criptográfica irreversible (`Contraseña cifrada : "password_hash"`, algoritmo BCrypt).
-- **Primer administrador:** En una instalación nueva, el primer usuario Administrador se crea automáticamente a partir de los parámetros de instalación (`SATORI_ADMIN_USERNAME` y `SATORI_ADMIN_PASSWORD`), solo si ese usuario aún no existe.
+- **Almacenamiento seguro de contraseñas:** Ninguna contraseña se guarda en texto visible; el sistema almacena únicamente su huella criptográfica irreversible (`Contraseña cifrada : "password_hash"`, algoritmo bcrypt).
+- **Cuentas iniciales:** Las migraciones de la base de datos crean las cuentas de desarrollo `admin` y `recepcion`. Son **solo para desarrollo**: antes de cualquier despliegue real el administrador debe cambiar sus contraseñas desde la aplicación web (`POST /api/v1/auth/change-password`) y crear las cuentas definitivas del personal.
 - **Retiro de personal sin pérdida de historial:** Cuando un empleado deja de laborar en el hotel, su cuenta no se elimina físicamente de la base de datos para conservar el registro histórico de qué operaciones realizó en su momento; en su lugar, el administrador desactiva la cuenta (`Usuario activo : "active = false"`), bloqueando de inmediato su ingreso al sistema.
 
 ---
 
 ## 3. Seguridad en las Comunicaciones y el Chatbot
 
-1. **Aislamiento de servicios internos:** La base de datos principal y el motor de memoria rápida se ejecutan dentro de una red interna privada de contenedores y no están expuestos a internet público. Únicamente el servidor de aplicaciones y el canal de recepción de mensajes de WhatsApp reciben tráfico externo autorizado.
+1. **Aislamiento de servicios internos:** La base de datos principal y la memoria de sesiones del chatbot (Redis, que solo usa el orquestador) se ejecutan dentro de una red interna privada de contenedores y sus puertos solo responden en el propio equipo. Únicamente el servidor de aplicaciones y el canal de recepción de mensajes de WhatsApp reciben tráfico externo autorizado.
 2. **Verificación de autenticidad de mensajes de WhatsApp:** Las notificaciones entrantes desde la plataforma oficial de Meta incluyen una firma criptográfica en su encabezado (`Firma de seguridad de Meta : "X-Hub-Signature-256"`), la cual permite validar que el mensaje proviene genuinamente de WhatsApp y no de un tercero no autorizado.
 3. **Control de mensajes duplicados:** En caso de que la red telefónica o Meta reenvíe un mismo mensaje por intermitencia de conexión, el sistema identifica el código único del mensaje (`Identificador de mensaje : "message_id"`) para evitar procesarlo dos veces.
-4. **Identificación del asistente de WhatsApp ante el servidor central:** El orquestador del chatbot se identifica con una llave de servicio privada (`Llave de servicio : "SATORI_SERVICE_KEY"`). Sin ella no es posible consultar, crear ni modificar reservas, y con ella solo se permiten las operaciones propias de la atención al huésped.
+4. **Identificación del asistente de WhatsApp ante el servidor central:** El orquestador del chatbot se identifica con una llave de servicio privada (`Llave de servicio : "SATORI_SERVICE_KEY"`, que el servidor central también acepta con el nombre `"N8N_INTERNAL_API_KEY"`). Se envía en el encabezado `X-Service-Key`; sin ella no es posible consultar, crear ni modificar reservas, y con ella solo se permiten las operaciones propias de la atención al huésped.
 5. **Protección de claves y credenciales:** Todas las contraseñas de base de datos, llaves de inteligencia artificial (`Clave de Google Gemini : "GEMINI_API_KEY"`) y tokens de conexión a WhatsApp (`Token de WhatsApp : "WHATSAPP_API_TOKEN"`) se cargan desde variables de entorno locales ([.env.example](../../.env.example)) excluidas del repositorio de código.
 
 ---
@@ -58,4 +58,13 @@ Para brindar total transparencia al propietario del hotel, el sistema contempla 
 - Creación o modificación de eventos especiales y descuentos por fechas.
 - Cancelaciones manuales de reservas y aplicación de reembolsos.
 - Ajustes de precios o de existencias en la tienda interna y registro de egresos financieros.
-Cada evento conserva la fecha y hora exacta, el usuario responsable y el detalle de la modificación realizada.
+Cada evento conserva la fecha y hora exacta, el usuario responsable y el detalle de la modificación realizada. La bitácora es inmutable y solo la consulta el Administrador (`GET /api/v1/auth/audit-logs`). También quedan registradas las confirmaciones de reservas, los pagos externos, los pagos de saldo y los inicios de sesión.
+
+---
+
+## 6. Prevención de Sobreventas y Pagos Duplicados
+
+- **Un solo candado, en la base de datos:** la restricción `EXCLUDE USING gist` de PostgreSQL impide que dos reservas activas de una misma habitación se crucen, aun si llegan en el mismo instante (ver [Base de Datos](Database.md)).
+- **Pagos idempotentes:** cada transacción de la pasarela se registra con un identificador único (`payment_id`); si el mismo pago llega dos veces, no se aplica de nuevo.
+- **Firma de los eventos de pago:** el webhook directo de la API valida la firma HMAC o el checksum de Wompi antes de confirmar una reserva; el orquestador valida el checksum SHA-256 del evento de Wompi antes de avisar al huésped.
+- **Datos mínimos en las respuestas al chatbot:** el documento del titular se devuelve enmascarado y los errores de código o documento incorrectos son indistinguibles para no revelar qué reservas existen.

@@ -13,7 +13,7 @@ tests/chatbot/
 ├── suite_pruebas_chatbot.js      # Suite integral de 65 casos (incluye bloque V9 TC-56 a TC-65)
 ├── verify_n8n_flow_integrity.py     # Validador de topologia: 0 enlaces rotos, 0 huerfanos, 0 switch errors
 ├── test_pago_wompi_v9.js            # Suite de pruebas de cobro Wompi (11 en memoria, 5 en vivo)
-├── test_e2e_v9_completo.js          # Prueba E2E en vivo de 9 pasos (fechas en 1 mensaje, mascota y aislamiento Redis)
+├── test_e2e_v9_completo.js          # Prueba E2E en vivo de 9 pasos (fechas en 1 mensaje, mascota y aislamiento de bloqueos entre conversaciones)
 ├── test_e2e_reserva_wompi_v9.js     # E2E de reserva con Wompi: pendiente de pago -> link -> evento firmado -> confirmada
 ├── test_reserva_guiada_abono_50.js  # Reserva guiada con 50%: queda pendiente de pago (pending_payment)
 ├── test_asistente_ia_autonomo.js    # Agente autonomo con extraccion JSON: queda pendiente de pago
@@ -168,7 +168,7 @@ Valida la transferencia fluida de conversaciones complejas a recepción humana.
 ### Bloque ITIL 4: Garantías de Calidad y Concurrencia (TC-51 a TC-55)
 Valida la resiliencia transaccional y la prevención absoluta de sobreventa (sobreventa = 0).
 
-- **TC-51:** Doble Candado en Redis: Concurrencia en milisegundo 0 con `Promise.all` (`SET NX EX 900`). Garantiza que ante solicitudes simultáneas solo un cliente obtenga el bloqueo.
+- **TC-51:** Modelo del candado de habitación: concurrencia en milisegundo 0 con `Promise.all`; ante solicitudes simultáneas solo un cliente obtiene el bloqueo. Es un modelo en memoria: la verificación real contra PostgreSQL (restricción `EXCLUDE GiST`) está en `tests/test_concurrency_rn02.py`.
 - **TC-52:** Doble Candado en PostgreSQL: Verificación en capa de persistencia final mediante aislamiento transaccional (`countConflictingBookings = 0`).
 - **TC-53:** Prueba de rendimiento y estrés: Ráfaga de 50 consultas concurrentes de disponibilidad resueltas en menos de 500ms.
 - **TC-54:** Tarifas dinámicas con eventos especiales: Aplicación de descuentos y recargos porcentuales estacionales.
@@ -249,8 +249,8 @@ python3 tests/chatbot/verify_n8n_flow_integrity.py
 1. **Prefijo Oficial de Reserva:** Toda reserva generada y consultada responde a la convención `TS-XXXX` (Torre Satori), eliminando cualquier nomenclatura provisional previa.
 2. **Cálculo de Reembolso sobre lo Abonado:** Las políticas de cancelación (RN-03) operan exclusivamente sobre el dinero que el huésped ingresó efectivamente a la cuenta del hotel (`paid_amount`). Jamás se emiten reembolsos calculados sobre saldos pendientes por cobrar.
 3. **Mecanismo de Doble Candado:**
-   - **Candado Rápido (Redis):** Bloqueo en memoria por 15 minutos (900 segundos) para impedir que dos personas seleccionen la misma habitación en WhatsApp.
-   - **Candado Firme (PostgreSQL):** Bloqueo transaccional a nivel de base de datos que garantiza 0 sobreventas incluso ante interrupciones de red o fallos de concurrencia.
+   - **Candado Temporal (PostgreSQL):** Reserva en estado `BLOQUEADA_TEMPORAL` con vencimiento a los 15 minutos (900 segundos) para impedir que dos personas seleccionen la misma habitación en WhatsApp.
+   - **Candado Firme (PostgreSQL):** La misma reserva pasa a `PENDIENTE_PAGO` y luego a `CONFIRMADA`; la restricción `EXCLUDE GiST` de la base de datos garantiza 0 sobreventas incluso ante interrupciones de red o fallos de concurrencia.
 4. **Protección de Datos Personales:** Cumplimiento riguroso del aviso de privacidad según la Ley 1581 de 2012 en el primer contacto con el asistente de Inteligencia Artificial.
 5. **Caducidad de Sesiones:** El tiempo de espera máximo por inactividad del huésped está calibrado en 10 minutos (600 segundos), tras lo cual se liberan las habitaciones reservadas temporalmente para permitir nuevas reservas.
 
@@ -278,10 +278,29 @@ node tests/chatbot/test_e2e_reserva_wompi_v9.js
 node tests/chatbot/test_cancelacion_reembolso.js
 ```
 
+**Orden de ejecución:** `test_pago_saldo_restante.js` y `test_cancelacion_reembolso.js` operan sobre reservas ya existentes (una con pago parcial y otra confirmada). En una base de datos vacía, ejecute antes `test_e2e_reserva_wompi_v9.js`, que deja una reserva confirmada con el 50% abonado.
+
 **Resultado esperado en V9:** como el cobro es con Wompi, una reserva recién creada por el chatbot queda en `pending_payment` / `pending` con `paid_amount = 0`; pasa a `confirmed` / `partial` (o `paid`) solo cuando llega el evento firmado de Wompi.
+
+---
+
+## Pruebas del Servidor Central (Python)
+
+Las pruebas del servidor FastAPI están en `tests/` (raíz del repositorio) y se ejecutan con `pytest` (configuración en `pytest.ini`). Crean y migran por su cuenta la base `satoripms_test`, así que no tocan los datos reales; solo necesitan PostgreSQL levantado y `DATABASE_URL` en formato `postgresql+psycopg://...`.
+
+| Archivo | Qué verifica |
+| :--- | :--- |
+| `test_seguridad_y_precios.py` | Documento del titular (400 sin él, 404 si no coincide, enmascarado), código `TS-XXXX` aleatorio, pago externo idempotente, retención de la habitación en `PENDIENTE_PAGO`, precios por noche con eventos y el listado de monitoreo. |
+| `test_n8n_integration.py` | Recorrido completo del chatbot contra la API: disponibilidad, bloqueo, reserva pendiente, pago aprobado, consulta, pago de saldo y cancelación con RN-03; flujo V10 sin nodos Redis. |
+| `test_concurrency_rn02.py`, `test_booking_lock.py` | Candado de 15 minutos y restricción contra sobreventa con solicitudes simultáneas. |
+| `test_payment_webhook.py`, `test_auth.py`, `test_rooms_availability.py`, `test_web_operations.py`, `test_health.py` | Webhook de pago con firma, autenticación, disponibilidad y operaciones del panel web. |
+
+```bash
+pytest
+```
 
 ---
 
 ## Integración Continua
 
-El flujo de GitHub Actions (`.github/workflows/ci.yml`) ejecuta sin necesidad de servicios externos: `verify_n8n_flow_integrity.py`, `suite_pruebas_chatbot.js` y `test_pago_wompi_v9.js`. Las pruebas `test_*.js` en vivo no se ejecutan en CI porque necesitan n8n, Redis y la API.
+El flujo de GitHub Actions (`.github/workflows/ci.yml`) ejecuta sin necesidad de servicios externos: `verify_n8n_flow_integrity.py`, `suite_pruebas_chatbot.js` y `test_pago_wompi_v9.js`; además compila la web y corre `pytest` con un PostgreSQL efímero. Las pruebas `test_*.js` en vivo no se ejecutan en CI porque necesitan n8n, Redis y la API levantados.

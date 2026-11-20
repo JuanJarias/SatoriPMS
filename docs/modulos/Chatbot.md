@@ -17,7 +17,7 @@ Sin importar en qué paso se encuentre el usuario, el asistente reconoce comando
 Si el viajero envía una nota de voz, imagen, video, documento o sticker cuando el asistente espera una respuesta de texto, el bot le informa amablemente que por ese canal procesa únicamente mensajes escritos o selecciones del menú interactivo, conservando el paso exacto en el que se encontraba la conversación para que el usuario no tenga que empezar de nuevo.
 
 ### C. Control de Inactividad y Liberación Automática de Bloqueos
-- Cada interacción del huésped actualiza su sesión activa en memoria rápida (`Sesión de usuario : "session:{waId}"`).
+- Cada interacción del huésped actualiza su sesión activa (`Sesión de usuario : "session:{waId}"`). El flujo V9 la guarda en la memoria de sesiones (Redis); el flujo V10 la guarda en PostgreSQL a través del servidor central y no necesita Redis.
 - Si transcurren **10 minutos** sin que el usuario responda, el asistente envía un único aviso preguntando si desea continuar con su solicitud.
 - Si se cumple **1 minuto adicional** sin respuesta (11 minutos en total), el sistema cierra la sesión, limpia los datos temporales y **libera inmediatamente los bloqueos de habitaciones asociados**, dejándolas disponibles para otros viajeros.
 
@@ -64,10 +64,10 @@ Este flujo acompaña al viajero pregunta por pregunta, validando la información
     - **Recargo por persona adicional** (indicando cuántas personas adicionales aplican y su valor unitario, o *"Sin recargo"* cuando no supera la capacidad base).
     - **Valor total de la estadía.**
     A continuación, ofrece tres opciones de acción:
-    - **Opción 1 — Pagar el 100% ahora:** Confirma la reserva como totalmente pagada.
-    - **Opción 2 — Pagar el 50% de anticipo:** Confirma la reserva abonando la mitad y dejando el 50% restante pendiente para pagarlo antes o durante el ingreso al hotel.
+    - **Opción 1 — Pagar el 100% ahora:** Registra la reserva a la espera del pago y envía un enlace de pago de Wompi por el valor total; al aprobarse el pago la reserva queda confirmada y pagada.
+    - **Opción 2 — Pagar el 50% de anticipo:** Registra la reserva a la espera del pago y envía un enlace de Wompi por la mitad; al aprobarse queda confirmada con el 50% abonado y el 50% restante pendiente para pagarlo antes o durante el ingreso al hotel.
     - **Opción 3 — Cancelar reserva:** Cancela el proceso y **libera de inmediato el bloqueo temporal de la habitación** para que vuelva a estar disponible.
-11. **Confirmación y entrega del código único:** Al completarse el pago del 100% o del 50%, el sistema registra la reserva definitiva, libera el candado temporal y entrega al huésped su **código único de reserva** con el formato `TS-XXXX` (por ejemplo, `TS-7K4Q`) junto con el desglose del monto abonado y el saldo pendiente.
+11. **Confirmación y entrega del código único:** Al completarse el pago del 100% o del 50%, el sistema deja la reserva retenida a la espera del pago (estado pendiente de pago), entrega el enlace de pago de Wompi y, cuando la pasarela aprueba la transacción, confirma la reserva definitiva y entrega al huésped su **código único de reserva** con el formato `TS-XXXX` (por ejemplo, `TS-7K4Q`) junto con el desglose del monto abonado y el saldo pendiente.
 
 ---
 
@@ -116,3 +116,12 @@ Cuando el viajero selecciona la opción 5 del menú o escribe palabras como *"ag
 1. El sistema activa el indicador de atención humana en la sesión del usuario (`Atención por agente activa : "agent_active"`).
 2. Envía una alerta al panel de recepción para que el personal del hotel atienda el chat desde el WhatsApp del establecimiento o desde la bandeja de conversaciones de la aplicación web.
 3. Mientras el modo de agente humano está activo, el chatbot guarda silencio ante los nuevos mensajes del huésped para no interrumpir la conversación con el recepcionista, hasta que la atención concluya o el huésped escriba *"menú"* para reactivar el asistente automático.
+
+---
+
+## 9. Versiones del Flujo y Relación con el Servidor Central
+
+- **[V9_ChatbotReservas.json](../../flows/n8n/V9_ChatbotReservas.json) (vigente):** incluye la llave de servicio en cada llamada, el documento del titular en consultas, pagos de saldo y cancelaciones, la reversión de la reserva si falla el cobro y la confirmación del pago con Wompi. Guarda la sesión en Redis.
+- **[V10_ChatbotReservas.json](../../flows/n8n/V10_ChatbotReservas.json):** guarda la sesión en PostgreSQL mediante `/api/v1/conversations/session/{key}` y elimina los 7 nodos de Redis. Aún **no** incorpora la llave de servicio, el documento del titular ni la confirmación del pago de Wompi del V9; hay que portarlos antes de reemplazar al V9.
+- **Contrato con la API:** n8n usa las rutas `/api/...` sin versión (disponibilidad, bloqueo, confirmación, consulta, pago de saldo, cancelación, pago externo y aviso de agente) y espera los estados en inglés (`pending_payment`, `confirmed`, `cancelled`). Ver [Servidor Central](BackendAPI.md).
+- **Verificación en vivo:** las pruebas de `tests/chatbot/test_*.js` se ejecutan contra el servidor FastAPI y pasan (ver [las pruebas del chatbot](../../tests/chatbot/README.md)).

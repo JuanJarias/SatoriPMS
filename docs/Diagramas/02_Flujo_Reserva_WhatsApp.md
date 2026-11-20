@@ -15,7 +15,7 @@ sequenceDiagram
     participant N as Orquestador Chatbot (n8n V9)
     participant IA as Inteligencia Artificial (Gemini)
     participant A as Servidor Central (API)
-    participant R as Memoria Rápida (Redis 7)
+    participant R as Memoria de Sesiones (Redis 7, solo n8n)
     participant DB as Base de Datos (PostgreSQL 16)
 
     H->>N: Escribe "Hola" o "Menú"
@@ -60,8 +60,8 @@ sequenceDiagram
     rect rgb(255, 248, 231)
         Note over N,R: Bloqueo Temporal Garantizado por 15 Minutos (900 segundos)
         N->>A: Solicita bloquear la habitación elegida<br/>(POST /api/bookings/lock)
-        A->>R: Ejecuta script atómico por intervalo de fechas<br/>(lock:room:{roomId}:intervals + metadata TTL 900s)
-        R-->>A: Confirma bloqueo y entrega código (lockToken)
+        A->>DB: Guarda la reserva BLOQUEADA_TEMPORAL con vencimiento en 15 min<br/>(restricción GiST contra cruces de fechas)
+        DB-->>A: Confirma el bloqueo y entrega el código (lockToken)
         A-->>N: Devuelve lockToken y vigencia (900s)
     end
 
@@ -76,18 +76,21 @@ sequenceDiagram
 
     alt Elige Opción 1 (Pago 100%) u Opción 2 (Anticipo 50%)
         H->>N: Selecciona modalidad de pago (1 = 100% / 2 = 50%)
-        N->>A: Solicita confirmar reserva en firme<br/>(POST /api/bookings/confirm)
-        A->>R: Verifica que el lockToken siga vigente
-        A->>DB: Guarda huésped y reserva agrupada (reservationGroupId)<br/>status = 'confirmed', payment_status = 'paid' o 'partial'
-        A->>R: Elimina de inmediato el bloqueo temporal
-        A-->>N: Devuelve código de reserva (TS-XXXX), total, abonado y saldo
+        N->>A: Solicita registrar la reserva<br/>(POST /api/bookings/confirm con X-Service-Key)
+        A->>DB: Guarda huésped y reserva agrupada (reservationGroupId)<br/>status = PENDIENTE_PAGO, payment_status = 'pending', paid_amount = 0<br/>Genera el código TS-XXXX aleatorio y único
+        A-->>N: Devuelve código de reserva (TS-XXXX), total y estado pending_payment
+        N-->>H: Envía el enlace de pago de Wompi (50% o 100%) con el código de reserva
+        H->>N: Paga en Wompi (evento firmado transaction.updated = APPROVED)
+        N->>A: Confirma el pago aprobado<br/>(POST /api/bookings/group/{code}/confirm-external-payment)
+        A->>DB: status = CONFIRMADA, payment_status = 'partial' o 'paid', registra la transacción
+        A-->>N: Devuelve reserva confirmada con monto abonado y saldo
         N->>R: Reinicia sesión de usuario a estado de menú
-        N-->>H: Envía confirmación exitosa con código único y desglose de pago
+        N-->>H: Envía confirmación del pago con código único y desglose
     else Elige Opción 3 (Cancelar) o Reinicia con "Menú"
         H->>N: Selecciona "3. Cancelar" o escribe "menú"
         N->>R: Limpia borrador de sesión del usuario
         N->>A: Solicita liberar el bloqueo de inmediato<br/>(POST /api/bookings/unlock)
-        A->>R: Elimina intervalo y metadatos del bloqueo
+        A->>DB: Marca el bloqueo como EXPIRADA
         N-->>H: Confirma cancelación y liberación inmediata de la habitación
     end
 ```
@@ -115,8 +118,8 @@ flowchart TD
     Bloqueo15Min --> ResumenPago["Muestra desglose de tarifa base,<br/>recargos y opciones:<br/>1) 100%  2) Anticipo 50%  3) Cancelar"]
     
     ResumenPago --> Pago{"Opción de Pago"}
-    Pago -- "100% o 50%" --> Confirmada["Reserva confirmada en base de datos<br/>con código TS-XXXX y liberación del candado"]
-    Pago -- "Cancelar o menú" --> Liberar["Liberación inmediata de habitaciones en memoria"]
+    Pago -- "100% o 50%" --> Confirmada["Reserva pendiente de pago con código TS-XXXX<br/>y enlace de Wompi; se confirma al aprobarse el pago"]
+    Pago -- "Cancelar o menú" --> Liberar["Liberación inmediata de habitaciones en la base de datos"]
 ```
 
 ---
@@ -125,4 +128,4 @@ flowchart TD
 
 1. **Dos caminos complementarios hacia la misma reserva:** Tanto el viajero que prefiere ser guiado pregunta por pregunta como el que prefiere redactar un solo mensaje en lenguaje natural convergen en las mismas reglas de validación del servidor central.
 2. **Transparencia en el cobro de personas adicionales:** Antes de que el huésped elija cómo pagar, el resumen discrimina siempre la tarifa base de las noches y el valor adicional cuando el grupo supera la capacidad base de la habitación.
-3. **Liberación inmediata ante desistimiento:** Si el viajero decide cancelar en el paso de pago o escribe *"menú"* para empezar de nuevo, el flujo invoca de inmediato la liberación del candado en memoria (`Liberar bloqueo : "POST /api/bookings/unlock"`), evitando que la habitación quede retenida innecesariamente.
+3. **Liberación inmediata ante desistimiento:** Si el viajero decide cancelar en el paso de pago o escribe *"menú"* para empezar de nuevo, el flujo invoca de inmediato la liberación del bloqueo en la base de datos (`Liberar bloqueo : "POST /api/bookings/unlock"`), evitando que la habitación quede retenida innecesariamente.

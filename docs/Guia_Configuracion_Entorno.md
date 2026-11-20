@@ -14,15 +14,15 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
   - [POSTGRES_USER](#postgres_user)
   - [POSTGRES_PASSWORD](#postgres_password)
   - [POSTGRES_DB](#postgres_db)
-- [2. Memoria en Caché y Bloqueo Concurrente (Redis)](#2-memoria-en-caché-y-bloqueo-concurrente-redis)
+- [2. Sesiones del Chatbot (Redis)](#2-sesiones-del-chatbot-redis)
   - [REDIS_URL](#redis_url)
 - [3. Servidor Central (Backend API)](#3-servidor-central-backend-api)
   - [PORT](#port)
   - [JWT_SECRET](#jwt_secret)
-  - [JWT_EXPIRATION_MS](#jwt_expiration_ms)
+  - [JWT_EXPIRES_MINUTES](#jwt_expires_minutes)
   - [SATORI_SERVICE_KEY](#satori_service_key)
-  - [CORS_ALLOWED_ORIGINS](#cors_allowed_origins)
-  - [SATORI_ADMIN_USERNAME y SATORI_ADMIN_PASSWORD](#satori_admin_username-y-satori_admin_password)
+  - [Orígenes web autorizados (CORS)](#orígenes-web-autorizados-cors)
+  - [Cuentas iniciales de desarrollo](#cuentas-iniciales-de-desarrollo)
 - [4. Integración con Meta for Developers y WhatsApp Cloud API](#4-integración-con-meta-for-developers-y-whatsapp-cloud-api)
   - [META_APP_ID](#meta_app_id)
   - [META_APP_SECRET](#meta_app_secret)
@@ -34,16 +34,16 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
   - [WHATSAPP_GRAPH_VERSION](#whatsapp_graph_version)
 - [5. Inteligencia Artificial (Google Gemini)](#5-inteligencia-artificial-google-gemini)
   - [GEMINI_API_KEY](#gemini_api_key)
-- [6. Pagos de Prueba](#6-pagos-de-prueba)
-  - [BOOKING_TEST_PAYMENT_ENABLED](#booking_test_payment_enabled)
 - [7. Pasarela de Pagos Wompi (Colombia)](#7-pasarela-de-pagos-wompi-colombia)
   - [WOMPI_ENABLED](#wompi_enabled)
   - [WOMPI_PUBLIC_KEY](#wompi_public_key)
   - [WOMPI_PRIVATE_KEY](#wompi_private_key)
   - [WOMPI_EVENTS_SECRET](#wompi_events_secret)
   - [WOMPI_API_URL y WOMPI_CHECKOUT_URL](#wompi_api_url-y-wompi_checkout_url)
+  - [PAYMENT_PROVIDER, PAYMENT_WEBHOOK_SECRET y WOMPI_ENVIRONMENT](#payment_provider-payment_webhook_secret-y-wompi_environment)
 - [8. Reputación y Reseñas Oficiales (Google Reviews)](#8-reputación-y-reseñas-oficiales-google-reviews)
   - [GOOGLE_REVIEWS_URL](#google_reviews_url)
+  - [GOOGLE_PLACES_API_KEY y GOOGLE_PLACE_ID](#google_places_api_key-y-google_place_id)
 - [9. Automatización del Chatbot (n8n)](#9-automatización-del-chatbot-n8n)
   - [COMPOSE_PROFILES](#compose_profiles)
   - [N8N_BASIC_AUTH_USER](#n8n_basic_auth_user)
@@ -70,16 +70,17 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
 ## 1. Base de Datos Relacional (PostgreSQL)
 
 ### DATABASE_URL
-- **Para qué sirve:** Define la cadena de conexión JDBC completa que utiliza el servidor central para comunicarse con el motor de base de datos PostgreSQL, autenticarse y realizar consultas de lectura y escritura.
+- **Para qué sirve:** Define la cadena de conexión (SQLAlchemy con el controlador `psycopg`) que utiliza el servidor central para comunicarse con el motor de base de datos PostgreSQL, autenticarse y realizar consultas de lectura y escritura.
 - **De dónde se saca:** Es una combinación estándar compuesta por el usuario, la contraseña, el host (nombre de máquina o contenedor), el puerto y el nombre de la base de datos.
 - **Cómo obtenerlo y configurarlo:**
   - *Requisitos previos:* Tener Docker instalado para desplegar el contenedor de PostgreSQL.
   - *Valores predeterminados para desarrollo local:*
     ```env
-    DATABASE_URL=jdbc:postgresql://satori:satori_dev@localhost:5432/satoripms
+    DATABASE_URL=postgresql+psycopg://satori:satori_dev@localhost:5432/satoripms
     ```
-  - *Estructura de la URL:* `jdbc:postgresql://<USUARIO>:<PASSWORD>@<HOST>:<PUERTO>/<NOMBRE_BD>`.
-  - Si el backend corre dentro de la red interna de Docker Compose, el host cambia de `localhost` a `postgres`.
+  - *Estructura de la URL:* `postgresql+psycopg://<USUARIO>:<PASSWORD>@<HOST>:<PUERTO>/<NOMBRE_BD>`.
+  - **No use el formato `jdbc:postgresql://...`** del servidor Java anterior: el servidor actual no lo entiende.
+  - Dentro de Docker, `docker-compose.yml` ya arma esta dirección con el host `postgres`; este valor se usa al ejecutar `pytest` o la API directamente en su equipo. Las pruebas crean y usan una base aparte (`satoripms_test`) para no tocar los datos reales.
 - **En dónde ponerlo:** En la sección `# ── Base de datos` del archivo `.env`.
 
 ---
@@ -123,17 +124,17 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
 
 ---
 
-## 2. Memoria en Caché y Bloqueo Concurrente (Redis)
+## 2. Sesiones del Chatbot (Redis)
 
 ### REDIS_URL
-- **Para qué sirve:** Cadena de conexión para acceder al servidor Redis, el cual administra las sesiones activas del chatbot de WhatsApp y ejecuta el "Candado Rápido" (bloqueos temporales atómicos de 15 minutos que previenen sobreventas).
+- **Para qué sirve:** Cadena de conexión al servidor Redis, que **solo usa el orquestador n8n (flujo V9)** para guardar la sesión de cada conversación de WhatsApp y los enlaces de pago. El servidor central no usa Redis: sus bloqueos temporales de 15 minutos viven en PostgreSQL. Cuando el flujo V10 reemplace al V9 (guarda la sesión en PostgreSQL), este servicio y esta variable se podrán retirar.
 - **De dónde se saca:** Es la dirección de red donde corre el servicio de Redis.
 - **Cómo obtenerlo y configurarlo:**
   - Para pruebas ejecutadas localmente desde la máquina anfitriona:
     ```env
     REDIS_URL=redis://localhost:6379
     ```
-  - Si el servicio corre dentro de la red de Docker: el contenedor de backend resuelve el host automáticamente como `redis:6379`.
+  - Si el servicio corre dentro de la red de Docker: n8n resuelve el host automáticamente como `redis:6379`.
 - **En dónde ponerlo:** En la variable `REDIS_URL` del archivo `.env`.
 
 ---
@@ -153,7 +154,7 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
 ---
 
 ### JWT_SECRET
-- **Para qué sirve:** Clave secreta criptográfica (HMAC-SHA256) empleada por el servidor central para firmar digitalmente los tokens de sesión de los administradores y recepcionistas. Garantiza que nadie pueda alterar o falsificar su identidad al interactuar con el sistema.
+- **Para qué sirve:** Clave secreta criptográfica (HMAC-SHA256) empleada por el servidor central para firmar digitalmente los tokens de sesión (JWT) de los administradores y recepcionistas. Garantiza que nadie pueda alterar o falsificar su identidad al interactuar con el sistema.
 - **De dónde se saca:** Es una cadena aleatoria y secreta que debe generar el administrador del sistema.
 - **Cómo obtenerlo paso a paso:**
   - *Requisitos previos:* Disponer de una terminal con el comando `openssl` o utilizar un generador seguro.
@@ -170,16 +171,16 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
 
 ---
 
-### JWT_EXPIRATION_MS
+### JWT_EXPIRES_MINUTES
 - **Para qué sirve:** Determina el tiempo de vigencia de la sesión de un usuario en el panel web antes de requerir que inicie sesión nuevamente.
 - **De dónde se saca:** Lo define la política de seguridad del hotel.
 - **Cómo configurarlo:**
-  - Se expresa en milisegundos.
+  - Se expresa en minutos.
   - Valor recomendado (un turno de recepción completo de 8 horas):
     ```env
-    JWT_EXPIRATION_MS=28800000
+    JWT_EXPIRES_MINUTES=480
     ```
-- **En dónde ponerlo:** En la variable `JWT_EXPIRATION_MS` del archivo `.env`.
+- **En dónde ponerlo:** En la variable `JWT_EXPIRES_MINUTES` del archivo `.env`.
 
 ---
 
@@ -196,36 +197,19 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
     ```env
     SATORI_SERVICE_KEY=9c1e7b3a5d2f4e6a8b0c1d3e5f7a9b2c4d6e8f0a1b3c5d7e9f2a4b6c8d0e1f3a
     ```
-- **En dónde ponerlo:** En la variable `SATORI_SERVICE_KEY` del archivo `.env`. El mismo archivo lo leen el servidor central y n8n, por lo que ambos quedan con la misma llave. Después de cambiarla, recree los contenedores `api` y `n8n`.
+- **En dónde ponerlo:** En la variable `SATORI_SERVICE_KEY` del archivo `.env`. El mismo archivo lo leen el servidor central y n8n, por lo que ambos quedan con la misma llave. El servidor central también la acepta con el nombre `N8N_INTERNAL_API_KEY`. Después de cambiarla, recree los contenedores `api` y `n8n`.
 
 ---
 
-### CORS_ALLOWED_ORIGINS
-- **Para qué sirve:** Lista de direcciones web desde las que el navegador puede consumir el servidor central (por ejemplo, la aplicación web de recepción).
-- **De dónde se saca:** Corresponde a la dirección en la que se publica la aplicación web.
-- **Cómo configurarlo:**
-  - Separe varias direcciones con comas, sin espacios innecesarios.
-  - Valor para desarrollo local:
-    ```env
-    CORS_ALLOWED_ORIGINS=http://localhost:5173
-    ```
-- **En dónde ponerlo:** En la variable `CORS_ALLOWED_ORIGINS` del archivo `.env`.
+### Orígenes web autorizados (CORS)
+- **Para qué sirve:** Lista de direcciones web desde las que el navegador puede consumir el servidor central (la aplicación web de recepción).
+- **Cómo configurarlo:** En el entorno local ya viene configurada para `http://localhost:5173` y `http://127.0.0.1:5173` en `docker-compose.yml` (variable `CORS_ORIGINS`, una lista JSON). Si publica la web en otra dirección, agréguela allí.
 
 ---
 
-### SATORI_ADMIN_USERNAME y SATORI_ADMIN_PASSWORD
-- **Para qué sirven:** Crean automáticamente el primer usuario Administrador al arrancar el servidor central, para poder ingresar al panel web en una instalación nueva.
-- **De dónde se sacan:** Los define el responsable de la instalación.
-- **Cómo configurarlos:**
-  - La contraseña debe tener **mínimo 8 caracteres**.
-  - El usuario solo se crea si todavía no existe; nunca se modifica un usuario existente.
-  - Opcionalmente, `SATORI_ADMIN_NAME` define el nombre visible del administrador.
-    ```env
-    SATORI_ADMIN_USERNAME=gerencia
-    SATORI_ADMIN_PASSWORD=una_contraseña_segura
-    SATORI_ADMIN_NAME=Gerencia Torre Satori
-    ```
-- **En dónde ponerlos:** En el archivo `.env`. Después del primer arranque se recomienda dejar `SATORI_ADMIN_PASSWORD` vacía.
+### Cuentas iniciales de desarrollo
+- **Para qué sirven:** Las migraciones de la base de datos crean dos cuentas para entrar al panel web en una instalación nueva: `admin` (contraseña `admin123`, Administrador) y `recepcion` (contraseña `recepcion123`, Recepcionista).
+- **Importante:** Son **solo para desarrollo**. Antes de un despliegue real, cambie las contraseñas desde la aplicación web y cree las cuentas definitivas del personal.
 
 ---
 
@@ -380,22 +364,6 @@ Para que el hotel pueda enviar y recibir mensajes automáticos por WhatsApp, se 
 
 ---
 
-## 6. Pagos de Prueba
-
-### BOOKING_TEST_PAYMENT_ENABLED
-- **Para qué sirve:** Bandera de control operativa que habilita o desactiva la simulación de pagos instantáneos en entornos de prueba locales sin necesidad de interactuar con la pasarela bancaria. Aun habilitada, solo un usuario Administrador puede usarla.
-- **De dónde se saca:** Es una directiva interna de control del servidor central.
-- **Cómo configurarlo:**
-  - Para pruebas automatizadas y desarrollo local: `true`.
-  - Para el entorno operativo real del hotel: `false`.
-  - Valor recomendado inicial:
-    ```env
-    BOOKING_TEST_PAYMENT_ENABLED=false
-    ```
-- **En dónde ponerlo:** En la variable `BOOKING_TEST_PAYMENT_ENABLED` del archivo `.env`.
-
----
-
 ## 7. Pasarela de Pagos Wompi (Colombia)
 
 El flujo conversacional V9 (`V9_ChatbotReservas.json`) incorpora la pasarela de pagos colombiana Wompi (Bancolombia) para la generación de enlaces de pago por el 50% de anticipo o el 100% total de la estadía:
@@ -415,12 +383,29 @@ El flujo conversacional V9 (`V9_ChatbotReservas.json`) incorpora la pasarela de 
 - **Para qué sirve:** Secreto criptográfico utilizado para validar la autenticidad e integridad de la firma SHA-256 en los eventos enviados al webhook `/webhook/wompi-events`. Evita ataques de suplantación o confirmaciones falsas de transacciones.
 - **De dónde se saca:** En el panel de Wompi en **Desarrolladores → Seguimiento de transacciones → Secreto de eventos**.
 
+### WOMPI_INTEGRITY_SECRET
+- **Para qué sirve:** Secreto de integridad de Wompi que usa el servidor central para firmar y verificar transacciones.
+- **De dónde se saca:** En el panel de Wompi, en **Desarrolladores → Secretos de integración**.
+
 ### WOMPI_API_URL y WOMPI_CHECKOUT_URL
 - **Valores predeterminados:**
   ```env
   WOMPI_API_URL=https://production.wompi.co/v1      # O https://sandbox.wompi.co/v1 en pruebas
   WOMPI_CHECKOUT_URL=https://checkout.wompi.co/l/
   WOMPI_LINK_EXPIRATION_HOURS=24
+  ```
+
+---
+
+### PAYMENT_PROVIDER, PAYMENT_WEBHOOK_SECRET y WOMPI_ENVIRONMENT
+- **Para qué sirven:** Configuran la pasarela de pagos **del servidor central** (aparte del flujo de n8n):
+  - `PAYMENT_PROVIDER`: `sandbox` (simula los pagos, valor por defecto de desarrollo) o `wompi`.
+  - `PAYMENT_WEBHOOK_SECRET`: secreto para validar la firma HMAC (`X-Hub-Signature-256`) de los avisos de pago que recibe `POST /api/v1/payments/webhook`.
+  - `WOMPI_ENVIRONMENT`: `sandbox` o `production`.
+  ```env
+  PAYMENT_PROVIDER=sandbox
+  PAYMENT_WEBHOOK_SECRET=tu_secreto_para_firma_hmac_sha256
+  WOMPI_ENVIRONMENT=sandbox
   ```
 
 ---
@@ -434,6 +419,17 @@ El flujo conversacional V9 (`V9_ChatbotReservas.json`) incorpora la pasarela de 
   GOOGLE_REVIEWS_URL=https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews
   ```
 - **Personalización:** Permite utilizar un enlace acortado propio de marca (por ejemplo `https://torresatori.com/resenas` o `https://g.page/r/.../review`).
+
+---
+
+### GOOGLE_PLACES_API_KEY y GOOGLE_PLACE_ID
+- **Para qué sirven:** El servidor central consulta la calificación y las reseñas reales del hotel en Google Places (nunca inventa reseñas). `GOOGLE_PLACE_ID` identifica al hotel y `GOOGLE_PLACES_API_KEY` es la clave de la API de Google.
+- **Cómo configurarlos:**
+  ```env
+  GOOGLE_PLACES_API_KEY=tu_clave_de_google_places
+  GOOGLE_PLACE_ID=ChIJQRr4FV2zOY4RvqM_8_EfzsY
+  ```
+- **Nota:** Sin la clave, el resumen de reseñas del panel web aparece vacío.
 
 ---
 
@@ -519,22 +515,19 @@ Una vez completadas todas las variables, el archivo `.env` en la raíz del proye
 
 ```env
 # Base de datos
-DATABASE_URL=jdbc:postgresql://satori:satori_dev@localhost:5432/satoripms
-POSTGRES_USER=user
-POSTGRES_PASSWORD=password_dev
+DATABASE_URL=postgresql+psycopg://satori:satori_dev@localhost:5432/satoripms
+POSTGRES_USER=satori
+POSTGRES_PASSWORD=satori_dev
 POSTGRES_DB=satoripms
 
-# Redis
+# Redis (solo n8n V9)
 REDIS_URL=redis://localhost:6379
 
 # Servidor Central
 PORT=8080
 JWT_SECRET=4f8b9d2e1c3a7f6e5d4c3b2a109876543210abcdef0123456789abcdef012345
-JWT_EXPIRATION_MS=28800000
+JWT_EXPIRES_MINUTES=480
 SATORI_SERVICE_KEY=9c1e7b3a5d2f4e6a8b0c1d3e5f7a9b2c4d6e8f0a1b3c5d7e9f2a4b6c8d0e1f3a
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-SATORI_ADMIN_USERNAME=gerencia
-SATORI_ADMIN_PASSWORD=una_contraseña_segura
 
 # WhatsApp / Meta
 META_APP_ID=1234567890123456
@@ -549,14 +542,21 @@ WHATSAPP_GRAPH_VERSION=v25.0
 # Inteligencia Artificial
 GEMINI_API_KEY=AIzaSy...
 
-# Pagos de prueba
-BOOKING_TEST_PAYMENT_ENABLED=false
+# Pasarela de pagos de la API
+PAYMENT_PROVIDER=sandbox
+PAYMENT_WEBHOOK_SECRET=tu_secreto_para_firma_hmac_sha256
+WOMPI_ENVIRONMENT=sandbox
 
-# Wompi
+# Google Places
+GOOGLE_PLACES_API_KEY=tu_clave_de_google_places
+GOOGLE_PLACE_ID=ChIJQRr4FV2zOY4RvqM_8_EfzsY
+
+# Wompi (flujo de n8n)
 WOMPI_ENABLED=true
 WOMPI_PUBLIC_KEY=pub_test_...
 WOMPI_PRIVATE_KEY=prv_test_...
 WOMPI_EVENTS_SECRET=test_events_...
+WOMPI_INTEGRITY_SECRET=test_integrity_...
 WOMPI_API_URL=https://sandbox.wompi.co/v1
 WOMPI_CHECKOUT_URL=https://checkout.wompi.co/l/
 
@@ -579,4 +579,4 @@ docker compose up -d
 # Verificar el estado de salud de los contenedores
 docker compose ps
 ```
-Todos los contenedores (`satori_postgres`, `satori_redis`, `satori_api` y `satori_n8n`) deben figurar en estado `running` o `healthy`.
+Todos los contenedores (`satori_postgres`, `satori_redis`, `satori_api` y `satori_n8n`) deben figurar en estado `running` o `healthy`. Compruebe también la API en `http://localhost:8080/api/v1/health` (debe responder `{"status":"ok","db":"connected"}`).

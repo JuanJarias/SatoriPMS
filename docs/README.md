@@ -36,7 +36,7 @@ Cada documento describe el funcionamiento previsto, las reglas de negocio y el d
 - [Índice de Diagramas](Diagramas/README.md): Guía de las representaciones visuales del proyecto:
   1. [Infraestructura y Servicios](Diagramas/01_Infraestructura_Servicios.md)
   2. [Flujo de Reserva por WhatsApp](Diagramas/02_Flujo_Reserva_WhatsApp.md)
-  3. [Prevención de Sobreventa (Doble Candado)](Diagramas/03_Concurrencia_Doble_Candado.md)
+  3. [Prevención de Sobreventa (Doble Candado en PostgreSQL)](Diagramas/03_Concurrencia_Doble_Candado.md)
   4. [Gestión Operativa en Recepción](Diagramas/04_Gestion_Operativa_Recepcion.md)
   5. [Ciclo de Vida de una Reserva](Diagramas/05_Ciclo_Vida_Reserva.md)
 
@@ -48,8 +48,18 @@ Cada documento describe el funcionamiento previsto, las reglas de negocio y el d
 ### 4. Actas y Actividades de Referencia (`docs/Reuniones/` y `docs/Actividades/`)
 - [Acta de Reunión con el Cliente](Reuniones/ReunionCliente.md): Minuta ejecutiva y transcripción íntegra de la sesión de levantamiento de requerimientos con el propietario del hotel, Frank Arias Salgado.
 - [Enunciado de Escenarios de Crisis Presupuestal (PDF)](<Actividades/ACTIVIDAD 4 (Escenarios de Crisis Presupuestal).pdf>): Documento académico de referencia para la simulación financiera.
-- [Plan de Transición y Alistamiento Operativo del Servicio](Actividades/Actividad5_Transicion_Servicio.md): Entregable de la transición del servicio a operación bajo el marco ITIL 4.
+- [Plan de Transición y Alistamiento Operativo del Servicio](Actividades/Actividad5_Transicion_Servicio.md): Entregable de la transición del servicio a operación bajo el marco ITIL 4 (versión actualizada al servidor FastAPI, el 11 de noviembre).
+- [Entregable en PDF](Actividades/Actividad5_Transicion_Servicio.pdf), [presentación en PDF](Actividades/SatoriPMS_Actividad5_Presentacion.pdf) y [presentación HTML](Actividades/index.html): Materiales de la sustentación.
 - [Enunciado de la Transición del Servicio (PDF)](<Actividades/ACTIVIDAD 5. Entregable transición del servicio (Operaciones).pdf>): Documento académico de referencia para el plan de transición.
 
 ### 5. Guías de Despliegue y Configuración
 - [Guía de Configuración de Variables de Entorno (.env)](Guia_Configuracion_Entorno.md): Manual detallado paso a paso para obtener y configurar cada una de las claves de acceso, identificadores de WhatsApp (Meta for Developers), Inteligencia Artificial (Google AI Studio), pasarela de pagos (Wompi), seguridad del servidor central y credenciales de infraestructura local.
+
+### 6. Planificación y Aprendizaje del Equipo
+Material generado durante la migración del servidor central a Python/FastAPI:
+- [Roadmap del Sprint 5](ROADMAP.md): Cronograma del 11 al 20 de noviembre de 2026 (plan original; el despliegue en la nube y el flujo sin Redis siguen pendientes).
+- [Notas de aprendizaje por lote](aprendizaje/M0.md): Un documento por lote de trabajo (`M0`–`M4` y `P0`–`P6`) con qué hace el cambio, por qué se diseñó así, cómo probarlo y preguntas de defensa.
+- [Auditoría y plan de migración](audit/05-plan-migracion.md): Documentos `audit/01` a `audit/12` con el diagnóstico del repositorio Java, el plan de migración y el estado de despliegue. Son registros históricos del momento en que se escribieron.
+- [Guía de dominio técnico](GUIA_TELEMATICA.md) y [contexto para consultar una IA externa](CONTEXTO_PARA_IA_EXTERNA.md): Guías de estudio y de contexto del equipo.
+- [Referencias del servidor Java anterior](legacy-ref/README.md): Migraciones SQL, contratos de endpoints y el flujo V8 del backend previo, conservados solo como consulta (el código Java está en el tag `legacy-java-backup`).
+

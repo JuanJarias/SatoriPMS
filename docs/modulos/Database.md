@@ -2,107 +2,80 @@
 
 ## 1. Propósito del Módulo
 
-La **Base de Datos** de **SatoriPMS** resguarda toda la información comercial, operativa y contable de **Torre Satori** sobre el motor relacional **PostgreSQL 16**. Su diseño garantiza que los datos de habitaciones, eventos especiales, huéspedes, reservas, pagos, consumos de tienda, movimientos financieros, reseñas y usuarios del personal se almacenen sin duplicidades, manteniendo el historial contable intacto y bloqueando de raíz cualquier intento de asignar una misma habitación a dos reservas en fechas cruzadas.
+La **Base de Datos** de **SatoriPMS** resguarda toda la información comercial, operativa y contable de **Torre Satori** sobre el motor relacional **PostgreSQL 16**. Es también el único lugar donde viven los bloqueos temporales de habitaciones: el servidor central no usa Redis. Su diseño garantiza que los datos de habitaciones, eventos especiales, huéspedes, reservas, pagos, consumos, movimientos financieros y usuarios del personal se almacenen sin duplicidades, manteniendo el historial contable intacto.
 
 ---
 
 ## 2. Organización de la Información del Hotel
 
-A continuación se describe qué información almacena cada entidad del sistema, explicando cada dato en lenguaje de negocio junto con su nombre técnico en la base de datos:
+A continuación se describe qué información almacena cada tabla, con su nombre técnico en la base de datos:
 
 ### A. Catálogo de Habitaciones (`Habitaciones : "room"`)
-Almacena la configuración comercial y operativa de cada una de las habitaciones del hotel (referencia actual de **9 habitaciones** administrables desde la aplicación web):
-- `Identificador único : "id"`: Número interno consecutivo de la habitación.
-- `Número de habitación : "number"`: Código visible de la habitación (por ejemplo, `"101"`, `"201"`, `"301"`), único en el hotel.
-- `Nombre comercial : "name"` y `Descripción : "description"`: Nombre y detalle de las comodidades de la habitación.
-- `Categoría o tipo : "type"`: Clasificación de la habitación (`"ESTANDAR"`, `"DOBLE"`, `"SUITE"`).
-- `Capacidad base de adultos : "base_adults_capacity"`: Cantidad de personas cubiertas por la tarifa base por noche.
-- `Capacidad máxima de adultos : "max_adults_capacity"` y `Capacidad de niños : "children_capacity"`: Tope máximo de personas permitidas en la habitación.
-- `Permitir mascotas : "allows_pets"`: Indica si la habitación es apta para viajeros con mascotas.
-- `Precio base por noche : "price_per_night"`: Valor por noche para la capacidad base.
-- `Precio por persona adicional : "extra_guest_price"`: Valor que se suma cuando el grupo supera la capacidad base sin exceder el tope máximo.
-- `Estado operativo : "status"`: Estado físico actual (`Disponible : "available"`, `Ocupada : "occupied"`, `En mantenimiento : "maintenance"`).
-- `Habitación activa : "active"`: Define si la habitación está habilitada para la venta.
-- **Regla de eliminación y protección:** Solo el Administrador puede crear, editar o eliminar habitaciones. Una habitación solo puede eliminarse si no tiene ninguna reserva en estado pendiente de pago o confirmada.
+Configuración comercial y operativa de cada habitación (referencia actual de **9 habitaciones**, numeradas del `"1"` al `"9"`, administrables desde la aplicación web):
+- `Identificador único : "id"` y `Número de habitación : "number"` (único en el hotel).
+- `Nombre comercial : "name"`, `Descripción : "description"` y `Tipo : "type"` (por ejemplo, Sencilla, Doble, Familiar, Suite).
+- `Capacidad base de adultos : "base_adults_capacity"`: Personas cubiertas por la tarifa base por noche.
+- `Capacidad máxima de adultos : "max_adults_capacity"` y `Capacidad de niños : "children_capacity"`.
+- `Permitir mascotas : "allows_pets"`, `Precio base por noche : "price_per_night"` y `Precio por persona adicional : "extra_guest_price"`.
+- `Estado operativo : "status"`: `available`, `occupied`, `cleaning` o `maintenance`. `Habitación activa : "active"`.
+- **Regla de eliminación:** Solo el Administrador puede crear, editar o eliminar habitaciones, y no puede eliminar una con reservas activas.
 
-### B. Eventos Especiales y Descuentos por Fechas (`Eventos especiales : "special_event"`)
-Permite al administrador programar temporadas altas, festividades locales o campañas de descuento en rangos de fechas específicos:
-- `Nombre del evento : "name"` y `Descripción : "description"`: Motivo del evento o promoción (por ejemplo, *"Festival Bandola"*, *"Descuento de Temporada Baja"*).
-- `Fecha de inicio : "start_date"` y `Fecha de fin : "end_date"`: Rango de días en que aplica el evento.
-- `Porcentaje de descuento o ajuste : "discount_percentage"`: Porcentaje de descuento (o incremento en temporada especial) que se aplica sobre las noches dentro del rango.
-- `Estadía mínima de noches : "min_nights"`: Cantidad mínima de noches requerida para reservar durante el evento (opcional).
-- `Evento activo : "active"`: Indica si la regla tarifaria se encuentra vigente.
+### B. Eventos Especiales (`Eventos especiales : "special_event"`)
+Temporadas, festividades o campañas con ajuste de tarifa por fechas:
+- `Nombre : "name"`, `Descripción : "description"`, `Fecha de inicio : "start_date"` y `Fecha de fin : "end_date"` (ambas incluidas).
+- `Porcentaje de ajuste : "discount_percentage"`: **con signo**; positivo es descuento y negativo es recargo. Se aplica noche por noche (regla provisional, pendiente de confirmar con el cliente).
+- `Evento activo : "active"`.
 
 ### C. Directorio de Huéspedes (`Huéspedes : "guest"`)
-Conserva el perfil de cada cliente que se comunica por WhatsApp o se registra en recepción:
-- `Identificador único : "id"`.
-- `Teléfono de WhatsApp : "whatsapp_phone"`: Número telefónico único del huésped que sirve como llave de reconocimiento automático en futuras visitas.
-- `Nombre completo : "name"`: Nombre y apellidos del titular.
-- `Documento de identidad : "document_number"`: Cédula o pasaporte del titular (entre 6 y 10 dígitos numéricos).
-- `Notas de recepción : "notes"`: Observaciones de atención o preferencias del cliente.
+- `Teléfono de WhatsApp : "whatsapp_phone"` (único; reconoce al huésped en futuras visitas), `Nombre completo : "name"`, `Documento de identidad : "document_number"`, `Correo : "email"` y `Consentimiento de tratamiento de datos : "habeas_data_accepted"` (Ley 1581 de 2012).
 
 ### D. Registro de Reservas (`Reservas : "booking"`)
-Contiene cada estadía reservada desde el chatbot de WhatsApp o desde la aplicación web:
-- `Identificador de reserva : "id"`.
-- `Identificador de grupo de reserva : "reservation_group_id"`: Código único universal e interno que agrupa todas las habitaciones tomadas en una misma solicitud familiar o grupal.
-- `Código de reserva : "booking_code"`: Código público que se entrega al huésped con el formato `TS-XXXX` (por ejemplo, `TS-7K4Q`). Es único por reserva, lo comparten todas las habitaciones del mismo grupo y se busca siempre por coincidencia exacta.
-- `Habitación asignada : "room_id"` y `Huésped titular : "guest_id"`.
+Cada habitación reservada, ya sea desde el chatbot o desde la aplicación web (una fila por habitación; las de un mismo grupo comparten código):
+- `Identificador : "id"`, `Habitación : "room_id"` y `Huésped titular : "guest_id"`.
+- `Identificador de grupo : "reservation_group_id"` y `Código público : "group_code"`: formato `TS-XXXX` aleatorio y único, compartido por todas las habitaciones del grupo y buscado siempre por coincidencia exacta.
 - `Fecha de entrada : "check_in"` y `Fecha de salida : "check_out"`.
-- `Estado de la reserva : "status"`: Admite exclusivamente cuatro estados en minúsculas:
-  - `Pendiente de pago : "pending_payment"`
-  - `Confirmada : "confirmed"`
-  - `Finalizada : "finished"`
-  - `Cancelada : "cancelled"`
-- `Estado del pago : "payment_status"`: Refleja la situación financiera de la reserva (`Pendiente : "pending"`, `Pago parcial del 50% : "partial"`, `Pagada al 100% : "paid"`, `Reembolsada : "refunded"`).
-- `Precio total de la estadía : "total_price"`: Valor total calculado (noches base más recargos por persona adicional y ajustes de eventos especiales).
-- `Monto abonado : "paid_amount"`: Dinero efectivamente pagado por el huésped hasta el momento (base sobre la cual se calcula cualquier saldo pendiente o reembolso por cancelación).
-- `Cantidad de adultos : "adults"`, `Cantidad de niños : "children"`, `Viaja con mascota : "with_pet"` y `Nombres de acompañantes : "companions"`.
-- `Canal de origen : "source"`: Indica si la reserva fue tomada por el asistente virtual (`"chatbot"`) o desde recepción (`"web"`).
-- `Código de bloqueo utilizado : "lock_id"`: Referencia del candado temporal de 15 minutos con el que se aseguró la habitación.
+- `Estado : "status"`: `BLOQUEADA_TEMPORAL`, `PENDIENTE_PAGO`, `CONFIRMADA`, `EN_CURSO`, `EXPIRADA` o `CANCELADA`.
+- `Vencimiento del bloqueo : "expires_at"`: 15 minutos desde que se crea un bloqueo temporal; vacío en las demás reservas.
+- `Estado del pago : "payment_status"`: `pending`, `partial` (50%), `paid` (100%) o `refunded`. `Identificador de pago : "payment_id"` (único; garantiza que una transacción no se aplique dos veces).
+- `Precio total : "total_price"` y `Monto abonado : "paid_amount"` (base para saldos y reembolsos).
+- `Adultos : "adults"`, `Niños : "children"`, `Mascota : "with_pet"` y `Acompañantes : "companions"` (nombres reales de los acompañantes).
+- `Canal de origen : "source"`: `"chatbot"` o `"web"`.
 
-### E. Catálogo de Productos y Consumos de Tienda (`Productos : "product"` y `Consumos : "consumption"`)
-Gestiona la vitrina del hotel y los cargos a las habitaciones:
-- **En `Productos : "product"`:** `Nombre del producto : "name"`, `Precio de venta actual : "price"`, `Cantidad en inventario : "stock"` y `Producto activo : "active"`. Si un producto con ventas históricas se retira del mercado, se marca como inactivo en lugar de borrarse físicamente.
-- **En `Consumos : "consumption"`:** `Producto vendido : "product_id"`, `Reserva asociada : "booking_id"` (cuando el huésped pide cargarlo a la cuenta de su habitación, o vacío si es una venta de mostrador a un visitante externo), `Cantidad : "quantity"`, `Precio unitario histórico : "unit_price"` (congela el precio al momento de la venta para que futuros cambios de tarifa no alteren cuentas pasadas) y `Consumo pagado : "paid"`.
+### E. Tienda, Cafetería y Folio
+- **Tienda (`Productos : "product"`):** `Código : "code"`, `Nombre`, `Categoría`, `Precio : "price"`, `Existencias : "stock"` y `Activo : "active"`.
+- **Cafetería Salgados Café:** la carta (`"cafe_menu"`) y las comandas (`"cafe_order"`, con `Reserva : "booking_id"`, `Habitación : "room_id"`, mesa, productos y total).
+- **Folio de la habitación (`"folio_charge"`):** cargos de tienda o cafetería asociados a una reserva, con cantidad, precio unitario histórico, total y si ya fueron pagados.
 
-### F. Movimientos Financieros (`Registros financieros : "financial_record"`)
-Consolida el flujo de caja del hotel para los reportes administrativos y la exportación contable:
-- `Tipo de movimiento : "type"`: `Ingreso : "income"` o `Egreso : "expense"`.
-- `Categoría contable : "category"`: Clasificación del movimiento (reserva, tienda, nómina, servicios públicos, mantenimiento, insumos).
-- `Monto : "amount"`, `Descripción : "description"`, `Reserva vinculada : "booking_id"` (si aplica) y `Fecha del movimiento : "date"`.
+### F. Egresos (`Egresos : "expense"`)
+`Fecha : "expense_date"`, `Monto : "amount"`, `Categoría`, `Descripción`, y la anulación lógica (`"voided"`, `"voided_reason"`) que conserva el comprobante sin borrarlo.
 
-### G. Reseñas y Opiniones de Huéspedes (`Reseñas : "review"`)
-Almacena las valoraciones recopiladas por el chatbot o registradas desde recepción:
-- `Nombre del autor : "author_name"`, `Teléfono de WhatsApp : "wa_id"`, `Calificación en estrellas : "rating"` (de 1 a 5), `Comentario : "comment"`, `Canal de origen : "source"` (`"chatbot"` o `"google"`), `Reserva vinculada : "booking_id"`, `Huésped vinculado : "guest_id"` y `Fecha de creación : "created_at"`.
+### G. Conversaciones de WhatsApp (`Conversaciones : "conversation"`)
+Sesión de cada huésped con el chatbot guardada en PostgreSQL: `Llave de sesión : "session_key"`, `Teléfono : "wa_id"`, `Nombre : "sender_name"`, `Estado y paso : "state"` y `"step"`, `Atención humana activa : "agent_active"`, `Contexto : "session_data"` y `Vencimiento : "expires_at"`.
 
-### H. Conversaciones de WhatsApp y Usuarios del Personal (`Conversaciones : "conversation"` y `Usuarios del sistema : "system_users"`)
-- **En `Conversaciones : "conversation"`:** Registra el vínculo con cada huésped, su estado de atención (`Atendida por bot : "bot"` o `Escalada a humano : "human_handling"`), si requiere intervención prioritaria (`Requiere agente : "needs_agent"`), fecha del último mensaje y resumen del contexto.
-- **En `Usuarios del sistema : "system_users"`:** Almacena las credenciales del personal del hotel (`Nombre de usuario : "username"`, `Contraseña cifrada : "password_hash"`, `Rol : "role"` —`"admin"` o `"receptionist"`—, `Nombre completo : "name"` y `Usuario activo : "active"`).
+### H. Usuarios del Personal y Auditoría
+- **`Usuarios del sistema : "system_users"`:** `Usuario : "username"`, `Contraseña cifrada : "password_hash"`, `Rol : "role"` (`Administrador` o `Recepcionista`), `Nombre : "name"` y `Activo : "active"`.
+- **`Bitácora de auditoría : "audit_log"`:** registro inmutable de las acciones críticas (fecha, usuario, acción, entidad e identificador, con el detalle en JSON).
 
 ---
 
-## 3. Regla de Exclusión para Impedir Sobreventas en Base de Datos
+## 3. Regla de Exclusión para Impedir Sobreventas
 
-Además del bloqueo temporal de 15 minutos en memoria rápida, la tabla `Reservas : "booking"` cuenta con una restricción matemática directamente en el motor de base de datos (`Restricción contra reservas superpuestas : "no_overlapping_bookings"`).
+El **primer y único candado** contra la sobreventa es una restricción matemática dentro del motor de base de datos sobre la tabla `Reservas : "booking"` (`Restricción contra reservas superpuestas : "no_overlapping_bookings"`).
 
-Esta regla utiliza un índice de rangos de fechas (`Índice GiST : "EXCLUDE USING gist"`) que impide insertar o actualizar dos reservas para la misma habitación si sus fechas de entrada y salida se cruzan (`"[)"`: incluye el día de entrada y excluye el día de salida, permitiendo que un huésped salga en la mañana y otro ingrese en la tarde del mismo día), siempre que la reserva se encuentre en estado `Pendiente de pago : "pending_payment"` o `Confirmada : "confirmed"`. Cuando una reserva cambia a `Cancelada : "cancelled"`, el rango queda libre automáticamente.
+Usa un índice de rangos de fechas (`EXCLUDE USING gist`) que impide insertar o actualizar dos reservas para la misma habitación si sus fechas se cruzan (`"[)"`: incluye el día de entrada y excluye el de salida, de modo que un huésped puede salir en la mañana y otro ingresar en la tarde del mismo día), siempre que la reserva esté en un estado que retiene la habitación: `BLOQUEADA_TEMPORAL`, `PENDIENTE_PAGO`, `CONFIRMADA` o `EN_CURSO`. Como el bloqueo temporal de 15 minutos es una fila más de esa tabla, el candado de corta duración y el definitivo son el mismo mecanismo: no hay forma de que dos procesos concurrentes tomen la misma habitación.
 
 ---
 
 ## 4. Control de Versiones del Esquema (Migraciones)
 
-La creación y evolución de las tablas se gestiona de forma automática al iniciar el servidor mediante archivos numerados en [apps/api/src/main/resources/db/migration/](../../apps/api/src/main/resources/db/migration):
+El esquema se gestiona con **Alembic**. El contenedor de la API ejecuta `alembic upgrade head` cada vez que arranca, por lo que la base siempre queda en la última versión. Las migraciones están en [apps/api/alembic/versions/](../../apps/api/alembic/versions):
 
-1. [V1__initial_schema.sql](../../apps/api/src/main/resources/db/migration/V1__initial_schema.sql): Crea las tablas principales del sistema (`room`, `guest`, `booking`, `review`, `product`, `consumption`, `conversation`, `system_users`), la restricción contra cruces de fechas y los índices de búsqueda rápida.
-2. [V3__align_id_types_with_jpa.sql](../../apps/api/src/main/resources/db/migration/V3__align_id_types_with_jpa.sql): Alinea los tipos de datos de los identificadores numéricos de todas las tablas para soportar volúmenes altos de registros.
-3. [V4__booking_groups_and_guest_document.sql](../../apps/api/src/main/resources/db/migration/V4__booking_groups_and_guest_document.sql): Incorpora el documento de identidad del huésped (`document_number`), el código de agrupación para reservas de múltiples habitaciones (`reservation_group_id`) y el listado de acompañantes (`companions`).
-4. [V5__add_paid_amount_and_review_entity.sql](../../apps/api/src/main/resources/db/migration/V5__add_paid_amount_and_review_entity.sql): Añade el control del monto efectivamente abonado (`paid_amount`) y adapta la tabla de reseñas (`review`).
-5. [V6__create_special_events_table.sql](../../apps/api/src/main/resources/db/migration/V6__create_special_events_table.sql): Crea la tabla de eventos especiales y temporadas (`special_events`) para descuentos o recargos tarifarios estacionales.
-6. [V7__create_restaurant_tables.sql](../../apps/api/src/main/resources/db/migration/V7__create_restaurant_tables.sql): Crea las tablas de la cafetería y restaurante Salgados Café (`menu_items`, `restaurant_orders`, `restaurant_order_items`) para comandas y consumos.
-7. [V8__remove_placeholder_reviews.sql](../../apps/api/src/main/resources/db/migration/V8__remove_placeholder_reviews.sql): Elimina las reseñas de ejemplo; las reseñas reales se consultan directamente en el perfil oficial de Google Reviews.
-8. [V9__add_booking_code.sql](../../apps/api/src/main/resources/db/migration/V9__add_booking_code.sql): Crea el código público de reserva (`booking_code`) en su propia columna y devuelve la columna de acompañantes (`companions`) a su propósito original.
+1. [001_initial_schema.py](../../apps/api/alembic/versions/001_initial_schema.py): Extensión `btree_gist`, tablas principales (`room`, `guest`, `booking`, `audit_log`), el identificador de pago único y la restricción `EXCLUDE` contra cruces de fechas.
+2. [002_system_users.py](../../apps/api/alembic/versions/002_system_users.py): Usuarios del personal y roles. Crea las cuentas de desarrollo `admin` y `recepcion` (**solo desarrollo**: cambie las contraseñas antes de un despliegue real).
+3. [003_conversations_and_payments.py](../../apps/api/alembic/versions/003_conversations_and_payments.py): Tabla de sesiones de conversación en PostgreSQL (reemplaza a Redis).
+4. [004_rooms_1_to_9_and_operations.py](../../apps/api/alembic/versions/004_rooms_1_to_9_and_operations.py): Habitaciones numeradas del 1 al 9 con las tarifas vigentes y las tablas operativas (tienda, cafetería, folio, eventos y egresos).
+5. [005_pending_payment_status.py](../../apps/api/alembic/versions/005_pending_payment_status.py): Estado `PENDIENTE_PAGO`; la restricción de exclusión lo incluye para que la reserva retenga la habitación hasta que llegue el pago.
 
-**Datos iniciales del hotel (plantillas repetibles):** las habitaciones y los productos reales no se publican en el repositorio. Se cargan con plantillas que se copian localmente sin la extensión `.example`. Al ser migraciones repetibles (prefijo `R__`), no ocupan un número de versión y pueden crearse en cualquier momento sin interferir con las migraciones anteriores:
-- [R__seed_rooms.sql.example](../../apps/api/src/main/resources/db/migration/R__seed_rooms.sql.example): Plantilla con las **9 habitaciones de referencia** (se copia como `R__seed_rooms.sql`).
-- [R__seed_products.sql.example](../../apps/api/src/main/resources/db/migration/R__seed_products.sql.example): Plantilla de productos de la tienda interna (se copia como `R__seed_products.sql`).
-- [dev_seed.sql](../../db/seed/dev_seed.sql): Archivo auxiliar para entornos de desarrollo local con usuarios, habitaciones, productos, eventos y huéspedes de prueba.
+**Pruebas:** `pytest` crea y migra por su cuenta una base aparte (`satoripms_test`), de modo que nunca toca los datos operativos.
+
+**Referencia histórica:** el esquema del servidor Java anterior (Flyway, `V1`–`V9`) se conserva en [docs/legacy-ref/db-migrations/](../legacy-ref/db-migrations) solo como consulta; no se ejecuta.

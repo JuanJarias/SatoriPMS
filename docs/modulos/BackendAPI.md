@@ -2,15 +2,20 @@
 
 ## 1. Propósito del Módulo
 
-El **Servidor Central** es el núcleo lógico de **SatoriPMS**. Actúa como único punto de coordinación entre el asistente de WhatsApp, la aplicación web de recepción y administración, la memoria rápida de bloqueos temporales y la base de datos del hotel.
+El **Servidor Central** es el núcleo lógico de **SatoriPMS**. Actúa como único punto de coordinación entre el asistente de WhatsApp, la aplicación web de recepción y administración y la base de datos del hotel. Está construido con **Python 3.12 y FastAPI**, y toda su persistencia vive en **PostgreSQL 16**: no depende de Redis ni de ningún otro almacén para los bloqueos.
 
 Su función es garantizar que todas las reglas del negocio —como el cálculo de precios con personas adicionales o eventos especiales, el bloqueo de 15 minutos contra sobreventa, la validación de abonos del 50% y 100%, el cálculo de reembolsos sobre lo efectivamente pagado y los permisos exclusivos del administrador— se apliquen de manera uniforme y segura sin importar desde qué canal se realice la operación.
 
+La documentación interactiva de todas las operaciones se publica en `http://localhost:8080/docs` (OpenAPI).
+
+### Rutas y versiones
+Las operaciones de la aplicación web se publican bajo `/api/v1/...`. Las que usa el orquestador del chatbot (n8n) se publican además en `/api/...` sin versión, con el mismo comportamiento. En este documento se citan las rutas de n8n (`/api/...`); la web usa las equivalentes con `/api/v1/`.
+
 ### Control de Acceso
 Ninguna operación del servidor central está abierta al público:
-- **Personal del hotel:** inicia sesión con usuario y contraseña (`Iniciar sesión : "POST /api/auth/login"`) y recibe una credencial digital firmada con vigencia limitada (por defecto, un turno de 8 horas), que acompaña cada operación posterior. La credencial indica si la persona es **Administrador** o **Recepcionista**, y el servidor rechaza las operaciones reservadas al Administrador cuando las intenta otro perfil.
-- **Asistente de WhatsApp:** se identifica con una llave de servicio privada que solo conocen el servidor central y el orquestador del chatbot. Con ella únicamente puede realizar las operaciones propias de la atención al huésped (disponibilidad, bloqueos, reservas, consulta, pago de saldo, cancelación y confirmación de pagos de la pasarela).
-- **Protección de los datos del huésped:** cuando la solicitud proviene del asistente de WhatsApp, consultar, pagar el saldo o cancelar una reserva exige el código de reserva **y** el documento del titular. Si el documento no coincide, el servidor responde exactamente igual que si la reserva no existiera, y nunca devuelve el documento completo (solo sus últimos 4 dígitos).
+- **Personal del hotel:** inicia sesión con usuario y contraseña (`Iniciar sesión : "POST /api/v1/auth/login"`) y recibe una credencial digital firmada (JWT) con vigencia limitada (por defecto, un turno de 8 horas), que acompaña cada operación posterior. La credencial indica si la persona es **Administrador** o **Recepcionista**, y el servidor rechaza las operaciones reservadas al Administrador cuando las intenta otro perfil.
+- **Asistente de WhatsApp:** se identifica con una llave de servicio privada (encabezado `X-Service-Key`, variable `SATORI_SERVICE_KEY`) que solo conocen el servidor central y el orquestador del chatbot. Con ella únicamente puede realizar las operaciones propias de la atención al huésped (disponibilidad, bloqueos, reservas, consulta, pago de saldo, cancelación y confirmación de pagos de la pasarela).
+- **Protección de los datos del huésped:** cuando la solicitud proviene del asistente de WhatsApp, consultar, pagar el saldo o cancelar una reserva exige el código de reserva **y** el documento del titular. Si el documento no coincide, el servidor responde exactamente igual que si la reserva no existiera (HTTP 404), y nunca devuelve el documento completo (solo sus últimos 4 dígitos, por ejemplo `******5666`).
 
 ---
 
@@ -18,103 +23,116 @@ Ninguna operación del servidor central está abierta al público:
 
 ### A. Consulta de Habitaciones Disponibles
 - **Concepto para el negocio:** Permite conocer qué habitaciones están libres y habilitadas para hospedar a un grupo de viajeros en un rango de fechas determinado, filtrando según la cantidad de adultos, niños y si viajan con mascota.
-- **Funcionamiento:** El servidor busca primero las habitaciones activas que no tengan reservas confirmadas ni pendientes de pago en esas fechas y que cumplan con la capacidad total solicitada; enseguida descarta cualquier habitación que tenga un bloqueo temporal de 15 minutos activo por parte de otro usuario y aplica las tarifas o descuentos de eventos especiales vigentes.
+- **Funcionamiento:** El servidor busca las habitaciones activas que no tengan reservas confirmadas, en curso o pendientes de pago en esas fechas y que cumplan con la capacidad solicitada; descarta cualquier habitación con un bloqueo temporal vigente de otro usuario (los bloqueos vencidos se ignoran) y cotiza cada una aplicando las tarifas, el recargo por persona adicional y los eventos especiales vigentes.
 - **Identificador técnico de la operación:** `Consulta de disponibilidad : "GET /api/rooms/availability"`
-- **Parámetros de entrada:**
-  - `Fecha de entrada : "checkIn"` (formato `AAAA-MM-DD`)
-  - `Fecha de salida : "checkOut"` (formato `AAAA-MM-DD`)
-  - `Cantidad de adultos : "adults"`
-  - `Cantidad de niños : "children"`
-  - `Viaja con mascota : "pet"`
+- **Parámetros de entrada:** `Fecha de entrada : "checkIn"` y `Fecha de salida : "checkOut"` (formato `AAAA-MM-DD`), `Cantidad de adultos : "adults"`, `Cantidad de niños : "children"` y `Viaja con mascota : "pet"`.
 
-### B. Administración del Catálogo de Habitaciones (Solo Administrador)
-- **Concepto para el negocio:** Permite al administrador del hotel crear nuevas habitaciones, actualizar toda su información comercial (número, nombre, tipo, tarifa por noche, recargo por persona adicional, capacidades de adultos y niños, admisión de mascotas, estado operativo) y eliminar habitaciones cuando corresponda.
-- **Regla de protección al eliminar:** Cuando el administrador solicita eliminar una habitación, el servidor verifica que no exista ninguna reserva en estado pendiente de pago o confirmada asociada a esa habitación. Si tiene reservas pendientes o actuales, la operación se rechaza informando el motivo para proteger a los huéspedes con reserva vigente.
+### B. Administración del Catálogo de Habitaciones
+- **Concepto para el negocio:** Permite al personal consultar las habitaciones (referencia actual de **9 habitaciones**, numeradas del 1 al 9) y al administrador crearlas, actualizar toda su información comercial y eliminarlas cuando corresponda. Recepción puede cambiar el estado físico (disponible, ocupada, limpieza, mantenimiento).
+- **Regla de protección al eliminar:** Si la habitación tiene reservas activas, la operación se rechaza (HTTP 409) informando el motivo, para proteger a los huéspedes con reserva vigente.
 - **Identificadores técnicos de las operaciones:**
-  - `Listar catálogo completo de habitaciones : "GET /api/rooms"`
-  - `Crear nueva habitación : "POST /api/rooms"`
-  - `Editar información de una habitación : "PUT /api/rooms/{id}"`
-  - `Eliminar habitación sin reservas pendientes : "DELETE /api/rooms/{id}"`
+  - `Listar habitaciones : "GET /api/v1/rooms"`
+  - `Crear habitación (Administrador) : "POST /api/v1/rooms"`
+  - `Editar habitación (Administrador) : "PUT /api/v1/rooms/{id}"`
+  - `Cambiar estado operativo : "PATCH /api/v1/rooms/{id}/status"`
+  - `Eliminar habitación sin reservas activas (Administrador) : "DELETE /api/v1/rooms/{id}"`
 
-### C. Gestión de Eventos Especiales y Descuentos por Fechas (Solo Administrador)
-- **Concepto para el negocio:** Permite definir temporadas o eventos especiales en el calendario (con fecha de inicio, fecha de fin y porcentaje de descuento o de recargo) para incentivar la ocupación o gestionar fechas de alta demanda turística en Sevilla.
-- **Aplicación sobre el precio:** El ajuste se aplica **noche por noche**: solo las noches de la estadía que caen dentro de las fechas del evento reciben el descuento o el recargo. Si varios eventos coinciden en una misma noche, sus porcentajes se suman.
+### C. Gestión de Eventos Especiales y Descuentos por Fechas
+- **Concepto para el negocio:** Permite al administrador definir temporadas o eventos especiales (fecha de inicio, fecha de fin y porcentaje) para incentivar la ocupación o gestionar fechas de alta demanda turística en Sevilla. El porcentaje es **con signo**: positivo es un descuento y negativo es un recargo.
+- **Aplicación sobre el precio (regla provisional, pendiente de confirmar con el cliente):** El ajuste se aplica **noche por noche**: solo las noches de la estadía que caen dentro de las fechas del evento (ambas fechas incluidas) reciben el descuento o el recargo. Si varios eventos coinciden en una misma noche, sus porcentajes se suman, y el precio de una noche nunca baja de cero. El recargo por persona adicional se ajusta con el promedio de las noches de la estadía. La alternativa pendiente de decisión es aplicar el primer evento a toda la estadía.
 - **Identificadores técnicos de las operaciones:**
-  - `Consultar eventos y promociones : "GET /api/events"`
-  - `Crear evento especial o descuento : "POST /api/events"`
-  - `Actualizar evento especial : "PUT /api/events/{id}"`
-  - `Eliminar o desactivar evento : "DELETE /api/events/{id}"`
+  - `Consultar eventos : "GET /api/v1/events"`
+  - `Crear evento (Administrador) : "POST /api/v1/events"`
+  - `Editar evento : "PUT /api/v1/events/{id}"`
+  - `Activar o desactivar evento : "PATCH /api/v1/events/{id}/toggle"`
+  - `Eliminar evento : "DELETE /api/v1/events/{id}"`
 
 ---
 
 ## 3. Operaciones de Bloqueo Temporal y Prevención de Sobreventa
 
 ### A. Adquisición de Bloqueo Temporal por 15 Minutos
-- **Concepto para el negocio:** Cuando un viajero elige una habitación en WhatsApp o un recepcionista inicia una reserva manual, el servidor coloca un candado temporal de 15 minutos (900 segundos) sobre esa habitación y esas fechas. Así, ningún otro usuario puede tomarla mientras el primero escribe sus datos y realiza el pago.
-- **Funcionamiento interno:** Utiliza un registro de intervalos de fechas en memoria rápida (`Intervalos bloqueados por habitación : "lock:room:{roomId}:intervals"`) y metadatos con expiración automática (`Metadatos del bloqueo : "lock:room:{roomId}:metadata:{token}"`). Si el rango de fechas se cruza con otro bloqueo vigente, devuelve un aviso de conflicto (código HTTP 409) para que el usuario elija otra habitación.
-- **Identificador técnico de la operación:** `Bloquear habitación temporalmente : "POST /api/bookings/lock"`
-- **Datos devueltos:** `Código único de bloqueo : "lockToken"`, `Tiempo de vigencia en segundos : "ttlSeconds"` (900) y `Precio base cotizado : "totalPrice"`.
+- **Concepto para el negocio:** Cuando un viajero elige una habitación en WhatsApp o un recepcionista inicia una reserva, el servidor coloca un candado temporal de 15 minutos (900 segundos) sobre esa habitación y esas fechas. Así, ningún otro usuario puede tomarla mientras el primero escribe sus datos y realiza el pago.
+- **Funcionamiento interno:** El bloqueo es una **fila de reserva en estado `BLOQUEADA_TEMPORAL` con una hora de vencimiento** (`expires_at`). Antes de crearla, el servidor marca como expirados los bloqueos vencidos de esa habitación dentro de la misma transacción. La restricción `EXCLUDE USING gist` de PostgreSQL impide que dos filas activas se crucen, de modo que la sobreventa es imposible aunque dos solicitudes lleguen en el mismo instante. Un proceso programado revisa cada 60 segundos y expira los bloqueos vencidos.
+- **Identificador técnico de la operación:** `Bloquear habitación temporalmente : "POST /api/bookings/lock"` (HTTP 409 si el rango se cruza con otra reserva o bloqueo vigente).
+- **Datos devueltos:** `Código único de bloqueo : "lockToken"` (identificador de la fila), `Tiempo de vigencia en segundos : "ttlSeconds"` (900) y el precio cotizado de la estadía.
 
 ### B. Liberación Inmediata de Bloqueos Temporales
-- **Concepto para el negocio:** Si el huésped decide cancelar la reserva antes de pagar, escribe *"menú"* para reiniciar su conversación o su sesión se cierra por inactividad, el servidor elimina de inmediato el bloqueo temporal en memoria sin esperar a que se cumplan los 15 minutos, devolviendo la habitación al inventario disponible al instante.
+- **Concepto para el negocio:** Si el huésped decide cancelar antes de pagar, escribe *"menú"* para reiniciar su conversación o su sesión se cierra por inactividad, el servidor marca de inmediato el bloqueo como expirado, devolviendo la habitación al inventario al instante.
 - **Identificador técnico de la operación:** `Liberar bloqueo temporal : "POST /api/bookings/unlock"`
-- **Datos recibidos:** Lista de habitaciones y sus códigos de bloqueo (`Lista de bloqueos a liberar : "locks"` con `Identificador de habitación : "roomId"` y `Código de bloqueo : "lockToken"`).
+- **Datos recibidos:** Lista de habitaciones y sus códigos de bloqueo (`"rooms"` con `"roomId"` y `"lockToken"`).
 
 ---
 
 ## 4. Operaciones de Confirmación, Consulta, Pago de Saldo y Cancelación de Reservas
 
-### A. Confirmación de Reserva (Individual o Grupal)
-- **Concepto para el negocio:** Registra en firme la reserva de una o varias habitaciones bajo un mismo código grupal (`Identificador de grupo de reserva : "reservationGroupId"`), guarda o actualiza la ficha del huésped titular y sus acompañantes, calcula el precio total (sumando las noches con sus ajustes por eventos especiales y el recargo por personas adicionales), genera el código público `TS-XXXX`, procesa la modalidad de pago elegida y libera los bloqueos temporales de memoria.
-- **Modalidades de pago admitidas (`Opción de pago : "paymentOption"`):**
-  - `Pago completo del 100% : "full"`: La reserva queda en estado `Confirmada : "confirmed"`, estado de pago `Pagada : "paid"`, monto abonado igual al 100% del total y saldo pendiente en cero.
-  - `Anticipo del 50% : "deposit"`: La reserva queda en estado `Confirmada : "confirmed"`, estado de pago `Pago parcial : "partial"`, monto abonado igual al 50% del total y el 50% restante como saldo pendiente.
-- **Identificación del canal de origen (`Origen de la reserva : "source"`):** Registra si la reserva provino del asistente de WhatsApp (`"chatbot"`) o del panel de recepción (`"web"`).
-- **Identificador técnico de la operación:** `Confirmar reserva : "POST /api/bookings/confirm"`
+### A. Estados de una reserva
+En la base de datos los estados están en español: `BLOQUEADA_TEMPORAL`, `PENDIENTE_PAGO`, `CONFIRMADA`, `EN_CURSO`, `EXPIRADA` y `CANCELADA`. Las respuestas dirigidas al chatbot los traducen al contrato que usa el flujo de n8n: `locked`, `pending_payment`, `confirmed`, `checked_in`, `expired` y `cancelled`. Los estados `BLOQUEADA_TEMPORAL`, `PENDIENTE_PAGO`, `CONFIRMADA` y `EN_CURSO` retienen la habitación.
 
-### B. Consulta de Reserva por Código Único
-- **Concepto para el negocio:** Permite tanto al huésped en WhatsApp como al recepcionista consultar todos los detalles de una reserva ingresando su código único con el formato `TS-XXXX` (por ejemplo, `TS-7K4Q`), que debe coincidir exactamente. Desde WhatsApp se exige además el documento del titular. Devuelve las habitaciones asignadas, fechas, noches, datos del titular, valor total, **monto efectivamente abonado**, **saldo pendiente** y el cálculo exacto de la política de reembolso aplicable en ese instante.
+### B. Confirmación de Reserva (Individual o Grupal)
+- **Concepto para el negocio:** Registra la reserva de una o varias habitaciones bajo un mismo código grupal (`reservationGroupId`), guarda o actualiza la ficha del huésped titular y sus acompañantes, calcula el precio total (noches con sus ajustes por eventos especiales y recargo por personas adicionales) y genera el código público `TS-XXXX`: cuatro caracteres aleatorios y únicos, sin `0`, `O`, `1` ni `I` para evitar confusiones.
+- **Reservas del chatbot:** quedan en estado `PENDIENTE_PAGO` con pago `pending` y monto abonado en cero. La habitación sigue retenida y **solo el pago aprobado de la pasarela la confirma** (sección F).
+- **Reservas del personal:** cuando confirma un recepcionista autenticado, se registra el pago de inmediato según la modalidad (`Opción de pago : "paymentOption"`): `full` deja la reserva `CONFIRMADA` y `paid` (100%); `deposit` la deja `CONFIRMADA` y `partial` (50%).
+- **Canal de origen (`source`):** `"chatbot"` o `"web"`.
+- **Identificadores técnicos:** `Confirmar reserva : "POST /api/bookings/confirm"` y `Crear reserva manual desde recepción : "POST /api/v1/bookings/manual"`.
+
+### C. Consulta de Reserva por Código Único
+- **Concepto para el negocio:** Permite al huésped en WhatsApp o al recepcionista consultar todos los detalles de una reserva con su código `TS-XXXX` (por ejemplo, `TS-7K4Q`), que debe coincidir exactamente; también se acepta el identificador de grupo completo. Desde WhatsApp se exige además el documento del titular (encabezado `X-Guest-Document`). Devuelve las habitaciones asignadas, fechas, noches, datos del titular, valor total, **monto efectivamente abonado**, **saldo pendiente** y la política de reembolso aplicable en ese instante.
 - **Identificador técnico de la operación:** `Consultar reserva por código : "GET /api/bookings/group/{code}"`
 
-### C. Pago del Saldo Restante (Segundo 50%)
-- **Concepto para el negocio:** Cuando una reserva fue garantizada con el anticipo del 50%, esta operación permite liquidar el 50% restante antes del ingreso o en recepción. Actualiza el monto pagado (`Monto abonado : "paid_amount"`) al 100% del valor total de la estadía, cambia el estado de pago a `Pagada : "paid"` y deja el saldo pendiente en cero.
+### D. Pago del Saldo Restante (Segundo 50%)
+- **Concepto para el negocio:** Cuando una reserva fue garantizada con el anticipo del 50%, permite liquidar el 50% restante. Pasa el monto abonado al 100% del valor de la estadía y el estado de pago a `Pagada : "paid"`. Si la reserva no tiene saldo pendiente o está cancelada, responde HTTP 409. Desde WhatsApp el cuerpo debe incluir `{"document": "..."}`.
 - **Identificador técnico de la operación:** `Pagar saldo restante de reserva : "POST /api/bookings/group/{code}/pay-remaining"`
 
-### D. Cancelación de Reserva y Cálculo de Reembolso sobre lo Pagado
-- **Concepto para el negocio:** Anula todas las habitaciones asociadas al código de reserva, liberando de inmediato las fechas en la base de datos para nuevos huéspedes, y calcula el monto a reembolsar **estrictamente sobre el valor que el cliente haya pagado hasta ese momento** (`Monto abonado : "paid_amount"`), según las horas que falten para la hora de entrada (15:00 del día de llegada):
+### E. Cancelación de Reserva y Cálculo de Reembolso sobre lo Pagado
+- **Concepto para el negocio:** Anula todas las habitaciones del código de reserva, liberando de inmediato las fechas en la base de datos, y calcula el reembolso **estrictamente sobre el valor que el cliente haya pagado** (`paid_amount`), según las horas que falten para la hora de entrada (15:00 del día de llegada):
   - Más de 72 horas antes: devolución del **100% de lo abonado**.
   - Entre 24 y 72 horas antes: devolución del **50% de lo abonado**.
   - Menos de 24 horas antes: **0% de devolución**.
-- **Identificador técnico de la operación:** `Cancelar reserva grupal : "POST /api/bookings/group/{code}/cancellation"`
+- **Identificador técnico de la operación:** `Cancelar reserva grupal : "POST /api/bookings/group/{code}/cancellation"` (desde WhatsApp, con `{"document": "..."}`).
 
-### E. Operaciones de Recepción (Check-in, Check-out y Monitoreo)
-- **Concepto para el negocio:** Permiten al recepcionista listar las reservas en tiempo real, registrar el ingreso físico del huésped en el hotel y procesar su salida una vez verificada la liquidación de todos los cargos de alojamiento y consumos de tienda.
-- **Identificadores técnicos de las operaciones:**
-  - `Listado general y monitoreo de reservas : "GET /api/bookings/debug"`
-  - `Registrar ingreso del huésped (Check-in) : "POST /api/bookings/{id}/check-in"`
-  - `Registrar salida del huésped (Check-out) : "POST /api/bookings/{id}/check-out"`
-
-### F. Conciliación Asíncrona de Pagos Externos (Pasarelas de Pago / Webhooks)
-- **Concepto para el negocio:** Permite conciliar pagos recibidos de forma asíncrona a través de pasarelas digitales (como Wompi). Cuando se genera un enlace de pago, la reserva se mantiene protegida en base de datos en estado de espera (`pending_payment`); una vez que la pasarela confirma la transacción (`APPROVED`), el webhook invoca este endpoint para formalizar la reserva a estado confirmada (`confirmed`), actualizar el estado de pago a `partial` (50%) o `paid` (100%) y asentar el importe efectivamente pagado.
-- **Identificadores técnicos de las operaciones:**
+### F. Conciliación de Pagos Externos (Pasarela de Pago)
+- **Concepto para el negocio:** Mientras el huésped no paga, la reserva permanece `PENDIENTE_PAGO` y retiene la habitación. Cuando la pasarela (Wompi) confirma la transacción `APPROVED`, el orquestador del chatbot invoca esta operación: la reserva pasa a `CONFIRMADA`, el pago a `partial` (50%) o `paid` (100%) y se asienta el importe pagado. La operación es **idempotente por transacción** (`transactionId`): repetirla no duplica el pago, y una transacción ya usada en otra reserva se rechaza con HTTP 409. Solo la llave de servicio o un administrador pueden invocarla.
+- **Identificadores técnicos:**
   - `Confirmar pago externo por código : "POST /api/bookings/group/{code}/confirm-external-payment"`
-  - `Confirmar pago externo con código en cuerpo : "POST /api/bookings/confirm-external-payment"`
+  - `Confirmar pago externo con código en el cuerpo : "POST /api/bookings/confirm-external-payment"` (campo `reservationCode`)
+  - `Webhook directo de la pasarela con firma : "POST /api/v1/payments/webhook"` (valida la firma HMAC `X-Hub-Signature-256` o el checksum de Wompi y aplica idempotencia por `payment_id`)
+  - `Generar enlace de pago : "POST /api/v1/payments/checkout-link"`
+
+### G. Operaciones de Recepción
+- **Concepto para el negocio:** Permiten listar las reservas, registrar el ingreso físico del huésped (pasa a `EN_CURSO`) y procesar su salida una vez liquidados todos los cargos de alojamiento y consumos.
+- **Identificadores técnicos:**
+  - `Listar reservas (web) : "GET /api/v1/bookings"`
+  - `Listado de monitoreo con estados del contrato de n8n : "GET /api/bookings/debug"` (uso interno; expone documentos completos)
+  - `Registrar ingreso (Check-in) : "POST /api/v1/bookings/{id}/check-in"`
+  - `Registrar salida (Check-out) : "POST /api/v1/bookings/{id}/check-out"`
 
 ---
 
-## 5. Operaciones de Conversaciones, Reseñas, Tienda y Finanzas
+## 5. Conversaciones, Reseñas, Tienda, Cafetería y Finanzas
 
-### A. Reseñas y Calificaciones de Huéspedes
-- **Canal de experiencia del huésped:** En el chatbot de WhatsApp, las opiniones se canalizan de forma abierta y transparente hacia el perfil oficial de **Torre Satori en Google Reviews** ([https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews](https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews)), prescindiendo de almacenamiento local en el bot para certificar imparcialidad.
-- **Operaciones de auditoría y soporte en el backend:**
-  - `Consultar reseñas registradas : "GET /api/reviews"`: Devuelve las opiniones almacenadas de Google Reviews para análisis de calidad interno en el panel web.
-  - `Resumen consolidado y métricas de reseñas : "GET /api/reviews/summary"`: Provee la calificación promedio, total de opiniones registradas y distribución por estrellas para alimentar el panel web. (Nota: La aplicación web opera en modo de solo lectura; no admite redacción de reseñas ni redirecciones externas).
+### A. Sesiones del chatbot y escalamiento a recepción
+- `Listar conversaciones de WhatsApp : "GET /api/v1/conversations"`: Bandeja de chats para el panel web; la web la consulta por sondeo.
+- `Aviso del chatbot de que un huésped pidió un agente : "POST /api/notifications/agent-request"`: Lo invoca n8n con la llave de servicio (`{"wa_id", "name", "context"}`). Marca como escalada la conversación en curso y responde 202.
+- `Escalar una conversación : "POST /api/v1/conversations/{id}/escalation"`: Marca la conversación como escalada y registra auditoría.
+- `Sesión conversacional : "GET | POST | PUT | DELETE /api/v1/conversations/session/{key}"`: Guarda en PostgreSQL el estado de la conversación y los enlaces de pago. Lo usa la versión V10 del flujo de n8n, que reemplaza los nodos de Redis; la V9 aún conserva su sesión en Redis (ver [Chatbot](Chatbot.md)).
 
-### B. Bandeja de Conversaciones y Escalamiento a Recepción
-- `Listar conversaciones de WhatsApp : "GET /api/conversations"`: Permite al panel web consultar los chats de los huéspedes, priorizando aquellos que solicitaron atención de un recepcionista humano.
-- `Notificar escalamiento a agente humano : "POST /api/conversations/{id}/escalation"`: Marca la conversación como escalada para que el panel web la muestre como pendiente de atención humana. El panel web consulta la bandeja por sondeo periódico; no hay canal de notificaciones en tiempo real.
-- `Aviso del chatbot de que un huésped pidió un agente : "POST /api/notifications/agent-request"`: Lo invoca n8n con la llave de servicio (`{"wa_id", "name", "context"}`). Marca como escalada la conversación en curso de ese número y responde 202.
+### B. Reseñas
+- `Resumen de reseñas : "GET /api/v1/reviews/summary"`: Calificación promedio, total de opiniones y distribución por estrellas consultadas en Google Places. El chatbot canaliza las opiniones al perfil oficial de **Torre Satori en Google Reviews**; la aplicación web opera en modo de solo lectura.
 
-### C. Tienda Interna, Inventario y Finanzas
-- **Catálogo y consumos de tienda:** Operaciones para crear y editar productos (`Gestión de productos : "/api/products"`), registrar compras con descuento automático de existencias y asociar el cargo a una reserva activa o como venta directa de mostrador (`Registro de consumos : "/api/consumptions"`).
-- **Movimientos financieros y reportes:** Operaciones para consolidar los ingresos por reservas y tienda, registrar gastos operativos del hotel (`Movimientos financieros : "/api/finances"`), calcular el pago de turnos del personal de recepción y generar el archivo contable descargable en formato Excel (`Exportación contable : "GET /api/finances/export"`).
+### C. Tienda interna, Salgados Café y folio de la habitación
+- `Productos de la tienda : "GET | POST /api/v1/store/products"` y `"PUT | DELETE /api/v1/store/products/{ref}"`: Inventario y precios (altas, cambios y bajas solo para el administrador).
+- `Venta de tienda : "POST /api/v1/store/sales"`: Descuenta existencias y, si se pide, carga el consumo al folio de la habitación.
+- `Carta y comandas de la cafetería : "GET | POST /api/v1/restaurant/menu"`, `"GET | POST /api/v1/restaurant/orders"` y `"PATCH /api/v1/restaurant/orders/{ref}/status"`.
+- `Cargos pendientes o históricos del folio : "GET /api/v1/folio-charges"`.
+
+### D. Finanzas y reportes
+- `Egresos : "GET | POST /api/v1/expenses"` y `"POST /api/v1/expenses/{id}/void"` (anulación lógica; el egreso no se borra).
+- `Resumen financiero : "GET /api/v1/finance/summary"`: Ingresos, egresos y desglose por canal.
+- `Exportación contable : "GET /api/v1/reports/export.xlsx"`: Libro de Excel con resumen, reservas, egresos e inventario.
+
+### E. Usuarios, auditoría y tiempo real
+- `Perfil, cambio de contraseña y gestión de cuentas : "GET /api/v1/auth/me"`, `"POST /api/v1/auth/change-password"`, `"GET | POST /api/v1/auth/users"` y `"PATCH /api/v1/auth/users/{id}"` (cuentas solo para el administrador).
+- `Bitácora de auditoría inmutable : "GET /api/v1/auth/audit-logs"` (solo administrador).
+- `Notificaciones en tiempo real : "GET /api/v1/events/stream"`: Canal SSE autenticado que avisa a la web los cambios de reservas, bloqueos y habitaciones.
+- `Salud del servicio : "GET /api/v1/health"`.

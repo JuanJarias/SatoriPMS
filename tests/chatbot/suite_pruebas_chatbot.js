@@ -520,7 +520,7 @@ const TEST_CASES = [
     flow: '2',
     flowName: 'Reserva con IA',
     title: 'Cancelacion del flujo IA y liberacion de bloqueos temporales',
-    description: 'El comando "cancelar" en el resumen de pago IA libera los bloqueos en Redis y retorna al menu.',
+    description: 'El comando "cancelar" en el resumen de pago IA libera los bloqueos y retorna al menu.',
     run: async () => {
       const input = 'cancelar';
       const isCancel = ['3', 'cancelar', 'no'].includes(Engine.normalize(input));
@@ -1038,14 +1038,14 @@ const TEST_CASES = [
     id: 'TC-51',
     flow: 'itil',
     flowName: 'Garantia ITIL 4',
-    title: 'Doble Candado en Redis: Concurrencia milisegundo 0 con Promise.all (SET NX EX 900)',
-    description: 'Simula 2 solicitudes exactamente simultaneas para la misma habitacion: solo 1 adquiere el bloqueo temporal.',
+    title: 'Modelo del candado de habitacion: concurrencia milisegundo 0 con Promise.all',
+    description: 'Modelo en memoria de 2 solicitudes exactamente simultaneas para la misma habitacion: solo 1 adquiere el bloqueo temporal. La verificacion real contra PostgreSQL (EXCLUDE GiST) esta en tests/test_concurrency_rn02.py.',
     run: async () => {
       const simulatedRedis = new Map();
       const lockKey = 'lock:room:101:2026-12-01:2026-12-03';
 
       const tryAcquireLock = async (guestId) => {
-        // Operacion atomica simulada equivalente a Redis SET NX
+        // Operacion atomica simulada (equivale a la restriccion de exclusion de PostgreSQL)
         if (simulatedRedis.has(lockKey)) {
           return { acquired: false, guestId };
         }
