@@ -1,0 +1,691 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>SatoriPMS — Presentación Final</title><style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap');
+
+@page { size: 1920px 1080px; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #EDE0D4;
+  font-family: 'Inter', 'Liberation Sans', 'DejaVu Sans', sans-serif;
+  color: #2B1D16;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.slide {
+  width: 1920px; height: 1080px; background: #EDE0D4;
+  position: relative; overflow: hidden;
+  page-break-after: always; break-after: page;
+}
+.slide:last-child { page-break-after: auto; break-after: auto; }
+.pill {
+  display: inline-flex; align-items: center; padding: 8px 22px; border-radius: 999px;
+  background: #F6E4E0; color: #9C5A3C; font-size: 24px; font-weight: 600; letter-spacing: 0.04em;
+}
+.pill-dark { background: #5C3D2E; color: #FAF5F0; }
+.pill-accent { background: #9C5A3C; color: #FAF5F0; }
+.pill-green { background: #E3EFE8; color: #2F6F4E; }
+.pill-blue { background: #E6D5C3; color: #3A5A78; }
+.pill-red { background: #F6E4E0; color: #B84A39; }
+h1 {
+  font-family: 'Merriweather', 'Liberation Serif', Georgia, serif;
+  font-size: 48px; font-weight: 700; line-height: 58px; color: #2B1D16; margin-top: 14px;
+}
+.header { position: absolute; top: 95px; left: 120px; width: 1380px; }
+.dots { position: absolute; top: 95px; right: 120px; display: flex; gap: 10px; }
+.dot {
+  width: 38px; height: 38px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 700; background: #FAF5F0; color: #634B3F; border: 1.5px solid #634B3F;
+}
+.dot.done { background: #5C3D2E; color: #FAF5F0; border-color: #5C3D2E; }
+.dot.active { background: #9C5A3C; color: #FAF5F0; border-color: #9C5A3C; }
+.page-num { position: absolute; bottom: 42px; right: 120px; font-size: 24px; font-weight: 600; color: #634B3F; }
+.source-foot { position: absolute; bottom: 30px; left: 120px; max-width: 1500px; line-height: 32px; font-size: 24px; color: #634B3F; }
+.card { background: #FAF5F0; border: 1.5px solid #D6C2B0; border-radius: 16px; box-shadow: 0 6px 20px rgba(43, 29, 22, 0.05); }
+.card-espresso { background: #5C3D2E; border: none; border-radius: 16px; color: #FAF5F0; }
+.card-alert { background: #F6E4E0; border: 1.5px solid #9C5A3C; border-radius: 16px; }
+.card-green { background: #E3EFE8; border: 1.5px solid #2F6F4E; border-radius: 16px; }
+.icon-circle {
+  width: 56px; height: 56px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 30px; background: #9C5A3C; color: #FAF5F0; flex-shrink: 0;
+}
+.serif { font-family: 'Merriweather', 'Liberation Serif', Georgia, serif; }
+</style></head><body><section class="slide">
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;">
+  <svg width="220" height="220" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:36px;">
+    <path d="M188 64C170 42 143 28 114 28C62 28 20 70 20 122C20 174 62 216 114 216C166 216 208 174 208 122C208 110 205 99 201 88" stroke="#9C5A3C" stroke-width="14" stroke-linecap="round"/>
+    <path d="M148 80C138 70 102 68 90 86C78 104 102 118 122 122C142 126 158 140 144 160C130 178 90 174 80 158" stroke="#9C5A3C" stroke-width="14" stroke-linecap="round"/>
+  </svg>
+  <div style="font-size:88px;line-height:114px;letter-spacing:-0.02em;">
+    <span style="font-weight:900;color:#2B1D16;">Satori</span><span style="font-weight:300;color:#9C5A3C;">PMS</span>
+  </div>
+  <div style="margin-top:22px;font-size:30px;font-weight:600;letter-spacing:0.22em;color:#634B3F;">TORRE SATORI · SEVILLA</div>
+  <div style="width:340px;height:2px;background:#C07A4B;margin:30px 0;"></div>
+  <div class="serif" style="font-size:34px;font-style:italic;color:#2B1D16;">"Claridad operativa. Hospitalidad sin límites."</div>
+</div>
+</section><section class="slide"><div class="header"><div class="pill">EQUIPO</div><h1>Equipo del proyecto</h1></div>
+<div style="position:absolute;top:96px;right:120px;font-size:34px;">
+  <span style="font-weight:900;color:#2B1D16;">Satori</span><span style="font-weight:300;color:#9C5A3C;">PMS</span>
+</div>
+<div style="position:absolute;top:255px;left:120px;display:flex;gap:40px;">
+<div class="card" style="width:533px;height:700px;padding:40px 36px;display:flex;flex-direction:column;align-items:center;text-align:center;">
+  <img src="Guarin.png" style="width:220px;height:220px;border-radius:999px;object-fit:cover;border:5px solid #9C5A3C;margin-bottom:28px;" />
+  <div style="font-size:32px;font-weight:700;color:#2B1D16;">Esteban Guarín Valencia</div>
+  <div class="pill pill-accent" style="margin:16px 0 24px 0;font-size:22px;">SCRUM MASTER</div>
+  <div style="font-size:28px;font-weight:700;color:#2B1D16;margin-bottom:16px;">Gobernanza y Chatbot n8n</div>
+  <ul style="list-style:none;text-align:left;font-size:26px;line-height:34px;color:#634B3F;width:100%;padding:0 12px;"><li style='margin-bottom:10px;'>• Flujo conversacional WhatsApp + IA</li><li style='margin-bottom:10px;'>• Gobernanza y despliegue ITIL 4</li><li style='margin-bottom:10px;'>• Plan de soporte y recuperación</li></ul>
+</div>
+<div class="card" style="width:533px;height:700px;padding:40px 36px;display:flex;flex-direction:column;align-items:center;text-align:center;">
+  <img src="Arias.png" style="width:220px;height:220px;border-radius:999px;object-fit:cover;border:5px solid #9C5A3C;margin-bottom:28px;" />
+  <div style="font-size:32px;font-weight:700;color:#2B1D16;">Juan José Arias Gallego</div>
+  <div class="pill pill-accent" style="margin:16px 0 24px 0;font-size:22px;">PRODUCT OWNER</div>
+  <div style="font-size:28px;font-weight:700;color:#2B1D16;margin-bottom:16px;">Negocio y Aplicación Web</div>
+  <ul style="list-style:none;text-align:left;font-size:26px;line-height:34px;color:#634B3F;width:100%;padding:0 12px;"><li style='margin-bottom:10px;'>• Panel web de recepción y finanzas</li><li style='margin-bottom:10px;'>• Criterios de aceptación (UAT)</li><li style='margin-bottom:10px;'>• Salgados Café y dictamen final</li></ul>
+</div>
+<div class="card" style="width:533px;height:700px;padding:40px 36px;display:flex;flex-direction:column;align-items:center;text-align:center;">
+  <img src="Garzón.jpeg" style="width:220px;height:220px;border-radius:999px;object-fit:cover;border:5px solid #9C5A3C;margin-bottom:28px;" />
+  <div style="font-size:32px;font-weight:700;color:#2B1D16;">Juan Felipe Garzón Trejos</div>
+  <div class="pill pill-accent" style="margin:16px 0 24px 0;font-size:22px;">DEVELOPMENT TEAM</div>
+  <div style="font-size:28px;font-weight:700;color:#2B1D16;margin-bottom:16px;">Arquitectura y Pruebas</div>
+  <ul style="list-style:none;text-align:left;font-size:26px;line-height:34px;color:#634B3F;width:100%;padding:0 12px;"><li style='margin-bottom:10px;'>• Backend Python 3.12 / FastAPI</li><li style='margin-bottom:10px;'>• Doble bloqueo en PostgreSQL 16</li><li style='margin-bottom:10px;'>• Automatización de pruebas</li></ul>
+</div></div>
+<div class="page-num">2</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 1 DE 5</div><h1>¿Qué necesidad identificamos?</h1></div><div class="dots"><div class="dot active">1</div><div class="dot ">2</div><div class="dot ">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+<div style="position:absolute;top:232px;left:120px;font-size:30px;font-weight:600;color:#634B3F;">Contexto operativo del Hotel Torre Satori (Sevilla, Valle del Cauca)</div>
+<div style="position:absolute;top:315px;left:120px;display:flex;gap:40px;">
+<div class="card" style="width:533px;height:540px;padding:48px 44px;">
+  <div class="icon-circle" style="width:68px;height:68px;background:#F6E4E0;color:#9C5A3C;">H</div>
+  <div class="serif" style="font-size:88px;font-weight:700;color:#9C5A3C;margin:36px 0 20px 0;">9</div>
+  <div style="font-size:32px;line-height:42px;color:#2B1D16;">habitaciones, una tienda y Salgados Café</div>
+</div>
+<div class="card" style="width:533px;height:540px;padding:48px 44px;">
+  <div class="icon-circle" style="width:68px;height:68px;background:#F6E4E0;color:#9C5A3C;">W</div>
+  <div class="serif" style="font-size:88px;font-weight:700;color:#9C5A3C;margin:36px 0 20px 0;">2</div>
+  <div style="font-size:32px;line-height:42px;color:#2B1D16;">canales de atención: WhatsApp y mostrador</div>
+</div>
+<div class="card" style="width:533px;height:540px;padding:48px 44px;">
+  <div class="icon-circle" style="width:68px;height:68px;background:#F6E4E0;color:#9C5A3C;">D</div>
+  <div class="serif" style="font-size:88px;font-weight:700;color:#9C5A3C;margin:36px 0 20px 0;">0</div>
+  <div style="font-size:32px;line-height:42px;color:#2B1D16;">bases de datos: libreta física y hoja de cálculo</div>
+</div></div>
+<div class="page-num">3</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 1 · NECESIDAD</div><h1>Necesidades identificadas</h1></div><div class="dots"><div class="dot active">1</div><div class="dot ">2</div><div class="dot ">3</div><div class="dot ">4</div><div class="dot ">5</div></div><div style="position:absolute;top:270px;left:120px;display:flex;gap:30px;">
+    <div class="card" style="width:312px;height:650px;padding:36px 28px;display:flex;flex-direction:column;">
+      <div class="icon-circle" style="background:#E6D5C3;color:#2B1D16;">1</div>
+      <div style="font-size:32px;font-weight:700;color:#9C5A3C;margin-top:28px;">N-01</div>
+      <div style="font-size:32px;font-weight:700;line-height:42px;color:#2B1D16;margin:14px 0 24px 0;">La atención depende de una persona</div>
+      <div style="font-size:30px;line-height:39px;color:#634B3F;">Sin respuesta nocturna ni en fines de semana.</div>
+      
+    </div>
+    <div class="card-espresso" style="width:312px;height:650px;padding:36px 28px;display:flex;flex-direction:column;">
+      <div class="icon-circle" style="background:#9C5A3C;color:#FAF5F0;">2</div>
+      <div style="font-size:32px;font-weight:700;color:#C07A4B;margin-top:28px;">N-02</div>
+      <div style="font-size:32px;font-weight:700;line-height:42px;color:#FAF5F0;margin:14px 0 24px 0;">Riesgo de doble reserva</div>
+      <div style="font-size:30px;line-height:39px;color:#EDE0D4;">La más grave: dos huéspedes para la misma habitación.</div>
+      <div class="pill pill-accent" style="margin-top:auto;">CRÍTICA</div>
+    </div>
+    <div class="card" style="width:312px;height:650px;padding:36px 28px;display:flex;flex-direction:column;">
+      <div class="icon-circle" style="background:#E6D5C3;color:#2B1D16;">3</div>
+      <div style="font-size:32px;font-weight:700;color:#9C5A3C;margin-top:28px;">N-03</div>
+      <div style="font-size:32px;font-weight:700;line-height:42px;color:#2B1D16;margin:14px 0 24px 0;">Cotizar, cobrar y reembolsar a mano</div>
+      <div style="font-size:30px;line-height:39px;color:#634B3F;">Cálculos lentos y propensos a error.</div>
+      
+    </div>
+    <div class="card" style="width:312px;height:650px;padding:36px 28px;display:flex;flex-direction:column;">
+      <div class="icon-circle" style="background:#E6D5C3;color:#2B1D16;">4</div>
+      <div style="font-size:32px;font-weight:700;color:#9C5A3C;margin-top:28px;">N-04</div>
+      <div style="font-size:32px;font-weight:700;line-height:42px;color:#2B1D16;margin:14px 0 24px 0;">Sin registro ni historial de clientes</div>
+      <div style="font-size:30px;line-height:39px;color:#634B3F;">Consumos y datos dispersos.</div>
+      
+    </div>
+    <div class="card" style="width:312px;height:650px;padding:36px 28px;display:flex;flex-direction:column;">
+      <div class="icon-circle" style="background:#E6D5C3;color:#2B1D16;">5</div>
+      <div style="font-size:32px;font-weight:700;color:#9C5A3C;margin-top:28px;">N-05</div>
+      <div style="font-size:32px;font-weight:700;line-height:42px;color:#2B1D16;margin:14px 0 24px 0;">PMS comerciales caros y sin WhatsApp</div>
+      <div style="font-size:30px;line-height:39px;color:#634B3F;">Costos altos y comisiones por reserva.</div>
+      
+    </div></div><div class="page-num">4</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 1 · IMPACTO</div><h1>Impacto en el negocio</h1></div><div class="dots"><div class="dot active">1</div><div class="dot ">2</div><div class="dot ">3</div><div class="dot ">4</div><div class="dot ">5</div></div><div style="position:absolute;top:280px;left:120px;display:flex;gap:40px;">
+<div class="card" style="width:533px;height:590px;padding:44px 40px;">
+  <div class="pill" style="background:#E6D5C3;color:#2B1D16;">CONFIANZA</div>
+  <div class="serif" style="font-size:76px;font-weight:700;color:#B84A39;margin:44px 0 26px 0;">1</div>
+  <div style="font-size:30px;line-height:39px;color:#2B1D16;">doble reserva deja a una familia sin habitación y genera una mala reseña en Google</div>
+</div>
+<div class="card" style="width:533px;height:590px;padding:44px 40px;">
+  <div class="pill" style="background:#E6D5C3;color:#2B1D16;">INGRESO</div>
+  <div class="serif" style="font-size:76px;font-weight:700;color:#9C5A3C;margin:44px 0 26px 0;">18 %</div>
+  <div style="font-size:30px;line-height:39px;color:#2B1D16;">de comisión por noche si la reserva se desvía a una agencia externa</div>
+</div>
+<div class="card" style="width:533px;height:590px;padding:44px 40px;">
+  <div class="pill" style="background:#E6D5C3;color:#2B1D16;">OPERACIÓN</div>
+  <div class="serif" style="font-size:76px;font-weight:700;color:#3A5A78;margin:44px 0 26px 0;">25 min</div>
+  <div style="font-size:30px;line-height:39px;color:#2B1D16;">promedio para registrar manualmente a un huésped y cuadrar su cuenta</div>
+</div></div><div class="page-num">5</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 1 · ALCANCE</div><h1>Objetivo y alcance</h1></div><div class="dots"><div class="dot active">1</div><div class="dot ">2</div><div class="dot ">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+<div class="card-espresso" style="position:absolute;top:250px;left:120px;width:1680px;padding:46px 56px;">
+  <div class="serif" style="font-size:36px;font-style:italic;line-height:47px;">
+    Que el huésped reserve a cualquier hora por WhatsApp, sin instalar nada y sin que la misma noche se venda dos veces; y que el hotel controle toda su operación en un solo lugar.
+  </div>
+</div>
+<div style="position:absolute;top:525px;left:120px;font-size:24px;font-weight:700;color:#634B3F;letter-spacing:0.06em;">MÓDULOS DEL SISTEMA</div>
+<div style="position:absolute;top:575px;left:120px;display:flex;gap:24px;">
+<div class="card" style="width:260px;height:330px;padding:34px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:64px;height:64px;background:#F6E4E0;color:#9C5A3C;margin-bottom:26px;">W</div>
+  <div style="font-size:28px;font-weight:700;color:#2B1D16;margin-bottom:14px;">Chatbot WhatsApp</div>
+  <div style="font-size:24px;line-height:31px;color:#634B3F;">Cotiza y reserva 24/7</div>
+</div>
+<div class="card" style="width:260px;height:330px;padding:34px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:64px;height:64px;background:#F6E4E0;color:#9C5A3C;margin-bottom:26px;">R</div>
+  <div style="font-size:28px;font-weight:700;color:#2B1D16;margin-bottom:14px;">Recepción web</div>
+  <div style="font-size:24px;line-height:31px;color:#634B3F;">Calendario, check-in y out</div>
+</div>
+<div class="card" style="width:260px;height:330px;padding:34px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:64px;height:64px;background:#F6E4E0;color:#9C5A3C;margin-bottom:26px;">F</div>
+  <div style="font-size:28px;font-weight:700;color:#2B1D16;margin-bottom:14px;">Finanzas</div>
+  <div style="font-size:24px;line-height:31px;color:#634B3F;">Abonos, saldos y reportes</div>
+</div>
+<div class="card" style="width:260px;height:330px;padding:34px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:64px;height:64px;background:#F6E4E0;color:#9C5A3C;margin-bottom:26px;">C</div>
+  <div style="font-size:28px;font-weight:700;color:#2B1D16;margin-bottom:14px;">Salgados Café</div>
+  <div style="font-size:24px;line-height:31px;color:#634B3F;">Cargos a habitación</div>
+</div>
+<div class="card" style="width:260px;height:330px;padding:34px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:64px;height:64px;background:#F6E4E0;color:#9C5A3C;margin-bottom:26px;">E</div>
+  <div style="font-size:28px;font-weight:700;color:#2B1D16;margin-bottom:14px;">Reseñas</div>
+  <div style="font-size:24px;line-height:31px;color:#634B3F;">Canalización a Google</div>
+</div>
+<div class="card" style="width:260px;height:330px;padding:34px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:64px;height:64px;background:#F6E4E0;color:#9C5A3C;margin-bottom:26px;">S</div>
+  <div style="font-size:28px;font-weight:700;color:#2B1D16;margin-bottom:14px;">Roles y seguridad</div>
+  <div style="font-size:24px;line-height:31px;color:#634B3F;">Auditoría y control</div>
+</div></div>
+<div class="page-num">6</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 2 DE 5</div><h1>Arquitectura de la solución</h1></div><div class="dots"><div class="dot done">1</div><div class="dot active">2</div><div class="dot ">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+<svg width="1680" height="640" viewBox="0 0 1680 640" style="position:absolute;top:255px;left:120px;" xmlns="http://www.w3.org/2000/svg"><defs><marker id="ah" markerUnits="userSpaceOnUse" markerWidth="18" markerHeight="18" refX="16" refY="9" orient="auto"><path d="M0,0 L18,9 L0,18 z" fill="#9C5A3C"/></marker><marker id="ahs" markerUnits="userSpaceOnUse" markerWidth="18" markerHeight="18" refX="2" refY="9" orient="auto-start-reverse"><path d="M0,0 L18,9 L0,18 z" fill="#9C5A3C"/></marker></defs><rect x="400" y="170" width="1280" height="300" rx="22" fill="#F4ECE4" stroke="#634B3F" stroke-width="3" stroke-dasharray="12 9"/><text x="1650" y="212" text-anchor="end" font-size="26" font-weight="700" fill="#634B3F">SERVIDOR ÚNICO · DOCKER COMPOSE</text><rect x="450" y="0" width="330" height="120" rx="18" fill="#E6D5C3" stroke="#C07A4B" stroke-width="3"/><text x="615.0" y="52.0" text-anchor="middle" font-size="34" font-weight="700" fill="#2B1D16">Gemini AI</text><text x="615.0" y="94.0" text-anchor="middle" font-size="26" fill="#634B3F">Interpreta el texto</text><rect x="450" y="520" width="330" height="120" rx="18" fill="#E6D5C3" stroke="#C07A4B" stroke-width="3"/><text x="615.0" y="572.0" text-anchor="middle" font-size="34" font-weight="700" fill="#2B1D16">Wompi</text><text x="615.0" y="614.0" text-anchor="middle" font-size="26" fill="#634B3F">Pasarela de pagos</text><rect x="0" y="235" width="300" height="170" rx="18" fill="#FAF5F0" stroke="#9C5A3C" stroke-width="3"/><text x="150.0" y="312.0" text-anchor="middle" font-size="34" font-weight="700" fill="#2B1D16">Huésped</text><text x="150.0" y="354.0" text-anchor="middle" font-size="26" fill="#634B3F">WhatsApp</text><rect x="900" y="520" width="330" height="120" rx="18" fill="#FAF5F0" stroke="#9C5A3C" stroke-width="3"/><text x="1065.0" y="572.0" text-anchor="middle" font-size="34" font-weight="700" fill="#2B1D16">Recepción</text><text x="1065.0" y="614.0" text-anchor="middle" font-size="26" fill="#634B3F">Aplicación web</text><rect x="450" y="245" width="330" height="150" rx="18" fill="#E6D5C3" stroke="#9C5A3C" stroke-width="3"/><text x="615.0" y="312.0" text-anchor="middle" font-size="34" font-weight="700" fill="#2B1D16">n8n</text><text x="615.0" y="354.0" text-anchor="middle" font-size="26" fill="#634B3F">Chatbot</text><rect x="900" y="245" width="330" height="150" rx="18" fill="#5C3D2E" stroke="#5C3D2E" stroke-width="3"/><text x="1065.0" y="312.0" text-anchor="middle" font-size="34" font-weight="700" fill="#FAF5F0">FastAPI</text><text x="1065.0" y="354.0" text-anchor="middle" font-size="26" fill="#EDE0D4">Reglas y seguridad</text><rect x="1330" y="245" width="310" height="150" rx="18" fill="#9C5A3C" stroke="#9C5A3C" stroke-width="3"/><text x="1485.0" y="312.0" text-anchor="middle" font-size="34" font-weight="700" fill="#FAF5F0">PostgreSQL 16</text><text x="1485.0" y="354.0" text-anchor="middle" font-size="26" fill="#FAF5F0">Doble candado</text><line x1="300" y1="320" x2="450" y2="320" stroke="#9C5A3C" stroke-width="4" marker-end="url(#ah)" marker-start="url(#ahs)"/><text x="350" y="296" text-anchor="middle" font-size="24" font-weight="600" fill="#634B3F">Meta</text><line x1="780" y1="320" x2="900" y2="320" stroke="#9C5A3C" stroke-width="4" marker-end="url(#ah)" marker-start="url(#ahs)"/><line x1="1230" y1="320" x2="1330" y2="320" stroke="#9C5A3C" stroke-width="4" marker-end="url(#ah)" marker-start="url(#ahs)"/><line x1="615" y1="245" x2="615" y2="125" stroke="#9C5A3C" stroke-width="4" marker-end="url(#ah)" marker-start="url(#ahs)"/><line x1="615" y1="395" x2="615" y2="515" stroke="#9C5A3C" stroke-width="4" marker-end="url(#ah)" marker-start="url(#ahs)"/><line x1="1065" y1="515" x2="1065" y2="400" stroke="#9C5A3C" stroke-width="4" marker-end="url(#ah)" marker-start="url(#ahs)"/></svg><div class="card" style="position:absolute;top:912px;left:120px;width:1500px;height:90px;padding:0 40px;display:flex;align-items:center;"><div style="font-size:30px;line-height:40px;color:#2B1D16;"><b>Un solo cerebro central:</b> WhatsApp y la web consultan el mismo servidor y la misma base de datos, así precios, cupos y reservas siempre coinciden.</div></div>
+<div class="page-num">7</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 2 · CONCURRENCIA</div><h1>Control de sobreventas</h1></div><div class="dots"><div class="dot done">1</div><div class="dot active">2</div><div class="dot ">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+<div style="position:absolute;top:270px;left:120px;display:flex;align-items:center;gap:24px;">
+  <div class="card-espresso" style="width:550px;height:620px;padding:40px;">
+    <div class="pill pill-accent">CANDADO 1</div>
+    <div class="serif" style="font-size:38px;font-weight:700;margin:26px 0 32px 0;">Apartado temporal (15 min)</div>
+    <div style="font-size:28px;line-height:36px;color:#EDE0D4;">
+      <p style="margin-bottom:22px;">• Mientras el huésped cotiza, la habitación queda apartada 15 minutos.</p>
+      <p style="margin-bottom:22px;">• Si dos personas intentan reservar a la vez, una continúa y la otra recibe rechazo inmediato.</p>
+      <p>• Si no paga a tiempo, se libera sola.</p>
+    </div>
+  </div>
+  <div style="font-size:48px;font-weight:700;color:#9C5A3C;">→</div>
+  <div class="card-espresso" style="width:550px;height:620px;padding:40px;">
+    <div class="pill" style="background:#C07A4B;color:#FAF5F0;">CANDADO 2</div>
+    <div class="serif" style="font-size:38px;font-weight:700;margin:26px 0 32px 0;">Regla física en base de datos</div>
+    <div style="font-size:28px;line-height:36px;color:#EDE0D4;">
+      <p style="margin-bottom:22px;">• PostgreSQL 16 (EXCLUDE GiST) prohíbe solapar fechas en la misma habitación.</p>
+      <p style="margin-bottom:22px;">• Garantía matemática directa en la base de datos.</p>
+      <p>• Funciona aunque el usuario cierre WhatsApp o falle la red.</p>
+    </div>
+  </div>
+  <div class="card-green" style="width:440px;height:620px;padding:56px 36px;display:flex;flex-direction:column;align-items:center;text-align:center;">
+    <div class="icon-circle" style="width:90px;height:90px;background:#2F6F4E;font-size:40px;">✓</div>
+    <div style="font-size:32px;font-weight:700;color:#2F6F4E;margin-top:44px;">Sobreventas</div>
+    <div class="serif" style="font-size:112px;font-weight:700;color:#2F6F4E;margin:16px 0;">0</div>
+    <div style="font-size:28px;line-height:36px;color:#2B1D16;">Resuelve la necesidad crítica N-02</div>
+  </div>
+</div>
+<div class="page-num">8</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 2 · DECISIONES</div><h1>Decisiones de diseño</h1></div><div class="dots"><div class="dot done">1</div><div class="dot active">2</div><div class="dot ">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+<div style="position:absolute;top:270px;left:120px;width:1070px;display:flex;flex-wrap:wrap;gap:30px;">
+<div class="card" style="width:520px;height:290px;padding:34px 32px;">
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
+    <div class="icon-circle" style="background:#5C3D2E;width:52px;height:52px;">1</div>
+    <div style="font-size:30px;font-weight:700;">Conversación separada de reglas</div>
+  </div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">n8n ajusta mensajes del chatbot sin modificar la lógica del hotel.</div>
+</div>
+<div class="card" style="width:520px;height:290px;padding:34px 32px;">
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
+    <div class="icon-circle" style="background:#5C3D2E;width:52px;height:52px;">2</div>
+    <div style="font-size:30px;font-weight:700;">IA controlada por el sistema</div>
+  </div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">Gemini solo recomienda habitaciones libres reales; plan B: menú guiado.</div>
+</div>
+<div class="card" style="width:520px;height:290px;padding:34px 32px;">
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
+    <div class="icon-circle" style="background:#5C3D2E;width:52px;height:52px;">3</div>
+    <div style="font-size:30px;font-weight:700;">Pago con link externo (Wompi)</div>
+  </div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">Los datos de tarjetas nunca pasan por servidores del hotel.</div>
+</div>
+<div class="card" style="width:520px;height:290px;padding:34px 32px;">
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
+    <div class="icon-circle" style="background:#5C3D2E;width:52px;height:52px;">4</div>
+    <div style="font-size:30px;font-weight:700;">Stack 100 % código abierto</div>
+  </div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">Python/FastAPI + PostgreSQL 16 + React: cero costos de licencias.</div>
+</div></div>
+<div class="card-alert" style="position:absolute;top:270px;left:1240px;width:560px;height:610px;padding:44px 40px;">
+  <div class="serif" style="font-size:36px;font-weight:700;color:#9C5A3C;margin-bottom:32px;">Beneficio para Torre Satori</div>
+  <div style="font-size:28px;line-height:36px;color:#2B1D16;">
+    <p style="margin-bottom:20px;">• Independencia total de proveedores comerciales.</p>
+    <p style="margin-bottom:20px;">• Cero riesgo al manejar tarjetas bancarias.</p>
+    <p style="margin-bottom:20px;">• Trazabilidad completa desde la necesidad hasta la prueba.</p>
+    <p>• Conciliación automática de pagos con firma criptográfica.</p>
+  </div>
+</div>
+<div class="page-num">9</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 2 · PROCESO</div><h1>Metodología y sprints</h1></div><div class="dots"><div class="dot done">1</div><div class="dot active">2</div><div class="dot ">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+<div style="position:absolute;top:338px;left:220px;width:1480px;height:4px;background:#C07A4B;"></div>
+<div style="position:absolute;top:290px;left:140px;width:1640px;display:flex;justify-content:space-between;">
+<div style="width:280px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:96px;height:96px;font-size:36px;background:#5C3D2E;">S1</div>
+  <div style="font-size:28px;font-weight:700;color:#9C5A3C;margin:22px 0 8px 0;">14–25 sep</div>
+  <div style="font-size:28px;font-weight:600;line-height:36px;">Arquitectura y base de datos</div>
+</div>
+<div style="width:280px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:96px;height:96px;font-size:36px;background:#9C5A3C;">S2</div>
+  <div style="font-size:28px;font-weight:700;color:#9C5A3C;margin:22px 0 8px 0;">28 sep–9 oct</div>
+  <div style="font-size:28px;font-weight:600;line-height:36px;">Chatbot de reservas</div>
+</div>
+<div style="width:280px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:96px;height:96px;font-size:36px;background:#5C3D2E;">S3</div>
+  <div style="font-size:28px;font-weight:700;color:#9C5A3C;margin:22px 0 8px 0;">12–23 oct</div>
+  <div style="font-size:28px;font-weight:600;line-height:36px;">Panel web y finanzas</div>
+</div>
+<div style="width:280px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:96px;height:96px;font-size:36px;background:#5C3D2E;">S4</div>
+  <div style="font-size:28px;font-weight:700;color:#9C5A3C;margin:22px 0 8px 0;">26 oct–6 nov</div>
+  <div style="font-size:28px;font-weight:600;line-height:36px;">Tienda, Café y roles</div>
+</div>
+<div style="width:280px;text-align:center;display:flex;flex-direction:column;align-items:center;">
+  <div class="icon-circle" style="width:96px;height:96px;font-size:36px;background:#5C3D2E;">S5</div>
+  <div style="font-size:28px;font-weight:700;color:#9C5A3C;margin:22px 0 8px 0;">9–20 nov</div>
+  <div style="font-size:28px;font-weight:600;line-height:36px;">Pruebas y despliegue</div>
+</div></div>
+<div style="position:absolute;top:630px;left:120px;display:flex;gap:40px;">
+<div class="card" style="width:390px;height:250px;padding:38px 32px;">
+  <div class="serif" style="font-size:34px;font-weight:700;color:#9C5A3C;margin-bottom:18px;">Scrum</div>
+  <div style="font-size:28px;line-height:36px;">PO, SM y equipo de desarrollo</div>
+</div>
+<div class="card" style="width:390px;height:250px;padding:38px 32px;">
+  <div class="serif" style="font-size:34px;font-weight:700;color:#9C5A3C;margin-bottom:18px;">GitHub</div>
+  <div style="font-size:28px;line-height:36px;">Ramas y Pull Requests revisados</div>
+</div>
+<div class="card" style="width:390px;height:250px;padding:38px 32px;">
+  <div class="serif" style="font-size:34px;font-weight:700;color:#9C5A3C;margin-bottom:18px;">CI / CD</div>
+  <div style="font-size:28px;line-height:36px;">Pruebas automáticas en cada cambio</div>
+</div>
+<div class="card" style="width:390px;height:250px;padding:38px 32px;">
+  <div class="serif" style="font-size:34px;font-weight:700;color:#9C5A3C;margin-bottom:18px;">DoD</div>
+  <div style="font-size:28px;line-height:36px;">Definition of Done en cada entrega</div>
+</div></div>
+<div class="page-num">10</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 DE 5</div><h1>Alcance implementado (v1.0.0)</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+<div style="position:absolute;top:270px;left:120px;display:flex;gap:60px;">
+  <div class="card" style="width:810px;height:640px;padding:44px;">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:36px;">
+      <div class="icon-circle" style="width:64px;height:64px;">W</div>
+      <div class="serif" style="font-size:38px;font-weight:700;">El huésped · WhatsApp</div>
+    </div>
+    <div style="font-size:30px;line-height:42px;">
+      <p style="margin-bottom:16px;">• Reserva guiada paso a paso o asistida por IA</p>
+      <p style="margin-bottom:16px;">• Consulta de reserva con código TS-XXXX y cédula</p>
+      <p style="margin-bottom:16px;">• Abono 50 % o pago total 100 % con Wompi</p>
+      <p style="margin-bottom:16px;">• Cancelación y cálculo automático de reembolso</p>
+      <p>• Invitación a reseña y paso directo a recepción</p>
+    </div>
+  </div>
+  <div class="card" style="width:810px;height:640px;padding:44px;">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:36px;">
+      <div class="icon-circle" style="width:64px;height:64px;background:#5C3D2E;">R</div>
+      <div class="serif" style="font-size:38px;font-weight:700;">El hotel · Aplicación web</div>
+    </div>
+    <div style="font-size:30px;line-height:42px;">
+      <p style="margin-bottom:16px;">• Dashboard, calendario y control de 9 habitaciones</p>
+      <p style="margin-bottom:16px;">• Check-in, check-out y liquidación de saldos</p>
+      <p style="margin-bottom:16px;">• Salgados Café y tienda con cargo a habitación</p>
+      <p style="margin-bottom:16px;">• Eventos y tarifas dinámicas por temporada</p>
+      <p>• Finanzas, reportes Excel y bitácora de auditoría</p>
+    </div>
+  </div>
+</div>
+<div class="page-num">11</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 · ESTEBAN GUARÍN</div><h1>Reserva por WhatsApp (n8n)</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+<div style="position:absolute;top:270px;left:120px;width:1280px;display:flex;flex-wrap:wrap;gap:25px;">
+<div class="card" style="width:300px;height:290px;padding:26px;">
+  <div class="icon-circle" style="width:48px;height:48px;font-size:28px;margin-bottom:20px;">1</div>
+  <div style="font-size:32px;font-weight:700;line-height:38px;margin-bottom:10px;">Fechas</div>
+  <div style="font-size:24px;line-height:30px;color:#634B3F;">Ingreso y salida</div>
+</div>
+<div class="card" style="width:300px;height:290px;padding:26px;">
+  <div class="icon-circle" style="width:48px;height:48px;font-size:28px;margin-bottom:20px;">2</div>
+  <div style="font-size:32px;font-weight:700;line-height:38px;margin-bottom:10px;">Habitación libre</div>
+  <div style="font-size:24px;line-height:30px;color:#634B3F;">Consulta en tiempo real</div>
+</div>
+<div class="card-alert" style="width:300px;height:290px;padding:26px;">
+  <div class="icon-circle" style="width:48px;height:48px;font-size:28px;margin-bottom:20px;">3</div>
+  <div style="font-size:32px;font-weight:700;line-height:38px;margin-bottom:10px;">Apartada 15 min</div>
+  <div style="font-size:24px;line-height:30px;color:#634B3F;">Candado temporal</div>
+</div>
+<div class="card" style="width:300px;height:290px;padding:26px;">
+  <div class="icon-circle" style="width:48px;height:48px;font-size:28px;margin-bottom:20px;">4</div>
+  <div style="font-size:32px;font-weight:700;line-height:38px;margin-bottom:10px;">Huéspedes</div>
+  <div style="font-size:24px;line-height:30px;color:#634B3F;">Adultos y niños</div>
+</div>
+<div class="card" style="width:300px;height:290px;padding:26px;">
+  <div class="icon-circle" style="width:48px;height:48px;font-size:28px;margin-bottom:20px;">5</div>
+  <div style="font-size:32px;font-weight:700;line-height:38px;margin-bottom:10px;">Ley 1581</div>
+  <div style="font-size:24px;line-height:30px;color:#634B3F;">Acepta el tratamiento de datos</div>
+</div>
+<div class="card" style="width:300px;height:290px;padding:26px;">
+  <div class="icon-circle" style="width:48px;height:48px;font-size:28px;margin-bottom:20px;">6</div>
+  <div style="font-size:32px;font-weight:700;line-height:38px;margin-bottom:10px;">Titular y mascota</div>
+  <div style="font-size:24px;line-height:30px;color:#634B3F;">Documento, acompañantes y recargo</div>
+</div>
+<div class="card" style="width:300px;height:290px;padding:26px;">
+  <div class="icon-circle" style="width:48px;height:48px;font-size:28px;margin-bottom:20px;">7</div>
+  <div style="font-size:32px;font-weight:700;line-height:38px;margin-bottom:10px;">Cotización y pago</div>
+  <div style="font-size:24px;line-height:30px;color:#634B3F;">Tarifa + evento · link Wompi 50 / 100 %</div>
+</div>
+<div class="card" style="width:300px;height:290px;padding:26px;">
+  <div class="icon-circle" style="width:48px;height:48px;font-size:28px;margin-bottom:20px;">8</div>
+  <div style="font-size:32px;font-weight:700;line-height:38px;margin-bottom:10px;">Código<br><span style="white-space:nowrap">TS-XXXX</span></div>
+  <div style="font-size:24px;line-height:30px;color:#634B3F;">Se confirma al aprobarse el pago</div>
+</div>
+</div>
+<div class="card-espresso" style="position:absolute;top:270px;left:1435px;width:365px;height:605px;padding:38px 34px;display:flex;flex-direction:column;">
+  <div class="icon-circle" style="width:64px;height:64px;margin-bottom:26px;">!</div>
+  <div class="serif" style="font-size:36px;font-weight:700;line-height:47px;margin-bottom:28px;">Concurrencia en vivo</div>
+  <div style="font-size:28px;line-height:36px;color:#EDE0D4;">Si un segundo huésped solicita la misma habitación y fechas mientras está apartada:</div>
+  <div class="pill" style="background:#B84A39;color:#FAF5F0;margin-top:auto;font-size:22px;white-space:nowrap;padding:8px 16px;">→ RECHAZADA (409)</div>
+</div>
+<div class="page-num">12</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 · JUAN JOSÉ ARIAS</div><h1>Operación en aplicación web</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div><div style="position:absolute;top:270px;left:120px;display:flex;gap:30px;">
+<div class="card" style="width:312px;height:630px;padding:36px 28px;">
+  <div class="icon-circle" style="background:#5C3D2E;margin-bottom:32px;">1</div>
+  <div style="font-size:32px;font-weight:700;line-height:42px;margin-bottom:24px;">Reserva visible al instante</div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">Llega desde WhatsApp sin registro manual.</div>
+</div>
+<div class="card" style="width:312px;height:630px;padding:36px 28px;">
+  <div class="icon-circle" style="background:#5C3D2E;margin-bottom:32px;">2</div>
+  <div style="font-size:32px;font-weight:700;line-height:42px;margin-bottom:24px;">Check-in el día de llegada</div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">Verificación de documento, saldo y llaves.</div>
+</div>
+<div class="card" style="width:312px;height:630px;padding:36px 28px;">
+  <div class="icon-circle" style="background:#5C3D2E;margin-bottom:32px;">3</div>
+  <div style="font-size:32px;font-weight:700;line-height:42px;margin-bottom:24px;">Pedido de Salgados Café</div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">Se carga a la habitación y se liquida al salir.</div>
+</div>
+<div class="card" style="width:312px;height:630px;padding:36px 28px;">
+  <div class="icon-circle" style="background:#5C3D2E;margin-bottom:32px;">4</div>
+  <div style="font-size:32px;font-weight:700;line-height:42px;margin-bottom:24px;">Evento de temporada</div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">Recargo o descuento aplicado en web y WhatsApp.</div>
+</div>
+<div class="card" style="width:312px;height:630px;padding:36px 28px;">
+  <div class="icon-circle" style="background:#5C3D2E;margin-bottom:32px;">5</div>
+  <div style="font-size:32px;font-weight:700;line-height:42px;margin-bottom:24px;">Bitácora de auditoría</div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">Registro de quién hizo cada acción y cuándo.</div>
+</div></div><div class="page-num">13</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 · SEGURIDAD</div><h1>Seguridad y protección de datos</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div><div style="position:absolute;top:270px;left:120px;width:1680px;display:flex;flex-wrap:wrap;gap:30px 40px;">
+<div class="card" style="width:820px;height:300px;padding:38px 36px;">
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:22px;">
+    <div class="icon-circle" style="background:#E3EFE8;color:#2F6F4E;">✓</div>
+    <div style="font-size:34px;font-weight:700;">Control por roles (JWT)</div>
+  </div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">Acceso separado para Administrador y Recepcionista; contraseñas cifradas con bcrypt.</div>
+</div>
+<div class="card" style="width:820px;height:300px;padding:38px 36px;">
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:22px;">
+    <div class="icon-circle" style="background:#E3EFE8;color:#2F6F4E;">✓</div>
+    <div style="font-size:34px;font-weight:700;">Ley 1581 de 2012</div>
+  </div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">Consentimiento explícito del huésped en WhatsApp, datos mínimos y consulta enmascarada de cédula.</div>
+</div>
+<div class="card" style="width:820px;height:300px;padding:38px 36px;">
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:22px;">
+    <div class="icon-circle" style="background:#E3EFE8;color:#2F6F4E;">✓</div>
+    <div style="font-size:34px;font-weight:700;">Pagos externos validados</div>
+  </div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">Tarjetas gestionadas por Wompi; la reserva solo se confirma al validar la firma criptográfica HMAC.</div>
+</div>
+<div class="card" style="width:820px;height:300px;padding:38px 36px;">
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:22px;">
+    <div class="icon-circle" style="background:#E3EFE8;color:#2F6F4E;">✓</div>
+    <div style="font-size:34px;font-weight:700;">Bitácora inmutable</div>
+  </div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">Cada cambio de tarifa, check-in, cancelación o consumo queda auditado con fecha, actor y entidad.</div>
+</div></div><div class="page-num">14</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 · VALIDACIÓN</div><h1>Validación y pruebas</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div><div style="position:absolute;top:280px;left:120px;display:flex;gap:40px;">
+<div class="card" style="width:390px;height:600px;padding:36px 32px;">
+  <div class="pill pill-green">APROBADO</div>
+  <div class="serif" style="font-size:68px;font-weight:700;margin:48px 0 18px 0;">36/36</div>
+  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:24px;">pruebas del servidor (pytest)</div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">Concurrencia, seguridad, tarifas y API FastAPI</div>
+</div>
+<div class="card" style="width:390px;height:600px;padding:36px 32px;">
+  <div class="pill pill-green">APROBADO</div>
+  <div class="serif" style="font-size:68px;font-weight:700;margin:48px 0 18px 0;">65/65</div>
+  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:24px;">pruebas de suite chatbot</div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">Flujos guiados, IA, cancelación y escalamiento</div>
+</div>
+<div class="card" style="width:390px;height:600px;padding:36px 32px;">
+  <div class="pill pill-green">APROBADO</div>
+  <div class="serif" style="font-size:68px;font-weight:700;margin:48px 0 18px 0;">11/11</div>
+  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:24px;">pruebas pasarela Wompi</div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">Links de pago, firma HMAC e idempotencia</div>
+</div>
+<div class="card" style="width:390px;height:600px;padding:36px 32px;">
+  <div class="pill pill-green">APROBADO</div>
+  <div class="serif" style="font-size:68px;font-weight:700;margin:48px 0 18px 0;">7/7</div>
+  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:24px;">pruebas en vivo E2E</div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">WhatsApp/n8n real contra FastAPI y Wompi</div>
+</div></div><div class="source-foot">Fuente: ejecución de las pruebas del repositorio (corte 19–20 nov 2026).</div><div class="page-num">15</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 · RENDIMIENTO</div><h1>Concurrencia y rendimiento</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+<div class="card-espresso" style="position:absolute;top:270px;left:120px;width:540px;height:630px;padding:48px 44px;">
+  <div style="font-size:30px;line-height:40px;color:#EDE0D4;">50 solicitudes simultáneas sobre la misma habitación</div>
+  <div class="serif" style="font-size:132px;font-weight:700;margin:36px 0 8px 0;">0</div>
+  <div style="font-size:38px;font-weight:700;color:#C07A4B;margin-bottom:22px;">dobles reservas</div>
+  <div style="font-size:28px;line-height:38px;color:#EDE0D4;">1 solicitud aceptada · 49 rechazadas (409)</div>
+</div>
+<div style="position:absolute;top:270px;left:700px;width:1100px;display:flex;flex-wrap:wrap;gap:30px 20px;">
+<div class="card" style="width:540px;height:300px;padding:34px 36px;">
+  <div class="serif" style="font-size:56px;font-weight:700;margin-bottom:12px;">&lt; 0,4 s</div>
+  <div style="font-size:28px;line-height:36px;color:#634B3F;margin-bottom:14px;">respuesta más lenta con 50 cotizaciones simultáneas</div>
+  <div style="font-size:26px;font-weight:600;color:#2F6F4E;">Promedio 0,13–0,31 s · meta &lt; 1,5 s</div>
+</div>
+<div class="card" style="width:540px;height:300px;padding:34px 36px;">
+  <div class="serif" style="font-size:56px;font-weight:700;margin-bottom:12px;">&lt; 1 s</div>
+  <div style="font-size:28px;line-height:36px;color:#634B3F;margin-bottom:14px;">para restaurar un respaldo completo de la base de datos</div>
+  <div style="font-size:26px;font-weight:600;color:#2F6F4E;">Con los datos actuales (≈ 9 MB)</div>
+</div>
+<div class="card" style="width:540px;height:300px;padding:34px 36px;">
+  <div class="serif" style="font-size:56px;font-weight:700;margin-bottom:12px;">&lt; 0,1 s</div>
+  <div style="font-size:28px;line-height:36px;color:#634B3F;margin-bottom:14px;">para que una reserva nueva aparezca en la web</div>
+  <div style="font-size:26px;font-weight:600;color:#2F6F4E;">Web y WhatsApp usan la misma base</div>
+</div>
+<div class="card" style="width:540px;height:300px;padding:34px 36px;">
+  <div class="serif" style="font-size:56px;font-weight:700;margin-bottom:12px;">&lt; 0,05 s</div>
+  <div style="font-size:28px;line-height:36px;color:#634B3F;margin-bottom:14px;">para emitir el código de reserva TS-XXXX</div>
+  <div style="font-size:26px;font-weight:600;color:#2F6F4E;">Visible de inmediato en recepción</div>
+</div></div>
+<div class="source-foot">Mediciones propias del servidor (3 corridas, 20 nov 2026), sin contar la red de WhatsApp.</div>
+<div class="page-num">16</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 4 DE 5</div><h1>Inversión del proyecto</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot done">3</div><div class="dot active">4</div><div class="dot ">5</div></div>
+<div style="position:absolute;top:270px;left:120px;display:flex;flex-direction:column;gap:30px;">
+<div class="card" style="width:780px;height:180px;padding:40px;display:flex;align-items:center;gap:28px;">
+  <div class="serif" style="font-size:54px;font-weight:700;color:#9C5A3C;width:300px;white-space:nowrap;">600 h</div>
+  <div style="font-size:30px;line-height:39px;">3 personas × 20 h/semana × 10 semanas</div>
+</div>
+<div class="card" style="width:780px;height:180px;padding:40px;display:flex;align-items:center;gap:28px;">
+  <div class="serif" style="font-size:54px;font-weight:700;color:#9C5A3C;width:300px;white-space:nowrap;">$24,7 M</div>
+  <div style="font-size:30px;line-height:39px;">inversión total de implementación (COP)</div>
+</div>
+<div class="card" style="width:780px;height:180px;padding:40px;display:flex;align-items:center;gap:28px;">
+  <div class="serif" style="font-size:54px;font-weight:700;color:#9C5A3C;width:300px;white-space:nowrap;">$0</div>
+  <div style="font-size:30px;line-height:39px;">en licencias: 100 % código abierto</div>
+</div></div>
+<div class="card" style="position:absolute;top:270px;left:960px;width:840px;height:600px;padding:36px 40px;display:flex;flex-direction:column;align-items:center;">
+  <div style="font-size:30px;font-weight:700;margin-bottom:28px;">Distribución de la inversión (85 % en construcción)</div>
+  <svg width="310" height="310" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="72" fill="none" stroke="#9C5A3C" stroke-width="40" stroke-dasharray="384.5 452.4" transform="rotate(-90 100 100)"/>
+    <circle cx="100" cy="100" r="72" fill="none" stroke="#C07A4B" stroke-width="40" stroke-dasharray="27.1 452.4" stroke-dashoffset="-384.5" transform="rotate(-90 100 100)"/>
+    <circle cx="100" cy="100" r="72" fill="none" stroke="#3A5A78" stroke-width="40" stroke-dasharray="40.8 452.4" stroke-dashoffset="-411.6" transform="rotate(-90 100 100)"/>
+    <text x="100" y="108" text-anchor="middle" font-size="26" font-weight="700" fill="#2B1D16">100 %</text>
+  </svg>
+  <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px 28px;margin-top:28px;font-size:26px;font-weight:600;white-space:nowrap;">
+    <div><span style="display:inline-block;width:16px;height:16px;background:#9C5A3C;border-radius:4px;margin-right:8px;"></span>Construcción 85 %</div>
+    <div><span style="display:inline-block;width:16px;height:16px;background:#C07A4B;border-radius:4px;margin-right:8px;"></span>Puesta en marcha 6 %</div>
+    <div><span style="display:inline-block;width:16px;height:16px;background:#3A5A78;border-radius:4px;margin-right:8px;"></span>Contingencia 9 %</div>
+  </div>
+</div>
+<div class="source-foot">Fuente: Presupuesto_SatoriPMS.xlsx</div><div class="page-num">17</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 4 · SOSTENIBILIDAD</div><h1>Costos de operación mensual</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot done">3</div><div class="dot active">4</div><div class="dot ">5</div></div>
+<div class="card" style="position:absolute;top:270px;left:120px;width:820px;height:620px;padding:36px 40px;">
+  <div style="font-size:30px;font-weight:700;margin-bottom:56px;">SatoriPMS cuesta 78,8 % menos al mes que un PMS comercial</div>
+  <div style="font-size:28px;font-weight:600;color:#634B3F;margin-bottom:12px;">PMS comercial</div>
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:54px;">
+    <div style="width:520px;height:84px;background:#B84A39;border-radius:10px;"></div>
+    <div style="font-size:32px;font-weight:700;color:#B84A39;">$1.369.500</div>
+  </div>
+  <div style="font-size:28px;font-weight:600;margin-bottom:12px;">SatoriPMS</div>
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:70px;">
+    <div style="width:110px;height:84px;background:#2F6F4E;border-radius:10px;"></div>
+    <div style="font-size:32px;font-weight:700;color:#2F6F4E;">$289.842</div>
+  </div>
+  <div style="font-size:24px;color:#634B3F;">Cifras mensuales en COP · Fuente: Presupuesto_SatoriPMS.xlsx</div>
+</div>
+<div style="position:absolute;top:270px;left:980px;display:flex;flex-direction:column;gap:25px;">
+  
+<div class="card" style="width:820px;height:120px;padding:0 36px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="font-size:30px;font-weight:600;">Servidor y dominio</div>
+  <div class="serif" style="font-size:38px;font-weight:700;color:#9C5A3C;">$54.642</div>
+</div>
+<div class="card" style="width:820px;height:120px;padding:0 36px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="font-size:30px;font-weight:600;">WhatsApp, IA y línea móvil</div>
+  <div class="serif" style="font-size:38px;font-weight:700;color:#9C5A3C;">$55.200</div>
+</div>
+<div class="card" style="width:820px;height:120px;padding:0 36px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="font-size:30px;font-weight:600;">Soporte técnico (5 h/mes)</div>
+  <div class="serif" style="font-size:38px;font-weight:700;color:#9C5A3C;">$180.000</div>
+</div>
+  <div class="card-espresso" style="width:820px;height:185px;padding:0 40px;display:flex;align-items:center;justify-content:space-between;">
+    <div class="serif" style="font-size:46px;font-weight:700;">≈ $2.700 COP</div>
+    <div style="font-size:28px;line-height:36px;color:#EDE0D4;width:360px;">de tecnología por cada reserva<br>(base: 40 reservas al mes)</div>
+  </div>
+</div>
+<div class="page-num">18</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 4 · CONTINUIDAD Y SOPORTE</div><h1>Disponibilidad, fallos y soporte</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot done">3</div><div class="dot active">4</div><div class="dot ">5</div></div><div style="position:absolute;top:270px;left:120px;width:1680px;display:flex;flex-wrap:wrap;gap:30px 40px;">
+<div class="card" style="width:820px;height:300px;padding:32px 36px;">
+  <div class="pill pill-green" style="margin-bottom:22px;">Disponibilidad y respaldos</div>
+  <div style="font-size:26px;line-height:34px;">• Uptime garantizado ≥ 99,5 % mensual.<br>• Respaldos automáticos diarios a las 03:00 a. m. (30 diarios + 12 mensuales).<br>• Restauración de respaldo probada: &lt; 1 s con los datos actuales.</div>
+</div>
+<div class="card" style="width:820px;height:300px;padding:32px 36px;">
+  <div class="pill pill-blue" style="margin-bottom:22px;">Plan ante posibles fallos</div>
+  <div style="font-size:26px;line-height:34px;">• Si falla la IA (Gemini): n8n cambia automáticamente al menú guiado.<br>• Si falla Meta/WhatsApp: recepción opera desde la aplicación web sin perder datos.</div>
+</div>
+<div class="card" style="width:820px;height:300px;padding:32px 36px;">
+  <div class="pill pill-accent" style="margin-bottom:22px;">Soporte N1 y N2</div>
+  <div style="font-size:26px;line-height:34px;">• Nivel 1 (Recepción): dudas operativas y atención al huésped.<br>• Nivel 2 (Ingeniería SatoriPMS): base de datos, webhooks, parches y servidor.</div>
+</div>
+<div class="card" style="width:820px;height:300px;padding:32px 36px;">
+  <div class="pill pill-red" style="margin-bottom:22px;">Tickets y acuerdos (SLA)</div>
+  <div style="font-size:26px;line-height:34px;">• Reporte directo por canal de tickets con prioridad:<br>P1 Crítico: respuesta &lt; 15 min · solución &lt; 2 h.<br>P2 Alto: &lt; 45 min · &lt; 6 h | P3 Medio: &lt; 3 h · &lt; 24 h.</div>
+</div></div><div class="page-num">19</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 5 DE 5</div><h1>Resultados alcanzados</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot done">3</div><div class="dot done">4</div><div class="dot active">5</div></div>
+<div style="position:absolute;top:270px;left:120px;display:flex;flex-direction:column;gap:20px;">
+<div class="card" style="width:980px;height:106px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="pill pill-dark">N-01</div>
+    <div style="font-size:28px;font-weight:600;">Atención automatizada las 24 horas por WhatsApp</div>
+  </div>
+  <div class="icon-circle" style="width:48px;height:48px;background:#E3EFE8;color:#2F6F4E;">✓</div>
+</div>
+<div class="card" style="width:980px;height:106px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="pill pill-dark">N-02</div>
+    <div style="font-size:28px;font-weight:600;">0 dobles reservas, por diseño y por prueba</div>
+  </div>
+  <div class="icon-circle" style="width:48px;height:48px;background:#E3EFE8;color:#2F6F4E;">✓</div>
+</div>
+<div class="card" style="width:980px;height:106px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="pill pill-dark">N-03</div>
+    <div style="font-size:28px;font-weight:600;">Cotización, cobro y reembolso automáticos</div>
+  </div>
+  <div class="icon-circle" style="width:48px;height:48px;background:#E3EFE8;color:#2F6F4E;">✓</div>
+</div>
+<div class="card" style="width:980px;height:106px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="pill pill-dark">N-04</div>
+    <div style="font-size:28px;font-weight:600;">Todo registrado y auditado en base de datos</div>
+  </div>
+  <div class="icon-circle" style="width:48px;height:48px;background:#E3EFE8;color:#2F6F4E;">✓</div>
+</div>
+<div class="card" style="width:980px;height:106px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="pill pill-dark">N-05</div>
+    <div style="font-size:28px;font-weight:600;">Una quinta parte del costo de un PMS comercial</div>
+  </div>
+  <div class="icon-circle" style="width:48px;height:48px;background:#E3EFE8;color:#2F6F4E;">✓</div>
+</div></div>
+<div class="card" style="position:absolute;top:270px;left:1140px;width:660px;height:610px;padding:36px 32px;">
+  <div class="serif" style="font-size:34px;font-weight:700;margin-bottom:24px;">Indicadores de cierre</div>
+  <div style="display:flex;flex-direction:column;gap:16px;">
+<div style="background:#E6D5C3;border:1px solid #D6C2B0;border-radius:10px;height:78px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="font-size:26px;">Respuesta con 50 simultáneas</div>
+  <div style="font-size:28px;font-weight:700;color:#2F6F4E;">&lt; 0,4 s</div>
+</div>
+<div style="background:#FAF5F0;border:1px solid #D6C2B0;border-radius:10px;height:78px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="font-size:26px;">Pruebas API y chatbot</div>
+  <div style="font-size:28px;font-weight:700;color:#2F6F4E;">36/36 · 65/65</div>
+</div>
+<div style="background:#E6D5C3;border:1px solid #D6C2B0;border-radius:10px;height:78px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="font-size:26px;">Pruebas Wompi y vivo</div>
+  <div style="font-size:28px;font-weight:700;color:#2F6F4E;">11/11 · 7/7</div>
+</div>
+<div style="background:#FAF5F0;border:1px solid #D6C2B0;border-radius:10px;height:78px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="font-size:26px;">Personal capacitado</div>
+  <div style="font-size:28px;font-weight:700;color:#2F6F4E;">100 %</div>
+</div>
+<div style="background:#E6D5C3;border:1px solid #D6C2B0;border-radius:10px;height:78px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="font-size:26px;">Dictamen final</div>
+  <div style="font-size:28px;font-weight:700;color:#2F6F4E;">Piloto autorizado</div>
+</div></div>
+</div>
+<div class="page-num">20</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 5 · RETORNO</div><h1>Retorno de la inversión</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot done">3</div><div class="dot done">4</div><div class="dot active">5</div></div><div style="position:absolute;top:280px;left:120px;display:flex;gap:40px;">
+<div class="card-espresso" style="width:533px;height:560px;padding:48px 44px;">
+  <div class="icon-circle" style="width:64px;height:64px;">1</div>
+  <div class="serif" style="font-size:84px;font-weight:700;margin:48px 0 24px 0;">13,7</div>
+  <div style="font-size:32px;line-height:42px;color:#EDE0D4;">meses para recuperar la inversión (ahorro + ingresos recuperados)</div>
+</div>
+<div class="card" style="width:533px;height:560px;padding:48px 44px;">
+  <div class="icon-circle" style="width:64px;height:64px;">2</div>
+  <div class="serif" style="font-size:84px;font-weight:700;margin:48px 0 24px 0;">$13 M</div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">de ahorro al año frente a un PMS comercial</div>
+</div>
+<div class="card" style="width:533px;height:560px;padding:48px 44px;">
+  <div class="icon-circle" style="width:64px;height:64px;">3</div>
+  <div class="serif" style="font-size:84px;font-weight:700;margin:48px 0 24px 0;">3</div>
+  <div style="font-size:32px;line-height:42px;color:#634B3F;">reservas directas al mes cubren la operación técnica</div>
+</div></div><div class="source-foot">Beneficio neto proyectado: $21,6 M/año (ahorro frente al PMS comercial + comisiones evitadas). 40 reservas/mes a $180.000. Fuente: Presupuesto_SatoriPMS.xlsx</div><div class="page-num">21</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 5 · EVOLUCIÓN</div><h1>Oportunidades de mejora</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot done">3</div><div class="dot done">4</div><div class="dot active">5</div></div>
+<div style="position:absolute;top:270px;left:120px;display:flex;gap:60px;">
+  <div class="card" style="width:810px;height:620px;padding:44px;">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:36px;">
+      <div class="icon-circle" style="width:64px;height:64px;background:#5C3D2E;">P</div>
+      <div class="serif" style="font-size:38px;font-weight:700;">Producto</div>
+    </div>
+    <div style="font-size:32px;line-height:42px;">
+      <p style="margin-bottom:20px;">• Pasarela Wompi en producción y facturación electrónica DIAN (v1.2.0)</p>
+      <p style="margin-bottom:20px;">• Automatizar publicación de reseñas en Google</p>
+      <p style="margin-bottom:20px;">• Alta disponibilidad multi-servidor (hoy 1 servidor)</p>
+      <p>• Pruebas de usabilidad en campo con huéspedes reales</p>
+    </div>
+  </div>
+  <div class="card" style="width:810px;height:620px;padding:44px;">
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:36px;">
+      <div class="icon-circle" style="width:64px;height:64px;">G</div>
+      <div class="serif" style="font-size:38px;font-weight:700;">Proceso</div>
+    </div>
+    <div style="font-size:32px;line-height:42px;">
+      <p style="margin-bottom:20px;">• Estimar con holgura las integraciones externas</p>
+      <p style="margin-bottom:20px;">• Iniciar trámites comerciales con Meta desde el día 1</p>
+      <p style="margin-bottom:20px;">• Documentación continua al ritmo del código</p>
+      <p>• Pruebas de concurrencia en CI con base de datos real</p>
+    </div>
+  </div>
+</div>
+<div class="page-num">22</div></section><section class="slide"><div class="header"><div class="pill">CIERRE</div><h1>Torre Satori · Listo para operar</h1></div>
+<div style="position:absolute;top:250px;left:120px;display:flex;gap:40px;">
+<div class="card-espresso" style="width:533px;height:300px;padding:40px;">
+  <div class="serif" style="font-size:64px;font-weight:700;color:#C07A4B;margin-bottom:20px;">24/7</div>
+  <div style="font-size:28px;line-height:36px;">Reservas automatizadas por WhatsApp, sin intervención de recepción</div>
+</div>
+<div class="card-espresso" style="width:533px;height:300px;padding:40px;">
+  <div class="serif" style="font-size:64px;font-weight:700;color:#C07A4B;margin-bottom:20px;">0</div>
+  <div style="font-size:28px;line-height:36px;">Sobreventas: doble candado validado en PostgreSQL 16</div>
+</div>
+<div class="card-espresso" style="width:533px;height:300px;padding:40px;">
+  <div class="serif" style="font-size:64px;font-weight:700;color:#C07A4B;margin-bottom:20px;">v1.0.0</div>
+  <div style="font-size:28px;line-height:36px;">Operación del hotel centralizada y en piloto controlado</div>
+</div></div>
+<div class="serif" style="position:absolute;top:640px;left:120px;width:1680px;text-align:center;font-size:130px;line-height:140px;font-weight:700;color:#2B1D16;">Gracias</div>
+<div style="position:absolute;top:810px;left:120px;width:1680px;text-align:center;font-size:36px;color:#634B3F;"><span style="font-weight:900;color:#2B1D16;">Satori</span><span style="font-weight:300;color:#9C5A3C;">PMS</span> · Torre Satori · Sevilla</div>
+<div class="page-num">23</div></section></body></html>

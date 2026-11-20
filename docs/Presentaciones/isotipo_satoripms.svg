@@ -1,0 +1,6 @@
+<svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Anillo Ensō abierto -->
+  <path d="M188 64C170 42 143 28 114 28C62 28 20 70 20 122C20 174 62 216 114 216C166 216 208 174 208 122C208 110 205 99 201 88" stroke="#9C5A3C" stroke-width="14" stroke-linecap="round"/>
+  <!-- Trazo S fluido central -->
+  <path d="M148 80C138 70 102 68 90 86C78 104 102 118 122 122C142 126 158 140 144 160C130 178 90 174 80 158" stroke="#9C5A3C" stroke-width="14" stroke-linecap="round"/>
+</svg>

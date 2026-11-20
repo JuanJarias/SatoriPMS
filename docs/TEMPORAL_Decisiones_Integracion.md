@@ -54,6 +54,28 @@ No te quedes con el primer error. Haz un diagnóstico completo y entrégale a tu
 | Recursos del equipo | Espacio en disco (`df -h`) y memoria asignada a Docker |
 | Estado de git | `git status -sb` y `git log --oneline -5`: ¿está en la rama `integracion-fastapi` y al día? |
 
+#### Diagnóstico específico de n8n y WhatsApp (puntos clave descubiertos)
+
+Si el contenedor `n8n` está arriba pero el bot no responde o no llegan mensajes a WhatsApp, revisa **todos** estos puntos antes de asumir un fallo de código:
+
+1. **Flujo no publicado o caché de `versionId` (n8n 2.47.3):**
+   - Si el webhook responde `404` (por ejemplo tras un `reset-dev.sh`), importa y publica el flujo con `./scripts/sync-n8n-flow.sh` (o `./scripts/start-dev.sh --sync-flow`).
+   - En n8n `2.47.3`, si editas el JSON y no cambias el `versionId` por un UUID nuevo antes de `n8n import:workflow` + `n8n publish:workflow --id=V9WompiChatbotRsv`, n8n sigue ejecutando la versión en caché; además conviene reiniciar `satori_n8n` (`docker restart satori_n8n`).
+2. **App de Meta Developers en Modo de desarrollo y suscripción de la WABA:**
+   - Aunque el `GET` de verificación (`hub.challenge`) funcione y el campo `messages` salga como **Suscritos**, si la app en Meta Developers está en **Modo de desarrollo**, Meta **no entrega mensajes reales** al webhook (solo los del botón **Probar**). Cambia la app a **Modo activo (Live)** y confirma con `GET /<WHATSAPP_ACCOUNT_ID>/subscribed_apps` que tu app aparezca suscrita.
+   - Si usas el número de prueba de Meta, tu celular debe estar agregado en la lista de destinatarios autorizados en **API Setup**.
+3. **Expiración del `WHATSAPP_TOKEN` (~24 horas):**
+   - El token temporal caduca cada 24 h. Verifica su vigencia con `./scripts/status-dev.sh` o consultando `https://graph.facebook.com/$WHATSAPP_GRAPH_VERSION/$WHATSAPP_PHONE_ID?access_token=...`. Si lo actualizas en `.env`, recrea el contenedor para que tome la variable (`docker compose --profile n8n up -d --force-recreate n8n`).
+4. **Errores silenciosos en nodos HTTP de WhatsApp (`continueRegularOutput`):**
+   - Los nodos de envío (`Enviar Mensaje WhatsApp1`, `Enviar Aviso Inactividad`, `Enviar Estado Pago WhatsApp`) tienen `onError: continueRegularOutput`, por lo que n8n marca la ejecución como `success` aunque Meta devuelva `400` o `401`. Si ves ejecuciones exitosas pero no llega el mensaje al teléfono, abre la ejecución en n8n (o revisa `execution_data` en `/home/node/.n8n/database.sqlite`) para ver la respuesta real de Graph API.
+5. **Túnel público (Cloudflare Tunnel / `zrok2`) y `curl`:**
+   - Meta no puede llegar a `localhost:5678`; el túnel público que uses (en tu entorno **Cloudflare Tunnel**, o `zrok2` si lo usas) debe estar activo apuntando a `localhost:5678`, coincidir con `N8N_PUBLIC_URL` / `N8N_WEBHOOK_URL` y con la URL del webhook en Meta (`.../webhook/whatsapp-webhook`). Si al probar con `curl` la petición tarda ~90 s, suele ser timeout de IPv6: prueba con `curl -4`.
+6. **Credenciales compartidas (`SATORI_SERVICE_KEY` y `GEMINI_API_KEY`):**
+   - Los nodos HTTP de V9 envían `X-Service-Key: $env.SATORI_SERVICE_KEY`; si no coincide con el contenedor `api`, la API responde `401`/`403`.
+   - Si falla la IA, verifica `GEMINI_API_KEY` en `.env` (ten en cuenta que `gemini-flash-lite-latest` rechaza `thinkingConfig` en `generationConfig` con `400 INVALID_ARGUMENT`).
+7. **Nodos `Wait` y liberación de bloqueos:**
+   - Las ramas paralelas que salen junto con `Esperar 10 min Inactividad` (`Wait`) pueden quedar diferidas o saltarse; cualquier liberación de bloqueo temporal en la API debe ejecutarse en serie antes de `Redis Guardar Sesión` / `Wait`.
+
 Cierra con un resumen en tres partes: **qué funciona**, **qué falla y por qué (todas las razones encontradas)** y **qué debe hacer tu usuario**.
 
 ### Límites (pregunta antes de hacer cualquiera de estas cosas)
