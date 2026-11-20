@@ -1,310 +1,176 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# SatoriPMS - Script de Inicialización y Desarrollo (Dev Server)
+# SatoriPMS - Levantar el entorno de desarrollo completo
+#
+# 1. Verifica herramientas y el archivo .env (secretos obligatorios).
+# 2. Levanta PostgreSQL, Redis, API y n8n con Docker Compose y espera a que
+#    cada servicio responda.
+# 3. Abre el túnel público zrok2 para n8n (WhatsApp y Wompi), si aplica.
+# 4. Inicia la aplicación web (Vite) en segundo plano.
+# 5. Muestra los enlaces de acceso.
 # ==============================================================================
-set -e # Salir inmediatamente si un comando falla
+set -Eeuo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
-# ------------------------------------------------------------------------------
-# Variables y Colores
-# ------------------------------------------------------------------------------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
-    ROOT_DIR="$SCRIPT_DIR"
-else
-    ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-fi
-cd "$ROOT_DIR"
+START_INFRA=true
+START_WEB=true
+START_TUNNEL=true
+BUILD=true
+SYNC_FLOW=false
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
-
-# Opciones por defecto
-START_FRONTEND=true
-ONLY_FRONTEND=false
-STOP_ONLY=false
-DESTROY_ONLY=false
-UPDATE_INFRA=false
-
-# ------------------------------------------------------------------------------
-# Funciones de Logging
-# ------------------------------------------------------------------------------
-log_step()    { echo -e "\n${BOLD}${BLUE}==>${NC} ${BOLD}$1${NC}"; }
-log_info()    { echo -e "  ${CYAN}[INFO]${NC} $1"; }
-log_success() { echo -e "  ${GREEN}[OK]${NC}   $1"; }
-log_warn()    { echo -e "  ${YELLOW}[WARN]${NC} $1"; }
-log_error()   { echo -e "  ${RED}[ERR]${NC}  $1"; }
-
-# ------------------------------------------------------------------------------
-# Detección de Docker Compose (v2 plugin o standalone)
-# ------------------------------------------------------------------------------
-get_compose_cmd() {
-    if docker compose version >/dev/null 2>&1; then
-        echo "docker compose"
-    elif command -v docker-compose >/dev/null 2>&1; then
-        echo "docker-compose"
-    else
-        echo ""
-    fi
-}
-
-# ------------------------------------------------------------------------------
-# Función de Ayuda
-# ------------------------------------------------------------------------------
 show_help() {
-    echo -e "${BOLD}Uso: ./scripts/start-dev.sh [opciones]${NC}"
-    echo
-    echo "Opciones de Arranque:"
-    echo "  -h, --help            Muestra esta ayuda y sale."
-    echo "  --frontend-only       Inicia únicamente la aplicación web React (sin requerir Docker)."
-    echo "  --no-frontend         Levanta la infraestructura Docker pero NO inicia React."
-    echo "  -u, --update          Reconstruye las imágenes de Docker vía multi-stage build."
-    echo
-    echo "Opciones de Detención/Destrucción:"
-    echo "  -d, --down            Detiene los contenedores sin borrar los datos."
-    echo "  -D, --destroy         ¡PELIGRO! Detiene y BORRA completamente todos los contenedores y volúmenes."
-    echo
-    echo "Ejemplos:"
-    echo "  ./scripts/start-dev.sh                 (Inicia todo el stack)"
-    echo "  ./scripts/start-dev.sh --frontend-only (Inicia interfaz web React en Vite)"
-    echo "  ./scripts/start-dev.sh -u              (Reconstruye contenedores e inicia)"
+    cat <<EOF
+Uso: ./scripts/start-dev.sh [opciones]
+
+Levanta toda la infraestructura y deja los servicios listos para usar.
+
+Opciones:
+  --no-frontend      No inicia la aplicación web (Vite).
+  --frontend-only    Solo inicia la aplicación web (sin Docker).
+  --no-tunnel        No abre el túnel público zrok2 para n8n.
+  --no-build         No reconstruye la imagen de la API (más rápido si no cambió el código).
+  --sync-flow        Importa y publica el flujo V9 en n8n al terminar.
+  -h, --help         Muestra esta ayuda.
+
+Otros scripts:
+  ./scripts/stop-dev.sh       Detiene todo conservando los datos.
+  ./scripts/reset-dev.sh      Borra contenedores y datos (pide confirmación).
+  ./scripts/status-dev.sh     Diagnóstico de servicios, túnel y WhatsApp.
+  ./scripts/sync-n8n-flow.sh  Importa y publica el flujo V9 en n8n.
+EOF
 }
 
-# ------------------------------------------------------------------------------
-# Analizar Argumentos CLI
-# ------------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        --frontend-only|--only-frontend)
-            ONLY_FRONTEND=true
-            shift
-            ;;
-        --no-frontend)
-            START_FRONTEND=false
-            shift
-            ;;
-        -d|--down)
-            STOP_ONLY=true
-            shift
-            ;;
-        -D|--destroy)
-            DESTROY_ONLY=true
-            shift
-            ;;
-        -u|--update)
-            UPDATE_INFRA=true
-            shift
-            ;;
-        *)
-            log_error "Opción no reconocida: $1"
-            show_help
-            exit 1
-            ;;
+        -h|--help) show_help; exit 0 ;;
+        --no-frontend) START_WEB=false ;;
+        --frontend-only|--only-frontend) START_INFRA=false; START_TUNNEL=false ;;
+        --no-tunnel) START_TUNNEL=false ;;
+        --no-build) BUILD=false ;;
+        -u|--update) BUILD=true ;;   # compatibilidad con la versión anterior
+        --sync-flow) SYNC_FLOW=true ;;
+        -d|--down)                    # compatibilidad con la versión anterior
+            log_warn "'start-dev.sh $1' está obsoleto; usa ./scripts/stop-dev.sh"
+            exec "$SCRIPTS_DIR/stop-dev.sh" ;;
+        -D|--destroy)                 # compatibilidad con la versión anterior
+            log_warn "'start-dev.sh $1' está obsoleto; usa ./scripts/reset-dev.sh"
+            exec "$SCRIPTS_DIR/reset-dev.sh" ;;
+        *) log_error "Opción no reconocida: $1"; show_help; exit 1 ;;
     esac
+    shift
 done
 
-# ------------------------------------------------------------------------------
-# Fase de Detención / Destrucción
-# ------------------------------------------------------------------------------
-COMPOSE_BIN="$(get_compose_cmd)"
+refuse_root
 
-if [ "$DESTROY_ONLY" = true ]; then
-    log_step "DESTRUCCIÓN DE INFRAESTRUCTURA"
-    if [ -z "$COMPOSE_BIN" ]; then
-        log_error "Docker Compose no está disponible para destruir contenedores."
-        exit 1
-    fi
-    log_warn "Esta acción eliminará TODOS los contenedores y los volúmenes (incluyendo la BD Postgres y Redis)."
-    read -p "¿Estás seguro de que deseas destruir todo? (escribe 'si' para confirmar): " -r confirm
-
-    if [[ "$confirm" != "si" && "$confirm" != "yes" && "$confirm" != "SI" ]]; then
-        log_info "Operación de destrucción cancelada."
-        exit 0
-    fi
-    
-    log_info "Destruyendo infraestructura y volúmenes con $COMPOSE_BIN..."
-    $COMPOSE_BIN down -v
-    log_success "Infraestructura y datos destruidos correctamente."
-    exit 0
-fi
-
-if [ "$STOP_ONLY" = true ]; then
-    log_step "Deteniendo SatoriPMS..."
-    if [ -z "$COMPOSE_BIN" ]; then
-        log_error "Docker Compose no está disponible para detener contenedores."
-        exit 1
-    fi
-    $COMPOSE_BIN down
-    log_success "Infraestructura detenida. Los datos de la BD están a salvo."
-    exit 0
-fi
-
-# ------------------------------------------------------------------------------
-# Fase 1: Verificación de Dependencias
-# ------------------------------------------------------------------------------
-check_dependencies() {
-    log_step "PASO 1: Verificando dependencias del sistema"
-    local missing=0
-
-    # Siempre se requiere node y npm para el frontend
-    for cmd in "node" "npm"; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
-            log_error "Comando '$cmd' no encontrado. Por favor instálalo."
-            missing=1
-        else
-            log_success "'$cmd' está instalado."
-        fi
+# ── 1. Dependencias ──────────────────────────────────────────────────────────
+log_step "PASO 1: Verificando herramientas"
+for cmd in curl setsid; do
+    command -v "$cmd" >/dev/null 2>&1 || die "Falta el comando '$cmd'."
+done
+if $START_WEB; then
+    for cmd in node npm; do
+        command -v "$cmd" >/dev/null 2>&1 || die "Falta '$cmd' (necesario para la aplicación web). Usa --no-frontend para omitirla."
     done
+    log_success "Node.js $(node --version) y npm $(npm --version)."
+fi
+if $START_INFRA; then
+    command -v docker >/dev/null 2>&1 || die "Falta 'docker'."
+    detect_compose
+    log_success "Docker y ${COMPOSE[*]} listos."
+fi
 
-    # Si NO es solo frontend, verificar docker y compose
-    if [ "$ONLY_FRONTEND" = false ]; then
-        if ! command -v docker >/dev/null 2>&1; then
-            log_error "Comando 'docker' no encontrado. Requerido para la base de datos y backend."
-            missing=1
-        else
-            log_success "'docker' está instalado."
-        fi
-
-        local compose_cmd
-        compose_cmd="$(get_compose_cmd)"
-        if [ -z "$compose_cmd" ]; then
-            log_error "Plugin de Docker Compose no encontrado ('docker compose' ni 'docker-compose')."
-            log_info "En EndeavourOS / Arch Linux puedes instalarlo ejecutando:"
-            log_info "  sudo pacman -S docker-compose"
-            log_info "O puedes arrancar únicamente la interfaz React ejecutando:"
-            log_info "  ./scripts/start-dev.sh --frontend-only"
-            missing=1
-        else
-            log_success "Docker Compose está listo ('$compose_cmd')."
-        fi
-
-        # Verificación opcional no bloqueante de JDK/Maven
-        if command -v mvn >/dev/null 2>&1 && command -v java >/dev/null 2>&1; then
-            log_info "JDK/Maven detectado en el host."
-        else
-            log_info "JDK/Maven no instalado en el host: el backend se compilará de forma aislada dentro de Docker Multi-Stage."
-        fi
+# ── 2. Archivo .env ──────────────────────────────────────────────────────────
+log_step "PASO 2: Verificando el archivo .env"
+if [ ! -f "$ENV_FILE" ]; then
+    cp "$ROOT_DIR/.env.example" "$ENV_FILE"
+    log_warn "No existía .env: se creó desde .env.example."
+    log_warn "Completa los secretos (guía: docs/Guia_Configuracion_Entorno.md) y vuelve a ejecutar."
+    exit 1
+fi
+if $START_INFRA; then
+    env_ok=true
+    jwt="$(env_get JWT_SECRET)"
+    if [ "${#jwt}" -lt 32 ]; then
+        log_error "JWT_SECRET debe tener al menos 32 caracteres (la API no arranca). Genera uno con: openssl rand -hex 32"
+        env_ok=false
     fi
+    service_key="$(env_get SATORI_SERVICE_KEY)"
+    if [ -z "$service_key" ] || [ "$service_key" = "cambia_esta_llave_de_servicio" ]; then
+        log_error "Falta SATORI_SERVICE_KEY en .env (n8n no podrá llamar a la API). Genera una con: openssl rand -hex 32"
+        env_ok=false
+    fi
+    $env_ok || exit 1
+    log_success "Secretos obligatorios presentes."
+fi
 
-    if [ $missing -eq 1 ]; then
-        log_error "Faltan dependencias críticas. Abortando."
+# ── 3. Contenedores ──────────────────────────────────────────────────────────
+if $START_INFRA; then
+    log_step "PASO 3: Levantando contenedores (PostgreSQL, Redis, API$(n8n_enabled && echo ', n8n'))"
+    up_args=(up -d --remove-orphans --wait --wait-timeout 240)
+    if $BUILD; then
+        up_args+=(--build)
+        log_info "Construyendo la API dentro de Docker (la primera vez tarda unos minutos)..."
+    fi
+    if ! compose "${up_args[@]}"; then
+        log_error "Docker Compose no pudo levantar los servicios. Revisa: docker compose logs --tail 50"
         exit 1
     fi
-}
+    log_success "Contenedores en ejecución."
 
-# ------------------------------------------------------------------------------
-# Fase 2: Verificación de Entorno (.env)
-# ------------------------------------------------------------------------------
-check_env() {
-    log_step "PASO 2: Verificando archivo de entorno"
-    if [ ! -f .env ]; then
-        log_warn "No se encontró el archivo .env"
-        if [ -f .env.example ]; then
-            log_info "Creando .env a partir de .env.example..."
-            cp .env.example .env
-            log_warn "Se creó un archivo .env base para desarrollo local."
-        else
-            log_error "Tampoco se encontró .env.example. Proyecto corrupto."
-            exit 1
+    wait_for_http "$API_URL/api-docs" 120 "Backend (API)" || {
+        log_info "Últimas líneas de la API:"; compose logs --tail 20 api || true; exit 1; }
+    if n8n_enabled; then
+        wait_for_http "$N8N_URL/healthz" 120 "n8n" || {
+            log_info "Últimas líneas de n8n:"; compose logs --tail 20 n8n || true; exit 1; }
+    else
+        log_info "n8n desactivado (COMPOSE_PROFILES no incluye 'n8n')."
+    fi
+fi
+
+# ── 4. Túnel público para n8n ────────────────────────────────────────────────
+if $START_INFRA && $START_TUNNEL && n8n_enabled; then
+    log_step "PASO 4: Túnel público de n8n"
+    public="$(public_n8n_url)"
+    share="$(zrok_share_name)"
+    if [ -z "$public" ]; then
+        log_warn "N8N_PUBLIC_URL está vacío: WhatsApp y Wompi no podrán llegar a n8n."
+    elif [ "$(http_code "$public/healthz" 8)" = "200" ]; then
+        log_success "El túnel ya está activo: $public"
+    elif [ -z "$share" ]; then
+        log_warn "N8N_PUBLIC_URL ($public) no es de zrok2 y no responde. Levanta tu túnel manualmente."
+    elif ! command -v zrok2 >/dev/null 2>&1; then
+        log_warn "zrok2 no está instalado; no se puede abrir el túnel $public"
+    else
+        log_info "Abriendo túnel zrok2 '$share' hacia el puerto $N8N_PORT..."
+        start_background "$TUNNEL_PID_FILE" "$TUNNEL_LOG_FILE" "$ROOT_DIR" \
+            zrok2 share public "$N8N_PORT" -n "public:$share" --headless
+        if ! wait_for_http "$public/healthz" 40 "Túnel público"; then
+            log_warn "Revisa $TUNNEL_LOG_FILE. Si aparece '409 shareConflict', libera el share huérfano:"
+            log_warn "  zrok2 delete share <share_id>   y vuelve a ejecutar este script."
+            stop_pid_group "$TUNNEL_PID_FILE" "Túnel zrok2" >/dev/null || true
         fi
+    fi
+fi
+
+# ── 5. Aplicación web ────────────────────────────────────────────────────────
+if $START_WEB; then
+    log_step "PASO 5: Aplicación web (React + Vite)"
+    if pid_alive "$WEB_PID_FILE" || [ "$(http_code "$WEB_URL")" = "200" ]; then
+        log_success "La aplicación web ya está en ejecución."
     else
-        log_success "Archivo .env detectado correctamente."
-    fi
-}
-
-# ------------------------------------------------------------------------------
-# Fase 3: Desplegar / Actualizar Infraestructura
-# ------------------------------------------------------------------------------
-deploy_infra() {
-    if [ "$ONLY_FRONTEND" = true ]; then
-        log_step "PASO 3: Infraestructura Docker Omitida (--frontend-only)"
-        return 0
-    fi
-
-    log_step "PASO 3: Levantando Infraestructura Backend (Docker)"
-    local compose_cmd="$(get_compose_cmd)"
-
-    if [ "$UPDATE_INFRA" = true ]; then
-        log_info "Reconstruyendo imagen de la API con Docker Multi-Stage..."
-        $compose_cmd up -d --build api
-        $compose_cmd up -d --remove-orphans
-    else
-        log_info "Iniciando contenedores (PostgreSQL, Redis, API)..."
-        $compose_cmd up -d --build api
-        $compose_cmd up -d --remove-orphans
-    fi
-    
-    log_info "Verificando contenedores..."
-    sleep 2
-    log_success "Infraestructura de contenedores inicializada."
-}
-
-# ------------------------------------------------------------------------------
-# Fase 4: Iniciar Frontend
-# ------------------------------------------------------------------------------
-start_frontend() {
-    log_step "PASO 4: Preparando Frontend (React + Vite)"
-    cd "$ROOT_DIR/apps/web"
-    
-    log_info "Instalando dependencias de npm..."
-    npm install --silent
-    log_success "Dependencias de frontend listas."
-
-    local compose_profiles
-    compose_profiles=$(grep '^COMPOSE_PROFILES=' "$ROOT_DIR/.env" | cut -d '=' -f2- || true)
-    local n8n_public_url
-    n8n_public_url=$(grep '^N8N_PUBLIC_URL=' "$ROOT_DIR/.env" | cut -d '=' -f2- || true)
-
-    echo -e "\n${BOLD}${GREEN}======================================================================${NC}"
-    echo -e "${BOLD}${GREEN}🎉 ¡SATORIPMS ESTÁ INICIANDO!${NC}"
-    echo -e "${BOLD}${GREEN}======================================================================${NC}"
-    echo -e "${BOLD}Resumen de Acceso a Servicios:${NC}"
-    echo -e "   • App Web (Frontend):  ${CYAN}http://localhost:5173${NC}"
-    if [ "$ONLY_FRONTEND" = false ]; then
-        echo -e "   • Backend API:         ${CYAN}http://localhost:8080/swagger-ui/index.html${NC}"
-        if [[ ",${compose_profiles}," == *",n8n,"* ]]; then
-            echo -e "   • n8n Chatbot:         ${CYAN}${n8n_public_url:-http://localhost:5678}${NC}"
-        else
-            echo -e "   • n8n Chatbot:         ${YELLOW}desactivado (perfil n8n no incluido)${NC}"
+        if [ ! -d "$WEB_DIR/node_modules" ] || [ "$WEB_DIR/package-lock.json" -nt "$WEB_DIR/node_modules/.package-lock.json" ]; then
+            log_info "Instalando dependencias de npm..."
+            (cd "$WEB_DIR" && npm install --silent --no-audit --no-fund)
         fi
-    else
-        echo -e "   • Backend API:         ${YELLOW}modo frontend-only (mock / offline)${NC}"
+        start_background "$WEB_PID_FILE" "$WEB_LOG_FILE" "$WEB_DIR" npm run dev
+        wait_for_http "$WEB_URL" 60 "Aplicación web" || {
+            log_info "Últimas líneas de $WEB_LOG_FILE:"; tail -n 20 "$WEB_LOG_FILE" || true; exit 1; }
     fi
-    
-    echo -e "${BOLD}${GREEN}======================================================================${NC}\n"
+fi
 
-    log_info "Levantando servidor de desarrollo Vite..."
-    npm run dev
-}
+# ── 6. Flujo n8n (opcional) ──────────────────────────────────────────────────
+if $SYNC_FLOW && $START_INFRA && n8n_enabled; then
+    "$SCRIPTS_DIR/sync-n8n-flow.sh"
+fi
 
-# ------------------------------------------------------------------------------
-# Ejecución Principal
-# ------------------------------------------------------------------------------
-main() {
-    if [ "$EUID" -eq 0 ]; then
-        log_error "Por favor no ejecutes este script como root o con sudo."
-        exit 1
-    fi
-
-    check_dependencies
-    check_env
-    deploy_infra
-    
-    if [ "$START_FRONTEND" = true ]; then
-        start_frontend
-    else
-        log_step "PASO 4: Frontend Omitido"
-        log_info "El frontend se omitió por la bandera --no-frontend."
-        log_success "Infraestructura lista."
-    fi
-}
-
-main "$@"
+print_links
