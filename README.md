@@ -18,12 +18,13 @@ El sistema resuelve la pérdida de reservas fuera del horario laboral y el riesg
 - [Configuración Necesaria](#configuración-necesaria)
 - [Instrucciones de Instalación e Inicialización](#instrucciones-de-instalación-e-inicialización)
 - [Validación y Pruebas Automatizadas](#validación-y-pruebas-automatizadas)
+- [Estado del Proyecto y Pendientes](#estado-del-proyecto-y-pendientes)
 - [Documentación Detallada](#documentación-detallada)
 - [Cómo Contribuir](#cómo-contribuir)
 - [Equipo de Desarrollo](#equipo-de-desarrollo)
 
 > [!NOTE]
-> **El servidor central migró de Java/Spring Boot a Python/FastAPI.** El código Java anterior sigue en el historial de git (rama `main` hasta el commit `3185c2b`) y las migraciones y plantillas de referencia están en [docs/legacy-ref/](docs/legacy-ref/README.md).
+> **El servidor central migró de Java/Spring Boot a Python/FastAPI.** El código Java anterior sigue en el tag `legacy-java-backup` y en el historial de `main` hasta el commit `3185c2b`; las migraciones y plantillas de referencia están en [docs/legacy-ref/](docs/legacy-ref/README.md). Una base de datos creada con el esquema del Java no sirve para FastAPI: ver [Instalación](#instrucciones-de-instalación-e-inicialización).
 
 ---
 
@@ -47,16 +48,20 @@ SatoriPMS/
 │   ├── api/                 # Servidor central (Python 3.12, FastAPI, SQLAlchemy y migraciones Alembic)
 │   └── web/                 # Aplicación web de recepción y administración (React 18, Vite)
 ├── docs/                    # Documentación técnica, manuales, diagramas y presupuestos
+│   ├── Actividades/         # Entregables académicos (Actividades 4 y 5)
 │   ├── Diagramas/           # Diagramas de arquitectura, concurrencia, secuencia y procesos
 │   ├── Presupuesto/         # Modelo financiero, costos de operación y análisis de crisis
-│   ├── legacy-ref/          # Referencia del backend Java anterior (migraciones, diagramas y flujos históricos)
-│   └── modulos/             # Especificaciones funcionales y arquitectura por módulo
+│   ├── modulos/             # Especificaciones funcionales y arquitectura por módulo
+│   ├── aprendizaje/         # Notas por lote de trabajo de la migración a FastAPI
+│   ├── audit/               # Auditorías y plan de migración (registros históricos)
+│   └── legacy-ref/          # Referencia del backend Java anterior (migraciones y contratos)
 ├── flows/
 │   └── n8n/                 # Flujo conversacional del chatbot (V9 activo con Redis; V10 sin Redis en preparación)
 ├── scripts/                 # Scripts de desarrollo: levantar, detener, reiniciar, diagnosticar y publicar el flujo n8n
-└── tests/
-    ├── chatbot/             # Suite integral del chatbot y scripts de validación (Node.js y Python)
-    └── backend/             # Pruebas del servidor central (pytest, base aislada satoripms_test)
+├── tests/
+│   ├── chatbot/             # Suite integral del chatbot y pruebas en vivo contra n8n (Node.js y Python)
+│   └── backend/             # Pruebas del servidor central (pytest, base aislada satoripms_test)
+└── .github/workflows/       # Integración continua: web, chatbot y backend
 ```
 
 ---
@@ -76,6 +81,8 @@ SatoriPMS/
 | **TypeScript** | Lenguaje de Frontend | 5 |
 | **Vite** | Empaquetador y Servidor Web | 4 |
 | **Tailwind CSS** | Framework de Estilos | 3.4 |
+| **pytest** | Pruebas del servidor central sobre PostgreSQL real | 8+ |
+| **Wompi** | Pasarela de pagos (enlaces de pago 50% / 100%) | API v1 |
 | **Docker & Compose** | Contenedores e Infraestructura | Docker 24+ / Compose 2.20+ |
 
 ---
@@ -92,8 +99,10 @@ flowchart TB
     subgraph Orquestacion["Capa de Orquestación e Inteligencia"]
         N8N["n8n 2.47.3 (Flujo V9 + Wompi)"]
         AI["Google Gemini (Flash Lite)"]
+        PAY["Wompi (pagos)"]
         REDIS["Redis 7 (sesión del chatbot)"]
         N8N <--> AI
+        N8N <--> PAY
         N8N <--> REDIS
     end
 
@@ -129,7 +138,7 @@ flowchart TB
    ```bash
    cp .env.example .env
    ```
-   Como mínimo defina `JWT_SECRET` (32 caracteres o más) y `SATORI_SERVICE_KEY` (la misma llave la usan la API y n8n). Los usuarios del personal (administrador y recepción) los crean las migraciones; consulta [docs/Guia_Configuracion_Entorno.md](docs/Guia_Configuracion_Entorno.md).
+   Como mínimo defina `JWT_SECRET` (32 caracteres o más) y `SATORI_SERVICE_KEY` (la misma llave la usan la API y n8n). Los usuarios del personal los crean las migraciones: `admin / admin123` y `recepcion / recepcion123` (**solo desarrollo**; cámbielas antes de un despliegue real). Si ejecuta `pytest` o la API fuera de Docker, `DATABASE_URL` debe tener el formato `postgresql+psycopg://...` (no `jdbc:`). Consulta [docs/Guia_Configuracion_Entorno.md](docs/Guia_Configuracion_Entorno.md).
 
 2. **Datos Iniciales del Hotel:**
    Las migraciones de Alembic (`apps/api/alembic/versions/`) crean el esquema y cargan las 9 habitaciones de referencia al arrancar la API. Las plantillas de semilla del backend Java anterior se conservan solo como referencia en [docs/legacy-ref/db-migrations/](docs/legacy-ref/README.md).
@@ -160,34 +169,52 @@ flowchart TB
 
    Todos los scripts aceptan `--help`. Los registros de la web y del túnel quedan en `.dev/`. La referencia completa está en [scripts/README.md](scripts/README.md).
 
+   > **Si ya tenía datos del servidor Java anterior:** la base `satoripms` quedó con el esquema de Flyway y FastAPI no arranca sobre ella. Para empezar de cero ejecute `./scripts/reset-dev.sh --start` (borra la información local).
+
 3. **Servicios disponibles en el entorno local:**
    - **Servidor Principal (API FastAPI):** `http://localhost:8080` (documentación OpenAPI: `http://localhost:8080/docs`)
    - **Orquestador del Chatbot (n8n):** `http://localhost:5678` (flujo activo con pasarela de pago Wompi: [V9_ChatbotReservas.json](flows/n8n/V9_ChatbotReservas.json); el [V10](flows/n8n/V10_ChatbotReservas.json) guarda la sesión en PostgreSQL y aún no incorpora la llave de servicio ni el documento del titular).
    - **Base de Datos (PostgreSQL 16):** Puerto local `5432`.
    - **Sesiones del chatbot (Redis 7):** Puerto local `6379`, usado únicamente por n8n.
-   - **Aplicación Web:** `http://localhost:5173`.
+   - **Aplicación Web:** `http://localhost:5173` (inicie sesión con una de las cuentas de desarrollo).
 
 ---
 
 ## Validación y Pruebas Automatizadas
 
-El proyecto cuenta con una suite integral de 65 pruebas automatizadas que validan los 5 flujos conversacionales de WhatsApp, las novedades del flujo V9 (pagos Wompi, seguridad de la API) y los requisitos no funcionales de ITIL 4 (doble candado de concurrencia, sobrecarga de 50 peticiones simultáneas y tarifas dinámicas):
+El proyecto cuenta con tres niveles de pruebas. El de la API usa PostgreSQL real, y el de n8n puede ejecutarse en memoria o contra el entorno levantado:
+
+| Nivel | Qué valida | Comando | Guía |
+| :--- | :--- | :--- | :--- |
+| **Servidor central** (36 pruebas) | Seguridad, documento del titular, código `TS-XXXX`, pago externo, precios por noche, sobreventa, webhook de pago y operaciones de la web | `pytest` | [tests/backend/](tests/backend/README.md) |
+| **Chatbot en memoria** (65 + 11 pruebas) | Los 5 flujos de WhatsApp, el cobro con Wompi y los requisitos de ITIL 4 | `node tests/chatbot/suite_pruebas_chatbot.js` | [tests/chatbot/](tests/chatbot/README.md) |
+| **Chatbot en vivo** (7 pruebas) | Conversaciones reales contra n8n, la API, Redis y Wompi | `node tests/chatbot/test_e2e_v9_completo.js` (y los demás `test_*.js`) | [tests/chatbot/](tests/chatbot/README.md) |
 
 ```bash
-# Suite completa del chatbot (65 pruebas)
+# Servidor central (crea y migra la base aislada satoripms_test; necesita PostgreSQL levantado)
+python3 -m venv .venv && .venv/bin/pip install -r apps/api/requirements.txt
+.venv/bin/pytest
+
+# Chatbot: suite completa, un flujo concreto, cobro Wompi e integridad del flujo n8n
 node tests/chatbot/suite_pruebas_chatbot.js
-
-# Únicamente un flujo específico (ejemplo: Flujo 1 Reserva Guiada)
 node tests/chatbot/suite_pruebas_chatbot.js --flow 1
-
-# Pruebas de cobro Wompi e integridad estructural del flujo n8n
 node tests/chatbot/test_pago_wompi_v9.js
-python3 tests/chatbot/verify_n8n_flow_integrity.py
-
-# Pruebas del servidor central (pytest; crea y migra la base aislada satoripms_test).
-# Requiere PostgreSQL levantado (./scripts/start-dev.sh) y las dependencias de apps/api/requirements.txt
-pytest
+python3 tests/chatbot/verify_n8n_flow_integrity.py flows/n8n/V9_ChatbotReservas.json
 ```
+
+La integración continua (`.github/workflows/ci.yml`) compila la web, ejecuta `pytest` con un PostgreSQL efímero y corre las pruebas del chatbot que no necesitan servicios.
+
+---
+
+## Estado del Proyecto y Pendientes
+
+El servidor central ya incluye reservas con bloqueo de 15 minutos, pagos con Wompi, verificación del documento del titular, tarifas por temporada, tienda, cafetería, finanzas, auditoría y exportación a Excel. Quedan por resolver, entre otros:
+- **Reservas pendientes de pago:** hoy retienen la habitación sin límite de tiempo.
+- **Flujo V10 sin Redis:** falta portarle la llave de servicio, el documento del titular y la confirmación del pago de Wompi para poder quitar Redis.
+- **Tarifas por evento:** la aplicación noche por noche es provisional hasta confirmarla con el cliente.
+- **WhatsApp en la web:** faltan alternar el bot, enviar mensajes manuales y el simulador.
+
+El detalle y las decisiones abiertas están en [docs/TEMPORAL_Decisiones_Integracion.md](docs/TEMPORAL_Decisiones_Integracion.md) (documento temporal para revisión del equipo).
 
 ---
 
@@ -200,7 +227,7 @@ Toda la documentación funcional, de diseño, diagramas y presupuesto del proyec
 ## Cómo Contribuir
 
 1. Crea una rama descriptiva a partir de la rama de trabajo vigente (`feat/nombre-funcionalidad` o `fix/nombre-correccion`).
-2. Realiza tus cambios verificando que los contenedores levanten sin errores y que las pruebas en `tests/chatbot/` se ejecuten satisfactoriamente (`node tests/chatbot/suite_pruebas_chatbot.js`).
+2. Realiza tus cambios verificando que los contenedores levanten sin errores y que las pruebas pasen: `pytest` para el servidor central y `node tests/chatbot/suite_pruebas_chatbot.js` para el chatbot.
 3. Actualiza la documentación técnica correspondiente en [docs/](docs/README.md).
 4. Abre una solicitud de integración (Pull Request) describiendo el propósito y alcance de los cambios realizados.
 
