@@ -9,14 +9,14 @@
 set -Eeuo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
-FLOW_FILE="$ROOT_DIR/flows/n8n/V9_ChatbotReservas.json"
+FLOW_FILE="$ROOT_DIR/flows/n8n/V10_ChatbotReservas.json"
 N8N_CONTAINER="satori_n8n"
 
 show_help() {
     cat <<EOF
 Uso: ./scripts/sync-n8n-flow.sh [ruta_flujo.json]
 
-Importa y publica en n8n el flujo indicado (por defecto flows/n8n/V9_ChatbotReservas.json)
+Importa y publica en n8n el flujo indicado (por defecto flows/n8n/V10_ChatbotReservas.json)
 y reinicia n8n para que el cambio quede activo.
 EOF
 }

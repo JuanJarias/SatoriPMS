@@ -31,7 +31,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const v9Path = path.join(ROOT, 'flows/n8n/V9_ChatbotReservas.json');
+const v9Path = path.join(ROOT, 'flows/n8n/V10_ChatbotReservas.json');
 const V9 = JSON.parse(fs.readFileSync(v9Path, 'utf8'));
 const LIVE = process.argv.includes('--live');
 

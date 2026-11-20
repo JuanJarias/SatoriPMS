@@ -108,7 +108,7 @@ fi
 
 # ── 3. Contenedores ──────────────────────────────────────────────────────────
 if $START_INFRA; then
-    log_step "PASO 3: Levantando contenedores (PostgreSQL, Redis, API$(n8n_enabled && echo ', n8n'))"
+    log_step "PASO 3: Levantando contenedores (PostgreSQL, API$(n8n_enabled && echo ', n8n'))"
     up_args=(up -d --remove-orphans --wait --wait-timeout 240)
     if $BUILD; then
         up_args+=(--build)

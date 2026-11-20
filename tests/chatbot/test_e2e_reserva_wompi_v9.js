@@ -20,23 +20,10 @@
  *   API_HOST=localhost node tests/chatbot/test_e2e_reserva_wompi_v9.js [--keep-link]
  */
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
-const { execSync } = require('child_process');
+const { loadEnv, findWompiLinkInPg } = require('./lib/env');
 
-const ROOT = path.resolve(__dirname, '..', '..');
-const env = (() => {
-  const out = {};
-  const file = path.join(ROOT, '.env');
-  if (fs.existsSync(file)) {
-    for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-      if (m) out[m[1]] = m[2];
-    }
-  }
-  return Object.assign(out, process.env);
-})();
+const env = loadEnv();
 
 const WA_ID = env.TEST_WA_ID || '573009988772';
 const TEST_NAME = 'Laura Wompi E2E';
@@ -47,7 +34,6 @@ const API_PORT = env.API_PORT || 8080;
 const SERVICE_KEY = env.SATORI_SERVICE_KEY || '';
 const N8N_HOST = env.N8N_HOST || 'localhost';
 const N8N_PORT = env.N8N_PORT || 5678;
-const REDIS_CONTAINER = env.REDIS_CONTAINER || 'satori_redis';
 const WOMPI_API = env.WOMPI_API_URL || 'https://production.wompi.co/v1';
 const KEEP_LINK = process.argv.includes('--keep-link');
 
@@ -85,13 +71,8 @@ function fetchBookings() {
   });
 }
 
-function redisLinkFor(waId) {
-  const keys = execSync(`docker exec ${REDIS_CONTAINER} redis-cli --raw KEYS 'wompi:link:*'`).toString().split('\n').filter(Boolean);
-  for (const k of keys) {
-    const v = execSync(`docker exec ${REDIS_CONTAINER} redis-cli --raw GET '${k}'`).toString().trim();
-    try { const j = JSON.parse(v); if (j.wa_id === waId) return Object.assign({ key: k }, j); } catch (e) { /* ignorar */ }
-  }
-  return null;
+async function findLinkFor(waId) {
+  return findWompiLinkInPg(waId, env);
 }
 
 async function run() {
@@ -118,10 +99,10 @@ async function run() {
       throw new Error(`Estado inesperado antes del pago: ${created.status}/${created.paymentStatus} (esperado pending_payment/pending)`);
     }
 
-    console.log('[Verificacion 2] Registro del link en Redis...');
+    console.log('[Verificacion 2] Registro del link en PostgreSQL...');
     let reg = null;
-    for (let i = 0; i < 10 && !reg; i++) { reg = redisLinkFor(WA_ID); if (!reg) await sleep(1000); }
-    if (!reg) throw new Error('No se encontro wompi:link:* para el huesped en Redis');
+    for (let i = 0; i < 10 && !reg; i++) { reg = await findLinkFor(WA_ID); if (!reg) await sleep(1000); }
+    if (!reg) throw new Error('No se encontro wompi:link:* para el huesped en PostgreSQL');
     linkId = reg.link_id;
     console.log(`  • ${reg.key} -> codigo ${reg.reservation_code}, ${reg.amount_in_cents} centavos`);
 

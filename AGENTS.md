@@ -1,21 +1,16 @@
 # Torre Satori PMS
-Hotel Torre Satori (Sevilla, Valle del Cauca), 9 habitaciones, ~40 reservas/mes. Proyecto Integrador II, Icesi. Hoy: 2026-11-10; fin Sprint 5: 2026-11-20.
-Monolito modular hexagonal: reservas y disponibilidad · habitaciones y estadías · clientes, reseñas y fidelización · tienda e inventario · finanzas y reportes · identidad y auditoría · conversaciones y notificaciones · recomendación asistida. WhatsApp (huésped) y web (admin, recepcionista) usan la MISMA API.
-Stack: Python 3.12 + FastAPI + Pydantic · PostgreSQL 16 (btree_gist) · SQLAlchemy + Alembic · APScheduler en proceso · React 18 + Vite (TypeScript conservado; desviación aceptada de JS), Tailwind, TanStack Query · n8n self-hosted + Gemini 2.0 Flash (solo adaptador y recomendador) · WhatsApp Cloud API · Cloudflare R2 · openpyxl. Prohibido: Java, Spring, JPA, Maven, Flyway, Redis.
-Épicas: E1 Reservas y chatbot WhatsApp · E2 Operación web (calendario, check-in/out) · E3 Facturación y finanzas · E4 Tienda e inventario · E5 Reseñas y fidelización · E6 Roles y auditoría.
-RN-02: EXCLUDE USING gist sobre room_id + daterange(check_in, check_out, '[)') para estados activos (BLOQUEADA_TEMPORAL, CONFIRMADA, EN_CURSO). Bloqueo con expires_at = NOW() + 15 min; job cada 60 s marca EXPIRADA y avisa a n8n. Disponibilidad ignora bloqueos vencidos. Reserva se confirma solo con webhook de pago validado, nunca por pantalla de éxito.
-RN conocidas: RN-01 capacidad y recargo persona adicional · RN-02 anterior · RN-03 reembolsos por cancelación · RN-04 tienda. Demás RN salen de issues/tablero; si no hay fuente: no verificada.
-Seguridad: JWT, roles Administrador y Recepcionista, bcrypt/Argon2, auditoría inmutable (fecha, actor, acción, entidad), webhooks con firma HMAC X-Hub-Signature-256 + idempotencia en DB, R2 privado con URL firmada 15 min, secretos solo en env, Ley 1581 (datos mínimos, HTTPS, sin datos personales en logs).
-Tiempo real y operación: SSE o WebSocket para calendario (HU-03). /api/v1/health, Sentry, pg_dump cifrado diario 3:00 a. m. a R2 (30 días), CI con Postgres 16 efímero y pytest con concurrencia RN-02.
-Chatbot: n8n solo es adaptador; contexto conversacional en FastAPI/PostgreSQL, no en Redis. Gemini solo recomienda, nunca confirma disponibilidad ni precios.
-Pendiente definir (no asumir): proveedor WhatsApp, pasarela (Wompi o MercadoPago), fórmula sueldo (HU-07), descuentos (HU-12 en DB), datos obligatorios registro, política conservación documentos.
-Decisiones:
-1. Estados en español en DB (BLOQUEADA_TEMPORAL, CONFIRMADA, EN_CURSO, EXPIRADA, CANCELADA); React usa una única capa de traducción.
-2. Candado es fila en tabla reservas con expires_at y EXCLUDE gist. Antes de insertar, expira en la misma transacción bloqueos vencidos de esa habitación.
-3. Recepción confirma manualmente con auditoría; chatbot solo con webhook de pago validado. Pasarela tras puerto con mock sandbox; proveedor por definir.
-4. Tablero: se REUTILIZAN y reubican las tarjetas existentes con etiqueta portar-python, no se duplican.
-5. Tiempo real con SSE (si el tiempo aprieta, polling TanStack Query primero). No-Show 12:00 queda fuera de alcance. Frontend TypeScript se conserva (9 habitaciones).
-Modos de trabajo: El dueño debe poder explicar y defender cada línea. Modos por ID: AGY (escribe y explica), GUIADO (concepto, esqueleto con TODOs, revisa código) o MÍO (solo revisa y señala errores). Sin modo asignado: GUIADO. MÍO por defecto para: EXCLUDE/Alembic, bloqueo con expiración, JWT con roles y validación de webhook.
-Aprendizaje: Cada lote deja docs/aprendizaje/<ID>.md: qué hace, por qué así, cómo probarlo y 3 preguntas de defensa con respuesta.
-Reglas de cambio: antes de cada cambio escribir POR QUÉ · QUÉ · ARCHIVOS · cómo verificaré. Commits humanizados en español, push solo a migracion-fastapi, nunca a main.
-Comunicación: Chat <= 10 líneas, detalle a docs/. Precedencia: documentos oficiales > AGENTS.md > docs/audit/ anteriores.
+Hotel Torre Satori (Sevilla, Valle del Cauca), 9 habitaciones (`1`–`9`), ~40 reservas/mes. Proyecto Integrador II, Icesi.
+Monolito modular hexagonal en **FastAPI + PostgreSQL 16 + React 18**: reservas y disponibilidad · habitaciones y estadías · clientes, reseñas y fidelización · tienda e inventario · finanzas y reportes · identidad y auditoría · conversaciones WhatsApp y notificaciones. WhatsApp (huésped) y web (admin, recepcionista) usan la misma API.
+
+## Stack Actual Integrado (`integracion-fastapi`)
+- **Backend:** Python 3.12 + FastAPI + Pydantic + SQLAlchemy async + Alembic (`apps/api/`) + APScheduler en proceso. Sin Redis en backend ni en `docker-compose.yml` (`legacy-java-backup` conserva el código Java histórico).
+- **Base de datos:** PostgreSQL 16 (`btree_gist`), `EXCLUDE USING gist` sobre `room_id + daterange(check_in, check_out, '[)')` para estados activos (`BLOQUEADA_TEMPORAL`, `PENDIENTE_PAGO`, `CONFIRMADA`, `EN_CURSO`).
+- **Expiración:** `BLOQUEADA_TEMPORAL` vence a los 15 min; `PENDIENTE_PAGO` (reservas chatbot Wompi) vence a las 24 h. Job cada 60 s marca `EXPIRADA` y publica eventos SSE/n8n.
+- **Frontend:** React 18 + Vite + TypeScript + Tailwind + TanStack Query (`apps/web/`).
+- **Chatbot y pagos:** n8n (`flows/n8n/V10_ChatbotReservas.json`, 0 nodos Redis, sesiones y `wompi:link:*` en PostgreSQL) + WhatsApp Cloud API + Wompi (puerto de pago + sandbox).
+
+## Reglas de Seguridad y Operación
+- JWT (`Administrador` y `Recepcionista`), Argon2/bcrypt, auditoría inmutable, `X-Service-Key` para n8n, webhooks HMAC `X-Hub-Signature-256` / Wompi `X-Event-Checksum` + idempotencia, Ley 1581 (sin PII en logs ni endpoints de debug en producción).
+- Pruebas automatizadas en `tests/backend/` (`pytest` contra `satoripms_test` aislada) y `tests/chatbot/` (`verify_n8n_flow_integrity.py`, `suite_pruebas_chatbot.js`, `test_pago_wompi_v9.js`).
+- Antes de cada cambio: explicar **POR QUÉ · QUÉ · ARCHIVOS · cómo verificaré**. Commits en español en la rama de trabajo activa (`integracion-fastapi`), nunca push directo a `main` sin revisión y verificación completa.
+- Comunicación concisa en chat (`<= 10` líneas), detalle técnico en `docs/`.

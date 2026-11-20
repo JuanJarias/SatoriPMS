@@ -18,14 +18,14 @@
  *   node tests/chatbot/test_e2e_v9_completo.js
  */
 const http = require('http');
-const { execSync } = require('child_process');
+const { loadEnv, getPgSession, deletePgSession } = require('./lib/env');
 
-const WA_ID = process.env.TEST_WA_ID || '573000009999';
-const N8N_HOST = process.env.N8N_HOST || 'localhost';
-const N8N_PORT = Number(process.env.N8N_PORT || 5678);
-const REDIS_CONTAINER = process.env.REDIS_CONTAINER || 'satori_redis';
-const CHECK_IN = process.env.TEST_CHECK_IN || '2026-12-01';
-const CHECK_OUT = process.env.TEST_CHECK_OUT || '2026-12-03';
+const env = loadEnv();
+const WA_ID = env.TEST_WA_ID || '573000009999';
+const N8N_HOST = env.N8N_HOST || 'localhost';
+const N8N_PORT = Number(env.N8N_PORT || 5678);
+const CHECK_IN = env.TEST_CHECK_IN || '2026-12-01';
+const CHECK_OUT = env.TEST_CHECK_OUT || '2026-12-03';
 
 function sendWebhook(text) {
   return new Promise((resolve, reject) => {
@@ -96,29 +96,26 @@ async function lockStatus(token) {
   return row ? row.status : null;
 }
 
-const getSession = () => {
-  const raw = execSync(`docker exec ${REDIS_CONTAINER} redis-cli GET session:${WA_ID}`, { encoding: 'utf8' }).trim();
-  return raw ? JSON.parse(raw) : null;
-};
+const getSession = () => getPgSession(`session:${WA_ID}`, env);
 
 async function sendAndWait(text) {
-  const prevTs = getSession()?.last_activity || 0;
+  const prevTs = (await getSession())?.last_activity || 0;
   const res = await sendWebhook(text);
   if (res.status !== 200) throw new Error(`Webhook devolvió HTTP ${res.status}: ${res.body}`);
   for (let i = 0; i < 30; i++) {
     await sleep(500);
-    const s = getSession();
+    const s = await getSession();
     if (s && s.last_activity && s.last_activity !== prevTs) return s;
   }
-  throw new Error(`Timeout esperando actualización de Redis para "${text}"`);
+  throw new Error(`Timeout esperando actualización de sesión PostgreSQL para "${text}"`);
 }
 
 async function main() {
   console.log('='.repeat(78));
-  console.log('  PRUEBA E2E EN VIVO — SATORIPMS CHATBOT V9 (n8n + API + Redis)');
+  console.log('  PRUEBA E2E EN VIVO — SATORIPMS CHATBOT V10 (n8n + API + PostgreSQL)');
   console.log('='.repeat(78));
 
-  execSync(`docker exec ${REDIS_CONTAINER} redis-cli DEL session:${WA_ID}`);
+  await deletePgSession(`session:${WA_ID}`, env);
 
   let s = await sendAndWait('Hola');
   console.log('[1/9] "Hola" ->', `${s.state} / ${s.step}`);
@@ -189,14 +186,14 @@ async function main() {
   console.log('[10/10] Opción 4 ("Consultar o Pagar" / menu_cancelar) ->', `${s.state} / ${s.step}`);
   if (s.state !== 'revisar_reserva' || s.step !== 'pedir_codigo') throw new Error('Falló Opción 4 Consultar o Pagar');
 
-  execSync(`docker exec ${REDIS_CONTAINER} redis-cli DEL session:${WA_ID}`);
+  await deletePgSession(`session:${WA_ID}`, env);
   console.log('='.repeat(78));
   console.log('  RESULTADO: 10/10 PASOS E2E APROBADOS AL 100%');
   console.log('='.repeat(78));
 }
 
-main().catch(err => {
-  try { execSync(`docker exec ${REDIS_CONTAINER} redis-cli DEL session:${WA_ID}`); } catch (_) {}
+main().catch(async (err) => {
+  try { await deletePgSession(`session:${WA_ID}`, env); } catch (_) {}
   console.error('ERROR E2E:', err.message);
   process.exit(1);
 });

@@ -18,24 +18,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Sesiones del chatbot (solo n8n V9) ─────────────────
-  # La API FastAPI no depende de Redis. Se retira cuando el flujo guarde la sesión
-  # en PostgreSQL (ver flows/n8n/V10_ChatbotReservas.json).
-  redis:
-    image: redis:7-alpine
-    container_name: satori_redis
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── Orquestación del chatbot ───────────────────────────
+  # ── Orquestación del chatbot (V10 sin Redis; sesiones en PostgreSQL) ──
   n8n:
     profiles: ["n8n"]
     image: n8nio/n8n:2.47.3
@@ -61,8 +44,6 @@ services:
       api:
         condition: service_started
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
   # ── Backend API (FastAPI) ──────────────────────────────
@@ -99,5 +80,4 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
   n8n_data:

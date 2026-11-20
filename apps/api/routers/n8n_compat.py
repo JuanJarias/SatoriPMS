@@ -1,6 +1,6 @@
 """Router de compatibilidad para el flujo n8n V10 (origin/main) y operaciones de grupo de reservas (Lote M3)."""
 
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 import re
 import sys
@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
+    from core.config import settings
     from core.database import get_db
     from dependencies.auth import require_role, require_service_or_role, resolve_actor_name
     from models.booking import Booking, BookingStatus
@@ -31,6 +32,7 @@ try:
         load_active_events,
     )
 except ImportError:
+    from apps.api.core.config import settings
     from apps.api.core.database import get_db
     from apps.api.dependencies.auth import (
         require_role,
@@ -496,6 +498,10 @@ async def confirm_bookings_batch(
         final_payment_status = "pending"
         final_booking_status = BookingStatus.CONFIRMADA.value
 
+    pending_expires_at = (
+        datetime.now(timezone.utc) + timedelta(hours=24) if pending_payment else None
+    )
+
     confirmed_bookings: list[Booking] = []
     try:
         for idx, item in enumerate(rooms_input):
@@ -533,7 +539,7 @@ async def confirm_bookings_batch(
             if existing_lock is not None:
                 existing_lock.guest_id = guest_id
                 existing_lock.status = final_booking_status
-                existing_lock.expires_at = None
+                existing_lock.expires_at = pending_expires_at
                 existing_lock.payment_status = final_payment_status
                 existing_lock.adults = adults
                 existing_lock.children = children
@@ -545,12 +551,18 @@ async def confirm_bookings_batch(
                 existing_lock.companions = companions_in or None
                 confirmed_bookings.append(existing_lock)
             else:
-                # Expirar candados vencidos antes de insertar
+                # Expirar candados y pagos pendientes vencidos antes de insertar
                 await db.execute(
                     update(Booking)
                     .where(
                         Booking.room_id == room.id,
-                        Booking.status == BookingStatus.BLOQUEADA_TEMPORAL.value,
+                        Booking.status.in_(
+                            [
+                                BookingStatus.BLOQUEADA_TEMPORAL.value,
+                                BookingStatus.PENDIENTE_PAGO.value,
+                            ]
+                        ),
+                        Booking.expires_at.is_not(None),
                         Booking.expires_at <= func.now(),
                     )
                     .values(status=BookingStatus.EXPIRADA.value)
@@ -561,7 +573,7 @@ async def confirm_bookings_batch(
                     check_in=check_in,
                     check_out=check_out,
                     status=final_booking_status,
-                    expires_at=None,
+                    expires_at=pending_expires_at,
                     payment_status=final_payment_status,
                     adults=adults,
                     children=children,
@@ -1048,16 +1060,16 @@ async def list_bookings(
 @router.get("/api/bookings/debug", status_code=status.HTTP_200_OK)
 async def list_bookings_debug(
     _principal: User | str = Depends(
-        require_service_or_role(
-            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
-        )
+        require_service_or_role([UserRole.ADMINISTRADOR.value])
     ),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    """Listado de monitoreo con los estados del contrato de n8n, usado por las pruebas en vivo del chatbot.
-
-    Expone documentos completos: es de uso interno (llave de servicio o personal autenticado).
-    """
+    """Listado interno con contrato n8n para pruebas; deshabilitado en producción."""
+    if settings.ENVIRONMENT.strip().lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Endpoint de depuración deshabilitado en producción",
+        )
     return await _booking_rows(db, api_status=True)
 
 

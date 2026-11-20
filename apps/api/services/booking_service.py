@@ -138,12 +138,18 @@ async def create_booking_lock(
     try:
         guest_id = await _resolve_guest_id(db, payload)
 
-        # 5. RN-02 / Decisión 2: Expirar atómicamente en la misma transacción candados vencidos de esa habitación
+        # 5. RN-02 / Decisión 2: Expirar atómicamente en la misma transacción bloqueos/pagos pendientes vencidos de esa habitación
         await db.execute(
             update(Booking)
             .where(
                 Booking.room_id == room.id,
-                Booking.status == BookingStatus.BLOQUEADA_TEMPORAL.value,
+                Booking.status.in_(
+                    [
+                        BookingStatus.BLOQUEADA_TEMPORAL.value,
+                        BookingStatus.PENDIENTE_PAGO.value,
+                    ]
+                ),
+                Booking.expires_at.is_not(None),
                 Booking.expires_at <= func.now(),
             )
             .values(

@@ -85,6 +85,17 @@ Cierra con un resumen en tres partes: **qué funciona**, **qué falla y por qué
 
 ---
 
+## Estado de decisiones (actualizado en `integracion-fastapi`)
+
+- **1. Limpieza de duplicados y obsoletos:** **RESUELTO.** Retirados `apps/api/src/`, duplicados en raíz y `docs/Presentaciones/`, `docs/audit/03-limpieza.md`, `05-plan-migracion.md`, `08-limpieza2.md`, `docs/legacy-ref/`; actualizados `AGENTS.md`, `docs/ROADMAP.md` y `docs/aprendizaje/P1.md`.
+- **2. Flujo n8n V10 sin Redis:** **RESUELTO.** `flows/n8n/V10_ChatbotReservas.json` (96 nodos) incorpora `X-Service-Key`, documento titular, `PENDIENTE_PAGO`/Wompi y reversión usando sesiones PostgreSQL; retirado `redis` de `docker-compose.yml` y migrados `scripts/` y `tests/chatbot/` a la API de sesiones.
+- **3. Vencimiento de `PENDIENTE_PAGO`:** **RESUELTO.** Fijado `expires_at = NOW() + 24 h` en `n8n_compat.py` y expiración automática en `expiration_service.py`, `booking_service.py` y `room_service.py`.
+- **4. Regla de eventos especiales por noche:** **PENDIENTE DE CONFIRMACIÓN CON EL CLIENTE** (por ahora mantiene multiplicador noche por noche en `apps/api/services/pricing.py`).
+- **5. Endpoints WhatsApp web y `/api/bookings/debug`:** **RESUELTO.** Añadidos `POST /api/v1/conversations/{id}/toggle-bot`, `POST /api/v1/conversations/{id}/messages` y `GET /api/v1/conversations/session-keys` conectados a `Chatbot.tsx`; `GET /api/bookings/debug` limitado a `X-Service-Key` / `Administrador` y deshabilitado (`404`) si `ENVIRONMENT=production`.
+- **Siguiente paso:** Revisar **Punto 5 pendiente del roadmap** (Playwright E2E, actualización `.github/workflows/ci.yml` y Docker prod / Nginx / R2 / Sentry — `P8` y `P9`).
+
+---
+
 ## 1. Dónde estamos
 
 - La rama `integracion-fastapi` se creó desde `main` y ya tiene fusionada `migracion-fastapi` (el PR #112 figura como fusionado). **Esa rama aún no llegó a `main`.**
