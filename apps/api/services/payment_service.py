@@ -4,13 +4,14 @@ from decimal import Decimal
 import hashlib
 import hmac
 import json
+import secrets
 import sys
 from typing import Any, Protocol
 import uuid
 
 from fastapi import HTTPException, status
 import httpx
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
@@ -25,11 +26,33 @@ except ImportError:
     from apps.api.services.event_bus import publish_pms_event
 
 
+_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"  # sin 0, O, 1 ni I para evitar confusiones
+_CODE_LENGTH = 4
+
+
 def generate_group_code(group_uuid: uuid.UUID | None = None) -> str:
-    """Genera un código oficial de reserva con prefijo TS-XXXX (ej. TS-8F3A)."""
-    uid = group_uuid or uuid.uuid4()
-    suffix = uid.hex[-4:].upper()
+    """Genera un código público de reserva TS-XXXX aleatorio (sin derivarlo del UUID).
+
+    El parámetro se conserva por compatibilidad con los llamadores anteriores y se ignora.
+    La unicidad se garantiza con ``generate_unique_group_code``.
+    """
+    suffix = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(_CODE_LENGTH))
     return f"TS-{suffix}"
+
+
+async def generate_unique_group_code(db: AsyncSession) -> str:
+    """Genera un código TS-XXXX que no esté en uso por ninguna reserva."""
+    for _ in range(50):
+        candidate = generate_group_code()
+        taken = await db.execute(
+            select(Booking.id).where(func.upper(Booking.group_code) == candidate).limit(1)
+        )
+        if taken.first() is None:
+            return candidate
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="No fue posible generar un código de reserva único",
+    )
 
 
 def verify_webhook_signature(
@@ -288,7 +311,7 @@ async def process_payment_webhook(
     # 3. Transicionar de BLOQUEADA_TEMPORAL a CONFIRMADA y asignar código TS-XXXX
     group_uuid = target_booking.reservation_group_id or uuid.uuid4()
     target_booking.reservation_group_id = group_uuid
-    group_code = target_booking.group_code or generate_group_code(group_uuid)
+    group_code = target_booking.group_code or await generate_unique_group_code(db)
     target_booking.group_code = group_code
     if not target_booking.companions:
         target_booking.companions = group_code

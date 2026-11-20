@@ -10,12 +10,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
     from models.booking import Booking, BookingStatus
+    from models.operations import SpecialEvent
     from models.room import Room
     from schemas.room import RoomAvailabilityItem
+    from services.pricing import (
+        extra_guest_total,
+        nightly_multipliers,
+        room_stay_total,
+    )
 except ImportError:
     from apps.api.models.booking import Booking, BookingStatus
+    from apps.api.models.operations import SpecialEvent
     from apps.api.models.room import Room
     from apps.api.schemas.room import RoomAvailabilityItem
+    from apps.api.services.pricing import (
+        extra_guest_total,
+        nightly_multipliers,
+        room_stay_total,
+    )
+
+
+async def load_active_events(
+    db: AsyncSession,
+    check_in: date,
+    check_out: date,
+) -> list[SpecialEvent]:
+    """Eventos activos que cubren al menos una noche de la estadía [check_in, check_out)."""
+    result = await db.execute(
+        select(SpecialEvent).where(
+            SpecialEvent.active.is_(True),
+            SpecialEvent.start_date < check_out,
+            SpecialEvent.end_date >= check_in,
+        )
+    )
+    return list(result.scalars().all())
 
 
 def calculate_room_stay_price(
@@ -23,12 +51,14 @@ def calculate_room_stay_price(
     check_in: date,
     check_out: date,
     adults: int,
+    events: list[SpecialEvent] | None = None,
 ) -> tuple[int, int, Decimal]:
-    """Calcula noches, adultos adicionales y precio total aplicando RN-01."""
-    nights = (check_out - check_in).days
+    """Calcula noches, adultos adicionales y precio total (RN-01) con eventos por noche."""
+    multipliers = nightly_multipliers(check_in, check_out, events)
+    nights = len(multipliers)
     extra_adults = max(0, adults - room.base_adults_capacity)
-    base_cost = room.price_per_night * Decimal(nights)
-    extra_cost = room.extra_guest_price * Decimal(extra_adults) * Decimal(nights)
+    base_cost = room_stay_total(room.price_per_night, multipliers)
+    extra_cost = extra_guest_total(room.extra_guest_price, extra_adults, multipliers)
     total_price = (base_cost + extra_cost).quantize(Decimal("0.01"))
     return nights, extra_adults, total_price
 
@@ -64,6 +94,7 @@ async def get_available_rooms(
             or_(
                 Booking.status.in_(
                     [
+                        BookingStatus.PENDIENTE_PAGO.value,
                         BookingStatus.CONFIRMADA.value,
                         BookingStatus.EN_CURSO.value,
                     ]
@@ -95,6 +126,7 @@ async def get_available_rooms(
     result = await db.execute(stmt)
     rooms = result.scalars().all()
 
+    events = await load_active_events(db, check_in, check_out)
     items: list[RoomAvailabilityItem] = []
     for room in rooms:
         nights, extra_adults, total_price = calculate_room_stay_price(
@@ -102,6 +134,7 @@ async def get_available_rooms(
             check_in=check_in,
             check_out=check_out,
             adults=adults,
+            events=events,
         )
         items.append(
             RoomAvailabilityItem(

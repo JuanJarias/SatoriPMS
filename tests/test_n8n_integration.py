@@ -172,28 +172,46 @@ async def test_n8n_v10_end_to_end_booking_lifecycle_and_rn03_cancellation() -> N
         c_data = confirm_res.json()
         code = c_data["code"]
         assert code.startswith("TS-")
-        assert c_data["status"] == "CONFIRMADA"
-        assert c_data["paymentStatus"] == "partial"
-        assert c_data["paidAmount"] == 170000.0
-        assert c_data["remainingAmount"] == 170000.0
+        # El chatbot deja la reserva pendiente de pago: solo el pago aprobado la confirma
+        assert c_data["status"] == "pending_payment"
+        assert c_data["paymentStatus"] == "pending"
+        assert c_data["paidAmount"] == 0.0
 
-        # 4. Consulta por código TS-XXXX
-        group_res = await client.get(f"/api/bookings/group/{code}")
+        doc = {"X-Guest-Document": "1054862079"}
+
+        # 4. El pago aprobado de la pasarela confirma con el 50% abonado (Wompi, vía n8n)
+        pay_ext = await client.post(
+            f"/api/bookings/group/{code}/confirm-external-payment",
+            json={"paymentOption": "deposit", "transactionId": "txn-e2e-lifecycle-1"},
+        )
+        assert pay_ext.status_code == 200
+        assert pay_ext.json()["status"] == "confirmed"
+        assert pay_ext.json()["paymentStatus"] == "partial"
+        assert pay_ext.json()["paidAmount"] == 170000.0
+        assert pay_ext.json()["remainingAmount"] == 170000.0
+
+        # 5. Consulta por código TS-XXXX con el documento del titular
+        group_res = await client.get(f"/api/bookings/group/{code}", headers=doc)
         assert group_res.status_code == 200
         assert group_res.json()["canPayRemaining"] is True
         assert group_res.json()["refundPolicy"]["refundPercentage"] == 100
+        assert group_res.json()["guestDocument"] == "******2079"
 
-        # 5. Pago del 50% de saldo restante
-        pay_rem_res = await client.post(f"/api/bookings/group/{code}/pay-remaining")
+        # 6. Pago del saldo restante
+        pay_rem_res = await client.post(
+            f"/api/bookings/group/{code}/pay-remaining", json={"document": "1054862079"}
+        )
         assert pay_rem_res.status_code == 200
         assert pay_rem_res.json()["paymentStatus"] == "paid"
         assert pay_rem_res.json()["remainingAmount"] == 0.0
 
-        # 6. Cancelación con cálculo de reembolso RN-03 (>72h antes de 2026-12-25 -> 100% de 340.000)
-        cancel_res = await client.post(f"/api/bookings/group/{code}/cancellation")
+        # 7. Cancelación con cálculo de reembolso RN-03 (>72h antes de 2026-12-25 -> 100% de 340.000)
+        cancel_res = await client.post(
+            f"/api/bookings/group/{code}/cancellation", json={"document": "1054862079"}
+        )
         assert cancel_res.status_code == 200
         cancel_data = cancel_res.json()
-        assert cancel_data["status"] == "CANCELADA"
+        assert cancel_data["status"] == "cancelled"
         assert cancel_data["refundPercentage"] == 100
         assert cancel_data["refundAmount"] == 340000.0
         assert "3" in cancel_data["freedRoomNumbers"]

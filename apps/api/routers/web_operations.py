@@ -28,7 +28,8 @@ try:
     from models.user import User, UserRole
     from services.audit_service import record_audit
     from services.event_bus import publish_pms_event
-    from services.payment_service import generate_group_code
+    from services.payment_service import generate_unique_group_code
+    from services.room_service import calculate_room_stay_price, load_active_events
     from services.reviews_service import fetch_google_reviews_summary
 except ImportError:
     from apps.api.core.database import get_db
@@ -50,7 +51,11 @@ except ImportError:
     from apps.api.models.user import User, UserRole
     from apps.api.services.audit_service import record_audit
     from apps.api.services.event_bus import publish_pms_event
-    from apps.api.services.payment_service import generate_group_code
+    from apps.api.services.payment_service import generate_unique_group_code
+    from apps.api.services.room_service import (
+        calculate_room_stay_price,
+        load_active_events,
+    )
     from apps.api.services.reviews_service import fetch_google_reviews_summary
 
 router = APIRouter(tags=["Web Operations (M4 & P5)"])
@@ -218,6 +223,9 @@ async def create_web_manual_booking(
     check_in = date.fromisoformat(str(first_room_req.get("checkIn") or body.get("checkIn") or "2026-12-01"))
     check_out = date.fromisoformat(str(first_room_req.get("checkOut") or body.get("checkOut") or "2026-12-03"))
 
+    if check_in >= check_out:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="checkIn debe ser anterior a checkOut")
+
     # Resolver habitación estrictamente por ID primario para evitar colisiones con números 1-9
     room = await db.get(Room, int(raw_room_id)) if str(raw_room_id).isdigit() else None
     if room is None:
@@ -239,9 +247,15 @@ async def create_web_manual_booking(
 
     group_uuid = uuid.uuid4()
     requested_code = str(body.get("companions") or "").strip()
-    code = requested_code if requested_code.startswith("TS-") else generate_group_code(group_uuid)
-    nights = max(1, (check_out - check_in).days)
-    total_price = (room.price_per_night * Decimal(nights)).quantize(Decimal("0.01"))
+    code = requested_code if requested_code.startswith("TS-") else await generate_unique_group_code(db)
+    events = await load_active_events(db, check_in, check_out)
+    _, _, total_price = calculate_room_stay_price(
+        room=room,
+        check_in=check_in,
+        check_out=check_out,
+        adults=int(body.get("adults", 2)),
+        events=events,
+    )
 
     try:
         await db.execute(

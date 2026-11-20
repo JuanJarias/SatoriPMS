@@ -34,6 +34,7 @@ class BookingStatus(StrEnum):
     """Estados canónicos de reserva en español en la base de datos (Decisión 1)."""
 
     BLOQUEADA_TEMPORAL = "BLOQUEADA_TEMPORAL"
+    PENDIENTE_PAGO = "PENDIENTE_PAGO"
     CONFIRMADA = "CONFIRMADA"
     EN_CURSO = "EN_CURSO"
     EXPIRADA = "EXPIRADA"
@@ -42,6 +43,7 @@ class BookingStatus(StrEnum):
 
 ACTIVE_BOOKING_STATUSES = (
     BookingStatus.BLOQUEADA_TEMPORAL.value,
+    BookingStatus.PENDIENTE_PAGO.value,
     BookingStatus.CONFIRMADA.value,
     BookingStatus.EN_CURSO.value,
 )
@@ -106,7 +108,7 @@ class Booking(Base):
             "adults >= 0 AND children >= 0", name="chk_booking_people"
         ),
         CheckConstraint(
-            "status IN ('BLOQUEADA_TEMPORAL', 'CONFIRMADA', 'EN_CURSO', 'EXPIRADA', 'CANCELADA')",
+            "status IN ('BLOQUEADA_TEMPORAL', 'PENDIENTE_PAGO', 'CONFIRMADA', 'EN_CURSO', 'EXPIRADA', 'CANCELADA')",
             name="chk_booking_status",
         ),
         ExcludeConstraint(
@@ -115,7 +117,7 @@ class Booking(Base):
             name="no_overlapping_bookings",
             using="gist",
             where=text(
-                "status IN ('BLOQUEADA_TEMPORAL', 'CONFIRMADA', 'EN_CURSO')"
+                "status IN ('BLOQUEADA_TEMPORAL', 'PENDIENTE_PAGO', 'CONFIRMADA', 'EN_CURSO')"
             ),
         ),
         Index("idx_booking_room", "room_id"),

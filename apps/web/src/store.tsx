@@ -181,6 +181,7 @@ const DB_BOOKING_STATUS_TO_UI: Record<string, BookingStatusKey> = {
   CONFIRMADA: 'confirmada',
   confirmed: 'confirmada',
   BLOQUEADA_TEMPORAL: 'bloqueada',
+  PENDIENTE_PAGO: 'pendiente',
   pending_payment: 'pendiente',
   EN_CURSO: 'enCurso',
   occupied: 'enCurso',

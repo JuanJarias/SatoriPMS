@@ -20,7 +20,7 @@ try:
         UnlockResponse,
     )
     from services.event_bus import publish_pms_event
-    from services.room_service import calculate_room_stay_price
+    from services.room_service import calculate_room_stay_price, load_active_events
 except ImportError:
     from apps.api.models.booking import Booking, BookingStatus
     from apps.api.models.guest import Guest
@@ -32,7 +32,10 @@ except ImportError:
         UnlockResponse,
     )
     from apps.api.services.event_bus import publish_pms_event
-    from apps.api.services.room_service import calculate_room_stay_price
+    from apps.api.services.room_service import (
+        calculate_room_stay_price,
+        load_active_events,
+    )
 
 LOCK_DURATION_MINUTES = 15
 
@@ -123,11 +126,13 @@ async def create_booking_lock(
             detail=f"La habitación {room.number} no admite mascotas",
         )
 
+    events = await load_active_events(db, payload.check_in, payload.check_out)
     nights, extra_adults, total_price = calculate_room_stay_price(
         room=room,
         check_in=payload.check_in,
         check_out=payload.check_out,
         adults=payload.adults,
+        events=events,
     )
 
     try:

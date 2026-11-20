@@ -1,16 +1,16 @@
 /**
- * Test E2E Completo en Vivo — Chatbot V9 (n8n + API + Redis)
+ * Test E2E Completo en Vivo — Chatbot V9 (n8n + API + Redis de sesión)
  *
  * Valida de punta a punta contra el stack Docker activo:
  *   1. Menú principal de 5 opciones ("Hola"; la 5 es hablar con un agente)
  *   2. Opción 1 (Reserva guiada) -> paso directo a rango de fechas en un solo mensaje
  *   3. Reconocimiento de entrada y salida en un solo mensaje ("2026-12-01 al 2026-12-03")
- *   4. Selección y bloqueo temporal en Redis de una habitación sin mascotas (#103 o similar)
- *   5. Inyección de bloqueo concurrente de OTRA conversación sobre la misma habitación
+ *   4. Selección y bloqueo temporal (fila en PostgreSQL vía la API) de una habitación sin mascotas
+ *   5. Bloqueo concurrente de OTRA conversación sobre la misma habitación en otras fechas
  *   6. Flujo hasta paso "mascota" y respuesta "Sí"
  *   7. Verificación de:
- *      - Liberación del bloqueo de ESTA conversación (EXISTS = 0)
- *      - Preservación intacta del bloqueo de la OTRA conversación (EXISTS = 1)
+ *      - Liberación del bloqueo de ESTA conversación (deja de estar 'locked')
+ *      - Preservación intacta del bloqueo de la OTRA conversación (sigue 'locked')
  *      - Reenvío automático de habitaciones pet-friendly en el mismo rango y retorno a seleccion_habitacion
  *   8. Opción 3 (Reseñas Google) -> entrega de enlace canónico y sesión en menu
  *
@@ -69,6 +69,33 @@ function sendWebhook(text) {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+const API_HOST = process.env.API_HOST || 'localhost';
+const API_PORT = Number(process.env.API_PORT || 8080);
+const SERVICE_KEY = require('./lib/env').loadEnv().SATORI_SERVICE_KEY || '';
+
+function apiCall(method, path, body) {
+  return new Promise((resolve, reject) => {
+    const payload = body ? JSON.stringify(body) : null;
+    const headers = { 'X-Service-Key': SERVICE_KEY };
+    if (payload) { headers['Content-Type'] = 'application/json'; headers['Content-Length'] = Buffer.byteLength(payload); }
+    const req = http.request({ hostname: API_HOST, port: API_PORT, path, method, headers }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: data ? JSON.parse(data) : null }));
+    });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+// Un bloqueo temporal es una reserva en estado 'locked' (el token es el id de la reserva)
+async function lockStatus(token) {
+  const rows = (await apiCall('GET', '/api/bookings/debug')).body || [];
+  const row = rows.find(r => String(r.id) === String(token));
+  return row ? row.status : null;
+}
+
 const getSession = () => {
   const raw = execSync(`docker exec ${REDIS_CONTAINER} redis-cli GET session:${WA_ID}`, { encoding: 'utf8' }).trim();
   return raw ? JSON.parse(raw) : null;
@@ -117,13 +144,15 @@ async function main() {
     if (s.step !== 'huespedes' || !s.reservation_draft.lockTokens?.length) throw new Error('Falló bloqueo de habitación');
 
     const myLock = s.reservation_draft.lockTokens[0];
-    const lockBefore = execSync(`docker exec ${REDIS_CONTAINER} redis-cli EXISTS lock:room:${myLock.roomId}:metadata:${myLock.lockToken}`, { encoding: 'utf8' }).trim();
-    if (lockBefore !== '1') throw new Error('Bloqueo inicial no encontrado en Redis');
+    const lockBefore = await lockStatus(myLock.lockToken);
+    if (lockBefore !== 'locked') throw new Error(`Bloqueo inicial no encontrado en la API (estado: ${lockBefore})`);
 
-    // Simular bloqueo concurrente de OTRA conversación sobre la MISMA habitación
-    const otherToken = 'other-conversation-uuid-isolation-test';
-    execSync(`docker exec ${REDIS_CONTAINER} redis-cli ZADD lock:room:${myLock.roomId}:intervals 20800 ${otherToken}`);
-    execSync(`docker exec ${REDIS_CONTAINER} redis-cli HSET lock:room:${myLock.roomId}:metadata:${otherToken} checkIn 20800 checkOut 20802`);
+    // Bloqueo concurrente de OTRA conversación sobre la MISMA habitación, en otras fechas
+    const other = await apiCall('POST', '/api/bookings/lock', {
+      waId: '573009990000', roomId: myLock.roomId, checkIn: '2027-08-10', checkOut: '2027-08-12'
+    });
+    if (other.status !== 200) throw new Error(`No se pudo crear el bloqueo de la otra conversación (HTTP ${other.status})`);
+    const otherToken = other.body.lockToken;
 
     s = await sendAndWait('2 adultos');
     console.log('[5/9] "2 adultos" ->', s.step);
@@ -137,19 +166,18 @@ async function main() {
     s = await sendAndWait('Sí');
     console.log(`[8/9] "Sí" (mascota) -> ${s.state} / ${s.step} | pet-friendly reenviadas: ${s.reservation_draft.availableRooms?.length}`);
 
-    const lockAfter = execSync(`docker exec ${REDIS_CONTAINER} redis-cli EXISTS lock:room:${myLock.roomId}:metadata:${myLock.lockToken}`, { encoding: 'utf8' }).trim();
-    const otherLockAfter = execSync(`docker exec ${REDIS_CONTAINER} redis-cli EXISTS lock:room:${myLock.roomId}:metadata:${otherToken}`, { encoding: 'utf8' }).trim();
+    const lockAfter = await lockStatus(myLock.lockToken);
+    const otherLockAfter = await lockStatus(otherToken);
 
-    execSync(`docker exec ${REDIS_CONTAINER} redis-cli DEL lock:room:${myLock.roomId}:metadata:${otherToken}`);
-    execSync(`docker exec ${REDIS_CONTAINER} redis-cli ZREM lock:room:${myLock.roomId}:intervals ${otherToken}`);
+    await apiCall('POST', '/api/bookings/unlock', { rooms: [{ roomId: myLock.roomId, lockToken: otherToken }] });
 
-    if (lockAfter !== '0') throw new Error('El bloqueo de esta conversación NO se liberó');
-    if (otherLockAfter !== '1') throw new Error('Se alteró el bloqueo de OTRA conversación');
+    if (lockAfter === 'locked') throw new Error('El bloqueo de esta conversación NO se liberó');
+    if (otherLockAfter !== 'locked') throw new Error('Se alteró el bloqueo de OTRA conversación');
     if (s.step !== 'seleccion_habitacion') throw new Error('No retornó a seleccion_habitacion');
     if (!s.reservation_draft.availableRooms?.every(r => r.allowsPets !== false)) {
       throw new Error('Se reenviaron habitaciones que no permiten mascotas');
     }
-    console.log('      Aislamiento verificado: mi bloqueo=0 (liberado), otro bloqueo=1 (intacto)');
+    console.log(`      Aislamiento verificado: mi bloqueo=${lockAfter} (liberado), otro bloqueo=${otherLockAfter} (intacto)`);
   }
 
   await sendAndWait('Hola');

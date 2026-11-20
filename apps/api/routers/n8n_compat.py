@@ -2,11 +2,12 @@
 
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
+import re
 import sys
 from typing import Any
 import uuid
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, status
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
@@ -23,10 +24,11 @@ try:
     from services.audit_service import record_audit
     from services.booking_service import create_booking_lock
     from services.event_bus import publish_pms_event
-    from services.payment_service import generate_group_code
+    from services.payment_service import generate_unique_group_code
+    from services.pricing import extra_guest_total, nightly_multipliers, room_stay_total
     from services.room_service import (
-        calculate_room_stay_price,
         get_available_rooms,
+        load_active_events,
     )
 except ImportError:
     from apps.api.core.database import get_db
@@ -43,10 +45,15 @@ except ImportError:
     from apps.api.services.audit_service import record_audit
     from apps.api.services.booking_service import create_booking_lock
     from apps.api.services.event_bus import publish_pms_event
-    from apps.api.services.payment_service import generate_group_code
+    from apps.api.services.payment_service import generate_unique_group_code
+    from apps.api.services.pricing import (
+        extra_guest_total,
+        nightly_multipliers,
+        room_stay_total,
+    )
     from apps.api.services.room_service import (
-        calculate_room_stay_price,
         get_available_rooms,
+        load_active_events,
     )
 
 router = APIRouter(tags=["n8n V10 & Group Bookings"])
@@ -77,35 +84,109 @@ def _calculate_rn03_refund(
     return hours_until, pct, refund_amount, desc
 
 
-async def _find_bookings_by_code(
+NOT_FOUND_DETAIL = "No se encontró una reserva con ese código y documento"
+
+# Estados que n8n y las pruebas esperan (contrato heredado del servidor anterior).
+_API_STATUS = {
+    BookingStatus.BLOQUEADA_TEMPORAL.value: "locked",
+    BookingStatus.PENDIENTE_PAGO.value: "pending_payment",
+    BookingStatus.CONFIRMADA.value: "confirmed",
+    BookingStatus.EN_CURSO.value: "checked_in",
+    BookingStatus.EXPIRADA.value: "expired",
+    BookingStatus.CANCELADA.value: "cancelled",
+}
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+_ACTIVE_FOR_GUEST = (
+    BookingStatus.PENDIENTE_PAGO.value,
+    BookingStatus.CONFIRMADA.value,
+    BookingStatus.BLOQUEADA_TEMPORAL.value,
+    BookingStatus.EN_CURSO.value,
+)
+
+
+def _api_status(db_status: str) -> str:
+    """Traduce el estado de base de datos al estado que consumen n8n y las pruebas."""
+    return _API_STATUS.get(db_status, db_status)
+
+
+def _is_service(principal: User | str) -> bool:
+    """True si quien llama es el chatbot (llave de servicio) y no una persona del personal."""
+    return isinstance(principal, str)
+
+
+def _digits(value: str | None) -> str:
+    return re.sub(r"\D", "", value or "")
+
+
+def _mask_document(document: str | None) -> str | None:
+    """Deja visibles solo los últimos 4 dígitos del documento."""
+    digits = _digits(document)
+    if not digits:
+        return None
+    visible = min(4, len(digits))
+    return "*" * (len(digits) - visible) + digits[-visible:]
+
+
+def _required_document(principal: User | str, document: str | None) -> str | None:
+    """El chatbot debe enviar el documento del titular; el personal no lo necesita."""
+    blank = document is None or not document.strip()
+    if _is_service(principal) and blank:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El documento del titular es obligatorio",
+        )
+    return None if blank else document
+
+
+async def _resolve_group(
     db: AsyncSession,
     code: str,
+    holder_document: str | None = None,
 ) -> list[Booking]:
-    """Busca todas las reservas de un grupo por código TS-XXXX, prefijo de UUID o ID numérico."""
+    """Reservas de un grupo por código público exacto (TS-XXXX) o UUID, verificando el titular.
+
+    Si el documento no coincide responde igual que si la reserva no existiera (404), para
+    no revelar qué códigos existen.
+    """
     clean = code.strip()
-    upper_code = clean.upper()
-    if not upper_code.startswith("TS-") and len(clean) == 4:
-        upper_code = f"TS-{upper_code}"
+    if not clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El código de reserva es obligatorio")
 
-    conditions = [
-        func.upper(Booking.group_code) == upper_code,
-        func.upper(Booking.companions) == upper_code,
-    ]
-    if clean.isdigit():
-        conditions.append(Booking.id == int(clean))
-    try:
-        parsed_uuid = uuid.UUID(clean)
-        conditions.append(Booking.reservation_group_id == parsed_uuid)
-    except ValueError:
-        pass
+    if _UUID_RE.match(clean):
+        stmt = select(Booking).where(Booking.reservation_group_id == uuid.UUID(clean))
+    else:
+        newest = await db.execute(
+            select(Booking.reservation_group_id)
+            .where(func.upper(Booking.group_code) == clean.upper())
+            .order_by(Booking.id.desc())
+            .limit(1)
+        )
+        row = newest.first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND_DETAIL)
+        group_id = row[0]
+        stmt = (
+            select(Booking).where(Booking.reservation_group_id == group_id)
+            if group_id is not None
+            else select(Booking).where(func.upper(Booking.group_code) == clean.upper())
+        )
+    bookings = list((await db.execute(stmt.order_by(Booking.id.asc()))).scalars().all())
+    if not bookings:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND_DETAIL)
 
-    stmt = (
-        select(Booking)
-        .where(or_(*conditions))
-        .order_by(Booking.id.asc())
-    )
-    res = await db.execute(stmt)
-    return list(res.scalars().all())
+    if holder_document is not None:
+        guest = await db.get(Guest, bookings[0].guest_id)
+        expected = _digits(guest.document_number if guest else None)
+        if not expected or expected != _digits(holder_document):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND_DETAIL)
+    return bookings
+
+
+def _document_from_body(body: dict[str, Any] | None) -> str | None:
+    value = (body or {}).get("document")
+    return str(value) if value is not None else None
 
 
 @router.get("/api/rooms/availability", status_code=status.HTTP_200_OK)
@@ -358,9 +439,9 @@ async def confirm_bookings_batch(
         guest_id = guest.id
 
     group_uuid = uuid.uuid4()
-    group_code = generate_group_code(group_uuid)
+    group_code = await generate_unique_group_code(db)
 
-    # 2. Calcular tarifa de grupo con RN-01
+    # 2. Calcular tarifa de grupo con RN-01 y eventos especiales por noche
     room_objs: list[Room] = []
     for item in rooms_input:
         r_id = int(item.get("roomId") or item.get("room_id"))
@@ -372,7 +453,8 @@ async def confirm_bookings_batch(
             )
         room_objs.append(room)
 
-    nights = (check_out - check_in).days
+    events = await load_active_events(db, check_in, check_out)
+    multipliers = nightly_multipliers(check_in, check_out, events)
     total_base_cap = sum(r.base_adults_capacity for r in room_objs)
     total_max_cap = sum(r.max_adults_capacity for r in room_objs)
     if adults > total_max_cap:
@@ -382,26 +464,37 @@ async def confirm_bookings_batch(
         )
 
     extra_adults = max(0, adults - total_base_cap)
-    extra_unit_price = room_objs[0].extra_guest_price
-    extra_cost = extra_unit_price * Decimal(extra_adults) * Decimal(nights)
+    extra_cost = extra_guest_total(room_objs[0].extra_guest_price, extra_adults, multipliers)
 
     room_totals: list[Decimal] = []
     for idx, room in enumerate(room_objs):
-        rt = room.price_per_night * Decimal(nights)
+        rt = room_stay_total(room.price_per_night, multipliers)
         if idx == 0:
             rt += extra_cost
         room_totals.append(rt.quantize(Decimal("0.01")))
 
     total_group_price = sum(room_totals, Decimal("0.00")).quantize(Decimal("0.01"))
-    if payment_option == "full":
+
+    # El chatbot (llave de servicio) deja la reserva pendiente de pago: solo el pago
+    # aprobado de la pasarela la confirma (confirm-external-payment). El personal que
+    # confirma desde la web registra el pago de inmediato.
+    pending_payment = _is_service(_principal)
+    if pending_payment:
+        group_paid = Decimal("0.00")
+        final_payment_status = "pending"
+        final_booking_status = BookingStatus.PENDIENTE_PAGO.value
+    elif payment_option == "full":
         group_paid = total_group_price
         final_payment_status = "paid"
+        final_booking_status = BookingStatus.CONFIRMADA.value
     elif payment_option == "deposit":
         group_paid = (total_group_price / Decimal("2")).quantize(Decimal("0.01"))
         final_payment_status = "partial"
+        final_booking_status = BookingStatus.CONFIRMADA.value
     else:
         group_paid = Decimal("0.00")
         final_payment_status = "pending"
+        final_booking_status = BookingStatus.CONFIRMADA.value
 
     confirmed_bookings: list[Booking] = []
     try:
@@ -439,7 +532,7 @@ async def confirm_bookings_batch(
 
             if existing_lock is not None:
                 existing_lock.guest_id = guest_id
-                existing_lock.status = BookingStatus.CONFIRMADA.value
+                existing_lock.status = final_booking_status
                 existing_lock.expires_at = None
                 existing_lock.payment_status = final_payment_status
                 existing_lock.adults = adults
@@ -449,7 +542,7 @@ async def confirm_bookings_batch(
                 existing_lock.paid_amount = room_paid
                 existing_lock.group_code = group_code
                 existing_lock.reservation_group_id = group_uuid
-                existing_lock.companions = companions_in or group_code
+                existing_lock.companions = companions_in or None
                 confirmed_bookings.append(existing_lock)
             else:
                 # Expirar candados vencidos antes de insertar
@@ -467,7 +560,7 @@ async def confirm_bookings_batch(
                     room_id=room.id,
                     check_in=check_in,
                     check_out=check_out,
-                    status=BookingStatus.CONFIRMADA.value,
+                    status=final_booking_status,
                     expires_at=None,
                     payment_status=final_payment_status,
                     adults=adults,
@@ -478,7 +571,7 @@ async def confirm_bookings_batch(
                     source=source,
                     group_code=group_code,
                     reservation_group_id=group_uuid,
-                    companions=companions_in or group_code,
+                    companions=companions_in or None,
                 )
                 db.add(new_b)
                 await db.flush()
@@ -507,14 +600,14 @@ async def confirm_bookings_batch(
         ) from exc
 
     remaining = (total_group_price - group_paid).quantize(Decimal("0.01"))
-    publish_pms_event("booking.confirmed", {"code": group_code})
+    publish_pms_event("booking.pending" if pending_payment else "booking.confirmed", {"code": group_code})
     return {
         "reservationGroupId": str(group_uuid),
         "code": group_code,
         "totalPrice": float(total_group_price),
         "bookingIds": [b.id for b in confirmed_bookings],
         "roomIds": [r.id for r in room_objs],
-        "status": BookingStatus.CONFIRMADA.value,
+        "status": _api_status(final_booking_status),
         "paymentStatus": final_payment_status,
         "paidAmount": float(group_paid),
         "remainingAmount": float(remaining),
@@ -525,20 +618,22 @@ async def confirm_bookings_batch(
 @router.get("/api/v1/bookings/group/{code}", status_code=status.HTTP_200_OK)
 async def get_booking_group_by_code(
     code: str,
-    _principal: User | str = Depends(
+    x_guest_document: str | None = Header(default=None, alias="X-Guest-Document"),
+    principal: User | str = Depends(
         require_service_or_role(
             [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
         )
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Consulta detalles de una reserva grupal por código TS-XXXX e incluye política de reembolso RN-03."""
-    bookings = await _find_bookings_by_code(db, code)
-    if not bookings:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró reserva con código {code}",
-        )
+    """Consulta una reserva por código TS-XXXX o UUID e incluye la política de reembolso RN-03.
+
+    El chatbot debe enviar el documento del titular en X-Guest-Document: si no coincide se
+    responde 404 como si la reserva no existiera y el documento se devuelve enmascarado.
+    """
+    is_service = _is_service(principal)
+    holder_document = _required_document(principal, x_guest_document)
+    bookings = await _resolve_group(db, code, holder_document)
 
     first = bookings[0]
     guest = await db.get(Guest, first.guest_id)
@@ -567,12 +662,8 @@ async def get_booking_group_by_code(
         first.check_in, paid_amount
     )
 
-    is_active = first.status in (
-        BookingStatus.CONFIRMADA.value,
-        BookingStatus.BLOQUEADA_TEMPORAL.value,
-        BookingStatus.EN_CURSO.value,
-    )
-    can_cancel = is_active and first.status != BookingStatus.CANCELADA.value
+    is_active = first.status in _ACTIVE_FOR_GUEST
+    can_cancel = is_active and date.today() < first.check_out
     can_pay_remaining = (
         is_active
         and first.payment_status == "partial"
@@ -581,25 +672,26 @@ async def get_booking_group_by_code(
 
     status_labels = {
         BookingStatus.CONFIRMADA.value: "Confirmada",
-        BookingStatus.BLOQUEADA_TEMPORAL.value: "Pendiente de pago",
+        BookingStatus.PENDIENTE_PAGO.value: "Pendiente de pago",
+        BookingStatus.BLOQUEADA_TEMPORAL.value: "Bloqueo temporal",
         BookingStatus.EN_CURSO.value: "En curso",
         BookingStatus.CANCELADA.value: "Cancelada",
         BookingStatus.EXPIRADA.value: "Expirada",
     }
     payment_labels = {
         "paid": "Pagada",
-        "partial": "Abono 50%",
+        "partial": "Abono parcial",
         "pending": "Pendiente de pago",
         "refunded": "Reembolsada",
     }
 
-    resolved_code = first.group_code or f"TS-{first.id}"
+    document = guest.document_number if guest else None
     return {
-        "code": resolved_code,
+        "code": first.group_code,
         "reservationGroupId": str(first.reservation_group_id) if first.reservation_group_id else None,
         "guestName": guest.name if guest else None,
         "guestPhone": guest.whatsapp_phone if guest else None,
-        "guestDocument": guest.document_number if guest else None,
+        "guestDocument": _mask_document(document) if is_service else document,
         "checkIn": first.check_in.isoformat(),
         "checkOut": first.check_out.isoformat(),
         "nights": nights,
@@ -610,7 +702,7 @@ async def get_booking_group_by_code(
         "totalPrice": float(total_price),
         "paidAmount": float(paid_amount),
         "pendingBalance": float(pending_balance),
-        "status": first.status,
+        "status": _api_status(first.status),
         "statusLabel": status_labels.get(first.status, first.status),
         "paymentStatus": first.payment_status,
         "paymentStatusLabel": payment_labels.get(first.payment_status, first.payment_status),
@@ -630,6 +722,7 @@ async def get_booking_group_by_code(
 @router.post("/api/v1/bookings/group/{code}/cancellation", status_code=status.HTTP_200_OK)
 async def cancel_booking_group(
     code: str,
+    body: dict[str, Any] | None = Body(default=None),
     principal: User | str = Depends(
         require_service_or_role(
             [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
@@ -637,13 +730,12 @@ async def cancel_booking_group(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Cancela la reserva grupal pasando a CANCELADA, libera el índice GiST y calcula reembolso RN-03."""
-    bookings = await _find_bookings_by_code(db, code)
-    if not bookings:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró reserva con código {code}",
-        )
+    """Cancela la reserva grupal pasando a CANCELADA, libera el índice GiST y calcula reembolso RN-03.
+
+    El chatbot debe enviar {"document": "..."} con el documento del titular.
+    """
+    holder_document = _required_document(principal, _document_from_body(body))
+    bookings = await _resolve_group(db, code, holder_document)
 
     first = bookings[0]
     if first.status == BookingStatus.CANCELADA.value:
@@ -658,11 +750,10 @@ async def cancel_booking_group(
         first.check_in, paid_amount
     )
 
-    new_payment_status = (
-        "refunded"
-        if paid_amount > Decimal("0.00") and refund_pct > 0
-        else first.payment_status
-    )
+    if first.payment_status in ("partial", "paid"):
+        new_payment_status = "refunded" if refund_pct > 0 else "paid"
+    else:
+        new_payment_status = "pending"
 
     freed_rooms: list[str] = []
     for b in bookings:
@@ -691,7 +782,7 @@ async def cancel_booking_group(
     return {
         "code": resolved_code,
         "reservationGroupId": str(first.reservation_group_id) if first.reservation_group_id else None,
-        "status": BookingStatus.CANCELADA.value,
+        "status": _api_status(BookingStatus.CANCELADA.value),
         "paymentStatus": new_payment_status,
         "totalPrice": float(total_price),
         "paidAmount": float(paid_amount),
@@ -709,26 +800,31 @@ async def cancel_booking_group(
 @router.post("/api/v1/bookings/group/{code}/pay-remaining", status_code=status.HTTP_200_OK)
 async def pay_remaining_balance(
     code: str,
-    _principal: User | str = Depends(
+    body: dict[str, Any] | None = Body(default=None),
+    principal: User | str = Depends(
         require_service_or_role(
             [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
         )
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Liquida el 50% de saldo pendiente actualizando payment_status a 'paid' y registrando en audit_log."""
-    bookings = await _find_bookings_by_code(db, code)
-    if not bookings:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró reserva con código {code}",
-        )
+    """Liquida el saldo pendiente de una reserva abonada al 50% y lo registra en audit_log.
+
+    El chatbot debe enviar {"document": "..."} con el documento del titular.
+    """
+    holder_document = _required_document(principal, _document_from_body(body))
+    bookings = await _resolve_group(db, code, holder_document)
 
     first = bookings[0]
     if first.status == BookingStatus.CANCELADA.value:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="No se puede pagar saldo de una reserva cancelada",
+            detail="Esta reserva está cancelada",
+        )
+    if first.payment_status != "partial":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta reserva no tiene un saldo pendiente o ya fue pagada completamente",
         )
 
     total_price = Decimal("0.00")
@@ -740,7 +836,7 @@ async def pay_remaining_balance(
     resolved_code = first.group_code or code.upper()
     await record_audit(
         db=db,
-        actor="guest_or_reception",
+        actor=resolve_actor_name(principal, "guest_or_reception"),
         action="BOOKING_PAY_REMAINING",
         entity="booking",
         entity_id=resolved_code,
@@ -754,26 +850,157 @@ async def pay_remaining_balance(
         "totalPrice": float(total_price),
         "bookingIds": [b.id for b in bookings],
         "roomIds": [b.room_id for b in bookings],
-        "status": first.status,
+        "status": _api_status(first.status),
         "paymentStatus": "paid",
         "paidAmount": float(total_price),
         "remainingAmount": 0.0,
     }
 
 
-@router.get("/api/bookings", status_code=status.HTTP_200_OK)
-@router.get("/api/v1/bookings", status_code=status.HTTP_200_OK)
-async def list_bookings(
-    _current_user: User = Depends(
-        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+async def _confirm_external_payment(
+    db: AsyncSession,
+    code: str,
+    body: dict[str, Any],
+    actor: str,
+) -> dict[str, Any]:
+    """Confirma el pago aprobado de una pasarela: PENDIENTE_PAGO pasa a CONFIRMADA con 50% o 100%."""
+    bookings = await _resolve_group(db, code)
+    first = bookings[0]
+    if first.status == BookingStatus.CANCELADA.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede registrar pago para una reserva cancelada",
+        )
+
+    transaction_id = str(body.get("transactionId") or body.get("transaction_id") or "").strip() or None
+    if transaction_id:
+        dup = await db.execute(select(Booking).where(Booking.payment_id == transaction_id))
+        already = dup.scalars().first()
+        if already is not None:
+            same_group = [b for b in bookings if b.id == already.id]
+            if not same_group:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="La transacción ya fue aplicada a otra reserva",
+                )
+            total_paid = sum((b.paid_amount for b in bookings), Decimal("0.00"))
+            total = sum((b.total_price for b in bookings), Decimal("0.00"))
+            return {
+                "reservationGroupId": str(first.reservation_group_id) if first.reservation_group_id else None,
+                "code": first.group_code,
+                "totalPrice": float(total),
+                "bookingIds": [b.id for b in bookings],
+                "roomIds": [b.room_id for b in bookings],
+                "status": _api_status(first.status),
+                "paymentStatus": first.payment_status,
+                "paidAmount": float(total_paid),
+                "remainingAmount": float(max(total - total_paid, Decimal("0.00"))),
+                "idempotent": True,
+            }
+
+    total_group_price = sum((b.total_price for b in bookings), Decimal("0.00"))
+    option = str(body.get("paymentOption") or body.get("payment_option") or "").strip().lower()
+    raw_amount = body.get("amount")
+    incoming = Decimal(str(raw_amount)).quantize(Decimal("0.01")) if raw_amount not in (None, "") else None
+
+    if option in ("full", "100"):
+        is_full = True
+    elif option in ("deposit", "50"):
+        is_full = False
+    elif incoming is not None and incoming >= total_group_price * Decimal("0.75"):
+        is_full = True
+    else:
+        is_full = first.payment_status == "partial"
+
+    new_payment_status = "paid" if is_full else "partial"
+    if is_full:
+        new_total_paid = total_group_price
+    elif incoming is not None and incoming > 0:
+        new_total_paid = incoming
+    else:
+        new_total_paid = (total_group_price / Decimal("2")).quantize(Decimal("0.01"))
+
+    for idx, b in enumerate(bookings):
+        b.status = BookingStatus.CONFIRMADA.value
+        b.expires_at = None
+        b.payment_status = new_payment_status
+        if is_full:
+            b.paid_amount = b.total_price
+        elif total_group_price > 0:
+            b.paid_amount = (new_total_paid * (b.total_price / total_group_price)).quantize(Decimal("0.01"))
+        if idx == 0 and transaction_id:
+            b.payment_id = transaction_id
+
+    await record_audit(
+        db=db,
+        actor=actor,
+        action="EXTERNAL_PAYMENT_CONFIRMED",
+        entity="booking",
+        entity_id=first.group_code or code,
+        details={
+            "payment_status": new_payment_status,
+            "paid_amount": str(new_total_paid),
+            "transaction_id": transaction_id,
+        },
+    )
+    await db.commit()
+    publish_pms_event("booking.confirmed", {"code": first.group_code})
+
+    return {
+        "reservationGroupId": str(first.reservation_group_id) if first.reservation_group_id else None,
+        "code": first.group_code,
+        "totalPrice": float(total_group_price),
+        "bookingIds": [b.id for b in bookings],
+        "roomIds": [b.room_id for b in bookings],
+        "status": _api_status(BookingStatus.CONFIRMADA.value),
+        "paymentStatus": new_payment_status,
+        "paidAmount": float(new_total_paid),
+        "remainingAmount": float(max(total_group_price - new_total_paid, Decimal("0.00"))),
+    }
+
+
+@router.post("/api/bookings/group/{code}/confirm-external-payment", status_code=status.HTTP_200_OK)
+@router.post("/api/v1/bookings/group/{code}/confirm-external-payment", status_code=status.HTTP_200_OK)
+async def confirm_external_payment_by_code(
+    code: str,
+    body: dict[str, Any] | None = Body(default=None),
+    principal: User | str = Depends(
+        require_service_or_role([UserRole.ADMINISTRADOR.value])
     ),
     db: AsyncSession = Depends(get_db),
-) -> list[dict[str, Any]]:
-    """Lista todas las reservas con datos del huésped y habitación para operación web (JWT)."""
+) -> dict[str, Any]:
+    """Confirma el pago aprobado de una pasarela (n8n tras el evento firmado de Wompi) o lo registra un administrador."""
+    return await _confirm_external_payment(
+        db, code, body or {}, resolve_actor_name(principal, "payment_gateway")
+    )
+
+
+@router.post("/api/bookings/confirm-external-payment", status_code=status.HTTP_200_OK)
+@router.post("/api/v1/bookings/confirm-external-payment", status_code=status.HTTP_200_OK)
+async def confirm_external_payment_by_body(
+    body: dict[str, Any] = Body(...),
+    principal: User | str = Depends(
+        require_service_or_role([UserRole.ADMINISTRADOR.value])
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Igual que la anterior, con el código de la reserva en el cuerpo (reservationCode)."""
+    code = str(body.get("reservationCode") or body.get("code") or "").strip()
+    if not code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reservationCode es obligatorio",
+        )
+    return await _confirm_external_payment(
+        db, code, body, resolve_actor_name(principal, "payment_gateway")
+    )
+
+
+async def _booking_rows(db: AsyncSession, api_status: bool = False) -> list[dict[str, Any]]:
+    """Reservas con datos del huésped y la habitación; opcionalmente con los estados del contrato de n8n."""
     res = await db.execute(select(Booking).order_by(Booking.id.desc()))
-    bookings = res.scalars().all()
     rows: list[dict[str, Any]] = []
-    for b in bookings:
+    for b in res.scalars().all():
         guest = await db.get(Guest, b.guest_id)
         room = await db.get(Room, b.room_id)
         rows.append(
@@ -781,7 +1008,7 @@ async def list_bookings(
                 "id": b.id,
                 "reservationGroupId": str(b.reservation_group_id) if b.reservation_group_id else None,
                 "bookingCode": b.group_code or f"TS-{b.id}",
-                "status": b.status,
+                "status": _api_status(b.status) if api_status else b.status,
                 "paymentStatus": b.payment_status,
                 "paidAmount": float(b.paid_amount),
                 "checkIn": b.check_in.isoformat(),
@@ -804,6 +1031,34 @@ async def list_bookings(
             }
         )
     return rows
+
+
+@router.get("/api/bookings", status_code=status.HTTP_200_OK)
+@router.get("/api/v1/bookings", status_code=status.HTTP_200_OK)
+async def list_bookings(
+    _current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Lista todas las reservas con datos del huésped y habitación para operación web (JWT)."""
+    return await _booking_rows(db)
+
+
+@router.get("/api/bookings/debug", status_code=status.HTTP_200_OK)
+async def list_bookings_debug(
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Listado de monitoreo con los estados del contrato de n8n, usado por las pruebas en vivo del chatbot.
+
+    Expone documentos completos: es de uso interno (llave de servicio o personal autenticado).
+    """
+    return await _booking_rows(db, api_status=True)
 
 
 sys.modules.setdefault("routers.n8n_compat", sys.modules[__name__])
