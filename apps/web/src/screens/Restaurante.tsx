@@ -102,18 +102,18 @@ export function Restaurante({ go }: { go: (view: string, param?: string) => void
       status: orderDestination === 'room' ? 'charged_to_room' : 'pending',
     });
     if (!res.success) {
-      show('Error al registrar comanda', res.message, 'bad');
+      show('Error al registrar pedido', res.message, 'bad');
       return;
     }
 
     if (orderDestination === 'room') {
       show(
-        'Comanda enviada con cargo a habitación',
+        'Pedido enviado con cargo a habitación',
         `Hab. ${targetRoomNum} (${guestRoomObj?.guest || ''}) · Total: ${formatCurrency(orderTotal)}`
       );
     } else {
       show(
-        'Comanda enviada a cocina',
+        'Pedido enviado a cocina',
         `${tableNumber} · Total: ${formatCurrency(orderTotal)}`
       );
     }
@@ -127,20 +127,20 @@ export function Restaurante({ go }: { go: (view: string, param?: string) => void
       <PageHeader
         eyebrow="Gastronomía & Cafetería de Especialidad"
         title="Salgados Café & Restaurante"
-        desc="Desayunos típicos, métodos de preparación de café de origen Sevilla, catas guiadas y comandas con cargo a habitación."
+        desc="Desayunos típicos, métodos de preparación de café de origen Sevilla, catas guiadas y pedidos con cargo a habitación."
         actions={
           <div className="flex gap-2">
             <Button
               variant={activeTab === 'menu' ? 'primary' : 'secondary'}
               onClick={() => setActiveTab('menu')}
             >
-              Carta y Nueva Comanda
+              Carta y Nuevo Pedido
             </Button>
             <Button
               variant={activeTab === 'comandas' ? 'primary' : 'secondary'}
               onClick={() => setActiveTab('comandas')}
             >
-              Comandas Activas ({orders.length})
+              Pedidos Activos ({orders.length})
             </Button>
           </div>
         }
@@ -221,7 +221,7 @@ export function Restaurante({ go }: { go: (view: string, param?: string) => void
                           onClick={() => addItemToOrder(item)}
                         >
                           <Plus size={14} />
-                          Agregar a comanda
+                          Agregar al pedido
                         </Button>
                       )}
                     </div>
@@ -231,18 +231,18 @@ export function Restaurante({ go }: { go: (view: string, param?: string) => void
             </div>
           </div>
 
-          {/* Columna Derecha: Comanda Actual */}
+          {/* Columna Derecha: Pedido Actual */}
           <div>
             <Card className="p-5 sticky top-6">
               <CardHeader
-                title="Comanda en Preparación"
+                title="Pedido en Preparación"
                 hint={`${orderItems.length} ítem(s) seleccionados`}
               />
 
               {orderItems.length === 0 ? (
                 <EmptyState
                   icon={<UtensilsCrossed size={26} />}
-                  title="No hay ítems en la comanda"
+                  title="No hay ítems en el pedido"
                 >
                   Selecciona desayunos, cafés Salgados o experiencias sensoriales.
                 </EmptyState>
@@ -273,14 +273,14 @@ export function Restaurante({ go }: { go: (view: string, param?: string) => void
                   </div>
 
                   <div className="border-t border-sand-200 pt-3 flex justify-between text-base font-bold">
-                    <span className="text-forest-900">Total Comanda:</span>
+                    <span className="text-forest-900">Total Pedido:</span>
                     <span className="text-terra-600">{formatCurrency(orderTotal)}</span>
                   </div>
 
-                  {/* Destino de la Comanda */}
+                  {/* Destino del Pedido */}
                   <div className="space-y-3 pt-2 border-t border-sand-200">
                     <span className="text-xs font-semibold uppercase tracking-wider text-ink-soft block">
-                      Destino de la comanda
+                      Destino del pedido
                     </span>
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -348,7 +348,7 @@ export function Restaurante({ go }: { go: (view: string, param?: string) => void
                       className="w-full mt-2"
                       onClick={handleSendOrder}
                     >
-                      Enviar comanda {orderDestination === 'room' ? 'y cargar a cuenta' : 'a preparación'}
+                      Enviar pedido {orderDestination === 'room' ? 'y cargar a cuenta' : 'a preparación'}
                     </Button>
                   </div>
                 </div>
@@ -357,15 +357,15 @@ export function Restaurante({ go }: { go: (view: string, param?: string) => void
           </div>
         </div>
       ) : (
-        /* Pestaña de Comandas Activas */
+        /* Pestaña de Pedidos Activos */
         <div className="space-y-4">
           <Card className="overflow-hidden">
             <div className="p-4 border-b border-sand-200 flex justify-between items-center">
               <h2 className="font-display font-semibold text-lg text-forest-900">
-                Historial de Comandas del Día
+                Historial de Pedidos del Día
               </h2>
               <span className="text-xs text-ink-soft">
-                {orders.length} comanda(s) registradas
+                {orders.length} pedido(s) registrados
               </span>
             </div>
 
@@ -375,7 +375,7 @@ export function Restaurante({ go }: { go: (view: string, param?: string) => void
                   <tr>
                     <th className="px-4 py-2.5 font-semibold text-xs text-ink-soft">Hora</th>
                     <th className="px-4 py-2.5 font-semibold text-xs text-ink-soft">Destino</th>
-                    <th className="px-4 py-2.5 font-semibold text-xs text-ink-soft">Detalle de Comanda</th>
+                    <th className="px-4 py-2.5 font-semibold text-xs text-ink-soft">Detalle del Pedido</th>
                     <th className="px-4 py-2.5 font-semibold text-xs text-ink-soft">Total</th>
                     <th className="px-4 py-2.5 font-semibold text-xs text-ink-soft">Estado</th>
                     <th className="px-4 py-2.5 font-semibold text-xs text-ink-soft text-right">Acción</th>
