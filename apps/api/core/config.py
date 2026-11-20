@@ -4,7 +4,13 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-_ROOT_ENV = Path(__file__).resolve().parents[3] / ".env"
+def _find_env_file() -> str:
+    """Busca el archivo .env en directorios padre de forma segura (local y Docker /app)."""
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            return str(candidate)
+    return ".env"
 
 
 class Settings(BaseSettings):
@@ -30,7 +36,7 @@ class Settings(BaseSettings):
     ]
 
     model_config = SettingsConfigDict(
-        env_file=str(_ROOT_ENV) if _ROOT_ENV.exists() else ".env",
+        env_file=_find_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )
