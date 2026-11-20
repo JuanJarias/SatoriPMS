@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
     from core.database import get_db
+    from dependencies.auth import require_service_or_role
+    from models.user import User, UserRole
     from schemas.booking import (
         LockRequest,
         LockResponse,
@@ -19,6 +21,8 @@ try:
     )
 except ImportError:
     from apps.api.core.database import get_db
+    from apps.api.dependencies.auth import require_service_or_role
+    from apps.api.models.user import User, UserRole
     from apps.api.schemas.booking import (
         LockRequest,
         LockResponse,
@@ -40,6 +44,11 @@ router = APIRouter(prefix="/api/v1/bookings", tags=["Bookings & Atomic Lock"])
 )
 async def lock_room(
     payload: LockRequest,
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> LockResponse:
     """Adquiere el candado GiST de 15 minutos tras validar RN-01, RN-12 y expirar bloqueos vencidos."""
@@ -53,6 +62,11 @@ async def lock_room(
 )
 async def unlock_room(
     payload: UnlockRequest,
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> UnlockResponse:
     """Libera manualmente un bloqueo temporal marcándolo como EXPIRADA."""

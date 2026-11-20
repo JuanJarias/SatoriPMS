@@ -7,9 +7,12 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 from sqlalchemy import delete, select, update
 
+from apps.api.core.config import settings
 from apps.api.core.database import AsyncSessionLocal
 from apps.api.main import app
 from apps.api.models import Booking, BookingStatus, Guest, Room
+
+_SVC_HEADERS = {"X-Service-Key": settings.N8N_INTERNAL_API_KEY}
 
 
 async def _clear_bookings_and_get_room_1() -> tuple[int, int]:
@@ -44,7 +47,7 @@ async def test_availability_calculates_extra_guest_surcharge_and_filters_capacit
     await _clear_bookings_and_get_room_1()
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_SVC_HEADERS) as client:
         # 1. Para 3 adultos (2 noches): Hab 4 (Balcón) tiene base=2, max=3, precio=210000, extra=40000 -> (210000+40000)*2 = 500000.00
         res = await client.get(
             "/api/v1/rooms/availability",
@@ -99,7 +102,7 @@ async def test_availability_hides_active_lock_but_ignores_expired_lock_inline_rn
         lock_id = lock.id
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_SVC_HEADERS) as client:
         res_active = await client.get(
             "/api/v1/rooms/availability",
             params={"check_in": "2026-12-10", "check_out": "2026-12-12", "adults": 2},
@@ -116,7 +119,7 @@ async def test_availability_hides_active_lock_but_ignores_expired_lock_inline_rn
         db_lock.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
         await session.commit()
 
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_SVC_HEADERS) as client:
         res_expired = await client.get(
             "/api/v1/rooms/availability",
             params={"check_in": "2026-12-10", "check_out": "2026-12-12", "adults": 2},

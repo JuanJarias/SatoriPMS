@@ -13,11 +13,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
     from core.database import get_db
+    from dependencies.auth import require_role, require_service_key, require_service_or_role, resolve_actor_name
     from models.conversation import Conversation
+    from models.user import User, UserRole
     from services.audit_service import record_audit
 except ImportError:
     from apps.api.core.database import get_db
+    from apps.api.dependencies.auth import require_role, require_service_key, require_service_or_role, resolve_actor_name
     from apps.api.models.conversation import Conversation
+    from apps.api.models.user import User, UserRole
     from apps.api.services.audit_service import record_audit
 
 router = APIRouter(tags=["Conversations & Sessions"])
@@ -55,6 +59,11 @@ def _normalize_session_key(raw_key: str) -> tuple[str, str | None]:
 )
 async def get_conversation_session(
     key: str,
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Recupera el estado conversacional o link de pago desde PostgreSQL (reemplazo 1:1 de Redis GET)."""
@@ -96,6 +105,11 @@ async def get_conversation_session(
 async def upsert_conversation_session(
     key: str,
     payload: SessionUpsertRequest,
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Guarda o actualiza el contexto conversacional en PostgreSQL 16 (reemplazo 1:1 de Redis SET)."""
@@ -169,6 +183,11 @@ async def upsert_conversation_session(
 )
 async def delete_conversation_session(
     key: str,
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Elimina una sesión conversacional inactiva en PostgreSQL 16 (reemplazo 1:1 de Redis DEL)."""
@@ -190,6 +209,7 @@ async def delete_conversation_session(
 )
 async def request_human_agent(
     payload: AgentEscalationRequest,
+    _service: str = Depends(require_service_key),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Escala una conversación de WhatsApp a un recepcionista humano y registra auditoría."""
@@ -242,6 +262,9 @@ async def request_human_agent(
 @router.get("/api/conversations", status_code=status.HTTP_200_OK)
 @router.get("/api/v1/conversations", status_code=status.HTTP_200_OK)
 async def list_conversations(
+    _current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """Lista las conversaciones de WhatsApp para la bandeja de entrada de recepción."""
@@ -271,8 +294,15 @@ async def list_conversations(
     "/api/conversations/{conversation_id}/escalation",
     status_code=status.HTTP_200_OK,
 )
+@router.post(
+    "/api/v1/conversations/{conversation_id}/escalation",
+    status_code=status.HTTP_200_OK,
+)
 async def escalate_conversation_by_id(
     conversation_id: int,
+    current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Activa o confirma escalamiento a humano por ID de conversación."""
@@ -280,6 +310,14 @@ async def escalate_conversation_by_id(
     if conv is not None:
         conv.agent_active = True
         conv.state = "escalamiento"
+        await record_audit(
+            db=db,
+            actor=resolve_actor_name(current_user),
+            action="CONVERSATION_ESCALATED",
+            entity="conversation",
+            entity_id=conversation_id,
+            details={"wa_id": conv.wa_id},
+        )
         await db.commit()
     return {"status": "escalated", "id": conversation_id}
 

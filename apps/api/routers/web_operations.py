@@ -13,13 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
     from core.database import get_db
+    from dependencies.auth import require_role
     from models.booking import ACTIVE_BOOKING_STATUSES, Booking, BookingStatus
     from models.guest import Guest
     from models.room import Room
+    from models.user import User, UserRole
     from services.audit_service import record_audit
     from services.payment_service import generate_group_code
 except ImportError:
     from apps.api.core.database import get_db
+    from apps.api.dependencies.auth import require_role
     from apps.api.models.booking import (
         ACTIVE_BOOKING_STATUSES,
         Booking,
@@ -27,6 +30,7 @@ except ImportError:
     )
     from apps.api.models.guest import Guest
     from apps.api.models.room import Room
+    from apps.api.models.user import User, UserRole
     from apps.api.services.audit_service import record_audit
     from apps.api.services.payment_service import generate_group_code
 
@@ -98,6 +102,9 @@ _SATORI_REVIEWS: list[dict[str, Any]] = [
 @router.post("/api/bookings/{booking_ref}/check-in", status_code=status.HTTP_200_OK)
 async def check_in_booking(
     booking_ref: str,
+    current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Transiciona una reserva a EN_CURSO al hacer check-in en mostrador y registra en audit_log (RN-05)."""
@@ -138,7 +145,7 @@ async def check_in_booking(
     code = first.group_code or f"TS-{first.id}"
     await record_audit(
         db=db,
-        actor="recepcion",
+        actor=current_user.username,
         action="BOOKING_CHECK_IN",
         entity="booking",
         entity_id=code,
@@ -163,6 +170,9 @@ async def check_in_booking(
 @router.post("/api/bookings/{booking_ref}/check-out", status_code=status.HTTP_200_OK)
 async def check_out_booking(
     booking_ref: str,
+    current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Liquida la cuenta al hacer check-out, libera el estado físico del cuarto y registra en audit_log."""
@@ -199,7 +209,7 @@ async def check_out_booking(
     code = first.group_code or f"TS-{first.id}"
     await record_audit(
         db=db,
-        actor="recepcion",
+        actor=current_user.username,
         action="BOOKING_CHECK_OUT",
         entity="booking",
         entity_id=code,
@@ -221,12 +231,16 @@ async def check_out_booking(
     }
 
 
-@router.post("/api/bookings/test-paid", status_code=status.HTTP_200_OK)
-async def create_web_paid_booking(
+@router.post("/api/v1/bookings/manual", status_code=status.HTTP_200_OK)
+@router.post("/api/bookings/manual", status_code=status.HTTP_200_OK)
+async def create_web_manual_booking(
     body: dict[str, Any] = Body(...),
+    current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Persiste en PostgreSQL 16 las reservas creadas directamente desde el panel web (store.tsx)."""
+    """Persiste en PostgreSQL 16 las reservas manuales creadas desde el panel web autenticado."""
     rooms_list = body.get("rooms") or []
     if not rooms_list:
         raise HTTPException(
@@ -301,7 +315,7 @@ async def create_web_paid_booking(
         db.add(booking)
         await record_audit(
             db=db,
-            actor="recepcion_web",
+            actor=current_user.username,
             action="BOOKING_CREATED_WEB",
             entity="booking",
             entity_id=code,
@@ -332,6 +346,9 @@ async def create_web_paid_booking(
 @router.get("/api/rooms", status_code=status.HTTP_200_OK)
 @router.get("/api/v1/rooms", status_code=status.HTTP_200_OK)
 async def list_all_rooms(
+    _current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """Lista todas las habitaciones del hotel con su tarifa, capacidad y estado físico."""
@@ -362,6 +379,7 @@ async def list_all_rooms(
 async def update_room(
     room_ref: str,
     body: dict[str, Any] = Body(...),
+    current_user: User = Depends(require_role([UserRole.ADMINISTRADOR.value])),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Actualiza precio base, capacidades o estado físico de una habitación y registra en audit_log (TC-02)."""
@@ -394,7 +412,7 @@ async def update_room(
 
     await record_audit(
         db=db,
-        actor="admin_web",
+        actor=current_user.username,
         action="ROOM_UPDATED",
         entity="room",
         entity_id=room.number,
@@ -414,10 +432,49 @@ async def update_room(
     }
 
 
+@router.patch("/api/rooms/{room_ref}/status", status_code=status.HTTP_200_OK)
+@router.patch("/api/v1/rooms/{room_ref}/status", status_code=status.HTTP_200_OK)
+async def update_room_operational_status(
+    room_ref: str,
+    body: dict[str, Any] = Body(...),
+    current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Permite a Recepción y Administración cambiar el estado operativo físico (available/cleaning/maintenance/occupied)."""
+    new_status = str(body.get("status") or "").strip()
+    if new_status not in ("available", "occupied", "cleaning", "maintenance"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Estado operativo inválido",
+        )
+    room = await db.get(Room, int(room_ref)) if room_ref.isdigit() else None
+    if room is None:
+        res = await db.execute(select(Room).where(Room.number == room_ref))
+        room = res.scalars().first()
+    if room is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habitación no encontrada")
+
+    room.status = new_status
+    await record_audit(
+        db=db,
+        actor=current_user.username,
+        action="ROOM_STATUS_UPDATED",
+        entity="room",
+        entity_id=str(room.id),
+        details={"number": room.number, "status": new_status},
+    )
+    await db.commit()
+    await db.refresh(room)
+    return {"id": room.id, "number": room.number, "status": room.status}
+
+
 @router.delete("/api/rooms/{room_ref}", status_code=status.HTTP_200_OK)
 @router.delete("/api/v1/rooms/{room_ref}", status_code=status.HTTP_200_OK)
 async def delete_room_if_no_active_bookings(
     room_ref: str,
+    current_user: User = Depends(require_role([UserRole.ADMINISTRADOR.value])),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Impide con HTTP 409 eliminar o desactivar una habitación si tiene reservas activas (TC-02)."""
@@ -449,7 +506,7 @@ async def delete_room_if_no_active_bookings(
     room.active = False
     await record_audit(
         db=db,
-        actor="admin_web",
+        actor=current_user.username,
         action="ROOM_DEACTIVATED",
         entity="room",
         entity_id=room.number,
@@ -462,7 +519,11 @@ async def delete_room_if_no_active_bookings(
 # ── 3. Salgados Café & Cargos al Folio de Habitación (TC-03) ─────────────────
 @router.get("/api/restaurant/menu", status_code=status.HTTP_200_OK)
 @router.get("/api/v1/restaurant/menu", status_code=status.HTTP_200_OK)
-async def get_salgados_cafe_menu() -> list[dict[str, Any]]:
+async def get_salgados_cafe_menu(
+    _current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
+) -> list[dict[str, Any]]:
     """Retorna el menú activo de cafetería y barismo de Salgados Café."""
     return _SALGADOS_MENU
 
@@ -471,10 +532,13 @@ async def get_salgados_cafe_menu() -> list[dict[str, Any]]:
 @router.post("/api/v1/restaurant/orders", status_code=status.HTTP_200_OK)
 async def create_restaurant_order(
     body: dict[str, Any] = Body(...),
+    current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Registra un pedido de Salgados Café y consolida el cargo en el folio de la reserva activa (TC-03)."""
-    room_number = str(body.get("roomNumber") or body.get("room_number") or "101")
+    room_number = str(body.get("roomNumber") or body.get("room_number") or "1")
     booking_id = body.get("bookingId") or body.get("booking_id")
     items = body.get("items") or []
     order_total = Decimal("0.00")
@@ -522,7 +586,7 @@ async def create_restaurant_order(
 
     await record_audit(
         db=db,
-        actor="salgados_cafe",
+        actor=current_user.username,
         action="RESTAURANT_ORDER_CHARGED",
         entity="booking",
         entity_id=target_booking.id if target_booking else room_number,
@@ -538,7 +602,11 @@ async def create_restaurant_order(
 
 @router.get("/api/restaurant/orders", status_code=status.HTTP_200_OK)
 @router.get("/api/v1/restaurant/orders", status_code=status.HTTP_200_OK)
-async def list_restaurant_orders() -> list[dict[str, Any]]:
+async def list_restaurant_orders(
+    _current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
+) -> list[dict[str, Any]]:
     """Lista las comandas registradas en Salgados Café."""
     return _RESTAURANT_ORDERS
 
@@ -546,7 +614,11 @@ async def list_restaurant_orders() -> list[dict[str, Any]]:
 # ── 4. Motor de Eventos Especiales y Descuentos (TC-04) ──────────────────────
 @router.get("/api/events", status_code=status.HTTP_200_OK)
 @router.get("/api/v1/events", status_code=status.HTTP_200_OK)
-async def list_special_events() -> list[dict[str, Any]]:
+async def list_special_events(
+    _current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
+) -> list[dict[str, Any]]:
     """Lista los eventos especiales y descuentos de temporada de Sevilla."""
     return _SPECIAL_EVENTS
 
@@ -555,6 +627,7 @@ async def list_special_events() -> list[dict[str, Any]]:
 @router.post("/api/v1/events", status_code=status.HTTP_200_OK)
 async def create_special_event(
     body: dict[str, Any] = Body(...),
+    current_user: User = Depends(require_role([UserRole.ADMINISTRADOR.value])),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Crea un evento con porcentaje de descuento y recalcula cotización si se indica baseAmount (TC-04)."""
@@ -577,7 +650,7 @@ async def create_special_event(
     _SPECIAL_EVENTS.append(event)
     await record_audit(
         db=db,
-        actor="admin_web",
+        actor=current_user.username,
         action="SPECIAL_EVENT_CREATED",
         entity="special_event",
         entity_id=event["id"],
@@ -592,6 +665,9 @@ async def create_special_event(
 @router.get("/api/v1/reviews/summary", status_code=status.HTTP_200_OK)
 async def get_reviews_summary(
     refresh: bool = Query(default=False),
+    _current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
 ) -> dict[str, Any]:
     """Retorna el consolidado de reseñas para la pantalla Resenas.tsx."""
     total = len(_SATORI_REVIEWS)

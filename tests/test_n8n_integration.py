@@ -7,9 +7,12 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 from sqlalchemy import delete, select
 
+from apps.api.core.config import settings
 from apps.api.core.database import AsyncSessionLocal
 from apps.api.main import app
 from apps.api.models import Booking, Conversation, Room
+
+_SVC_HEADERS = {"X-Service-Key": settings.N8N_INTERNAL_API_KEY}
 
 
 def test_n8n_v10_workflow_has_zero_redis_nodes() -> None:
@@ -42,7 +45,24 @@ async def test_postgresql_conversation_session_crud_and_agent_escalation() -> No
         await session.commit()
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test") as anon_client:
+        unauth_res = await anon_client.get("/api/v1/conversations/session/session:573110001122")
+        assert unauth_res.status_code == 401
+
+        bad_esc = await anon_client.post(
+            "/api/notifications/agent-request",
+            json={"wa_id": "573110001122", "name": "Carlos Restrepo"},
+        )
+        assert bad_esc.status_code == 401
+
+        login_res = await anon_client.post(
+            "/api/v1/auth/login",
+            json={"username": "recepcion", "password": "recepcion123"},
+        )
+        assert login_res.status_code == 200
+        jwt_headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
+
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_SVC_HEADERS) as client:
         # 1. Consulta inicial de sesión inexistente -> value: None
         get_empty = await client.get("/api/v1/conversations/session/session:573110001122")
         assert get_empty.status_code == 200
@@ -79,8 +99,8 @@ async def test_postgresql_conversation_session_crud_and_agent_escalation() -> No
         assert esc_res.status_code == 200
         assert esc_res.json()["agent_available"] is True
 
-        # 5. Listar bandeja de conversaciones -> GET /api/conversations
-        list_res = await client.get("/api/conversations")
+        # 5. Listar bandeja de conversaciones -> GET /api/conversations (requiere JWT web)
+        list_res = await client.get("/api/conversations", headers=jwt_headers)
         assert list_res.status_code == 200
         assert len(list_res.json()) == 1
         assert list_res.json()[0]["status"] == "escalated"
@@ -102,7 +122,7 @@ async def test_n8n_v10_end_to_end_booking_lifecycle_and_rn03_cancellation() -> N
         room_id = room.id
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_SVC_HEADERS) as client:
         # 1. Disponibilidad en formato camelCase de n8n V10
         avail_res = await client.get(
             "/api/rooms/availability",

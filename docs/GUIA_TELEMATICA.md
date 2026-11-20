@@ -381,7 +381,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 | :--- | :--- | :--- | :--- |
 | `P0` | Aislamiento DB de pruebas (`satoripms_test`) y variables `.env` Wompi/Google | `AGY` | [x] |
 | `P1` | Migración Alembic `004`: cuartos `1–9`, tarifas reales y tablas operativas | `AGY` | [x] |
-| `P2` | RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers | `AGY` | [ ] |
+| `P2` | RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers | `AGY` | [x] |
 | `P3` | Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` | `AGY` | [ ] |
 | `P4` | Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) | `AGY` | [ ] |
 | `P5` | Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel | `AGY` | [ ] |
@@ -429,7 +429,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 
 ---
 
-### `P2` — RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers (`MÍO`)
+### `P2` — RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers (`AGY`)
 - **Objetivo:** proteger con `Depends(require_role(...))` todos los endpoints administrativos y operativos de `web_operations.py` y `rooms.py`, exigir `X-Service-Key` en rutas internas consumidas por n8n (`/api/bookings/confirm`, `/lock`, `/unlock`, `/conversations/*`) y eliminar `/api/bookings/test-paid` y endpoints demo abiertos.
 - **Archivos afectados:** `apps/api/dependencies/auth.py`, `apps/api/routers/web_operations.py`, `apps/api/routers/rooms.py`, `apps/api/routers/bookings.py`, `apps/api/routers/n8n_compat.py`, `apps/api/routers/conversations.py`, `tests/test_auth.py`, `docs/aprendizaje/P2.md`.
 - **Criterio de aceptación:** peticiones web sin JWT devuelven `401`; Recepcionista recibe `403` en rutas de Administrador (CRUD cuartos, eventos, egresos, usuarios, auditoría); n8n sin `X-Service-Key` recibe `401`.
@@ -441,7 +441,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 - **Checklist manual:**
   1. Probar en `/docs` (Swagger) que `GET /api/v1/auth/audit` y `POST /api/v1/rooms` rechazan sin Bearer token.
   2. Iniciar sesión con rol `Recepcionista` y confirmar `403` al intentar editar tarifas o crear egresos.
-- **Casilla:** `[ ]` Completado y verificado.
+- **Casilla:** `[x]` Completado y verificado.
 - **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
 
 ---

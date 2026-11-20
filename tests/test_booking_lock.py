@@ -8,9 +8,12 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 from sqlalchemy import delete, select
 
+from apps.api.core.config import settings
 from apps.api.core.database import AsyncSessionLocal
 from apps.api.main import app
 from apps.api.models import Booking, BookingStatus, Guest, Room
+
+_SVC_HEADERS = {"X-Service-Key": settings.N8N_INTERNAL_API_KEY}
 
 
 async def _prepare_room_4() -> tuple[int, int]:
@@ -44,7 +47,7 @@ async def test_lock_validates_ley_1581_rn12_and_capacity_rn01() -> None:
     _, room_id = await _prepare_room_4()
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_SVC_HEADERS) as client:
         # 1. Sin consentimiento Ley 1581 (habeas_data_accepted = False) -> 400 Bad Request
         res_no_consent = await client.post(
             "/api/v1/bookings/lock",
@@ -96,7 +99,7 @@ async def test_lock_atomically_expires_past_lock_and_creates_new_15m_lock() -> N
         old_lock_id = expired_lock.id
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_SVC_HEADERS) as client:
         res = await client.post(
             "/api/v1/bookings/lock",
             json={
@@ -129,7 +132,7 @@ async def test_concurrent_http_lock_requests_return_one_200_and_nine_409() -> No
     _, room_id = await _prepare_room_4()
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_SVC_HEADERS) as client:
 
         async def send_lock(i: int) -> int:
             response = await client.post(

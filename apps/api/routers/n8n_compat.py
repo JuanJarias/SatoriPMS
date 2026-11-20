@@ -14,9 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
     from core.database import get_db
+    from dependencies.auth import require_role, require_service_or_role, resolve_actor_name
     from models.booking import Booking, BookingStatus
     from models.guest import Guest
     from models.room import Room
+    from models.user import User, UserRole
     from schemas.booking import LockRequest
     from services.audit_service import record_audit
     from services.booking_service import create_booking_lock
@@ -27,9 +29,15 @@ try:
     )
 except ImportError:
     from apps.api.core.database import get_db
+    from apps.api.dependencies.auth import (
+        require_role,
+        require_service_or_role,
+        resolve_actor_name,
+    )
     from apps.api.models.booking import Booking, BookingStatus
     from apps.api.models.guest import Guest
     from apps.api.models.room import Room
+    from apps.api.models.user import User, UserRole
     from apps.api.schemas.booking import LockRequest
     from apps.api.services.audit_service import record_audit
     from apps.api.services.booking_service import create_booking_lock
@@ -108,6 +116,11 @@ async def compat_rooms_availability(
     children: int = Query(default=0, ge=0),
     pet: bool = Query(default=False),
     with_pet: bool = Query(default=False),
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """Endpoint compatible con n8n V10 (camelCase) y API v1 (snake_case) para disponibilidad."""
@@ -158,6 +171,11 @@ async def compat_rooms_availability(
 @router.post("/api/bookings/lock", status_code=status.HTTP_200_OK)
 async def compat_lock_room(
     body: dict[str, Any] = Body(...),
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Crea bloqueo temporal de 15 min compatible con el nodo 'API Bloquear Habitación 15 min' de n8n V10."""
@@ -199,6 +217,11 @@ async def compat_lock_room(
 @router.post("/api/bookings/unlock", status_code=status.HTTP_200_OK)
 async def compat_unlock_rooms(
     body: dict[str, Any] | None = Body(default=None),
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, int]:
     """Libera uno o varios bloqueos temporales de n8n V10 marcándolos como EXPIRADA en PostgreSQL."""
@@ -256,6 +279,11 @@ async def compat_unlock_rooms(
 @router.post("/api/v1/bookings/confirm", status_code=status.HTTP_200_OK)
 async def confirm_bookings_batch(
     body: dict[str, Any] = Body(...),
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Confirma una o varias habitaciones bloqueadas asignando código TS-XXXX y registrando en audit_log."""
@@ -494,6 +522,11 @@ async def confirm_bookings_batch(
 @router.get("/api/v1/bookings/group/{code}", status_code=status.HTTP_200_OK)
 async def get_booking_group_by_code(
     code: str,
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Consulta detalles de una reserva grupal por código TS-XXXX e incluye política de reembolso RN-03."""
@@ -594,6 +627,11 @@ async def get_booking_group_by_code(
 @router.post("/api/v1/bookings/group/{code}/cancellation", status_code=status.HTTP_200_OK)
 async def cancel_booking_group(
     code: str,
+    principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Cancela la reserva grupal pasando a CANCELADA, libera el índice GiST y calcula reembolso RN-03."""
@@ -634,7 +672,7 @@ async def cancel_booking_group(
     resolved_code = first.group_code or code.upper()
     await record_audit(
         db=db,
-        actor="guest_or_reception",
+        actor=resolve_actor_name(principal, "guest_or_reception"),
         action="BOOKING_CANCELLED",
         entity="booking",
         entity_id=resolved_code,
@@ -667,6 +705,11 @@ async def cancel_booking_group(
 @router.post("/api/v1/bookings/group/{code}/pay-remaining", status_code=status.HTTP_200_OK)
 async def pay_remaining_balance(
     code: str,
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Liquida el 50% de saldo pendiente actualizando payment_status a 'paid' y registrando en audit_log."""
@@ -714,12 +757,15 @@ async def pay_remaining_balance(
     }
 
 
-@router.get("/api/bookings/debug", status_code=status.HTTP_200_OK)
-@router.get("/api/v1/bookings/debug", status_code=status.HTTP_200_OK)
-async def list_debug_bookings(
+@router.get("/api/bookings", status_code=status.HTTP_200_OK)
+@router.get("/api/v1/bookings", status_code=status.HTTP_200_OK)
+async def list_bookings(
+    _current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    """Lista todas las reservas con datos del huésped y habitación para monitoreo en tiempo real."""
+    """Lista todas las reservas con datos del huésped y habitación para operación web (JWT)."""
     res = await db.execute(select(Booking).order_by(Booking.id.desc()))
     bookings = res.scalars().all()
     rows: list[dict[str, Any]] = []
