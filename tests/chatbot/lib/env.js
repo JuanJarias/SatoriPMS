@@ -84,7 +84,27 @@ async function findWompiLinkInPg(waId, envObj = loadEnv()) {
   return null;
 }
 
+// Instantánea de la sesión del huésped (texto) para detectar cuándo el flujo ya respondió.
+async function snapshotSession(waId, envObj = loadEnv()) {
+  return JSON.stringify(await getPgSession(`session:${waId}`, envObj));
+}
+
+// Espera a que la sesión cambie respecto de `before` (el flujo procesó el mensaje) o a que venza el tiempo.
+async function waitSessionChange(waId, before, timeoutMs = 20000, envObj = loadEnv()) {
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    if ((await snapshotSession(waId, envObj)) !== before) {
+      await new Promise(r => setTimeout(r, 500));
+      return true;
+    }
+    await new Promise(r => setTimeout(r, 400));
+  }
+  return false;
+}
+
 module.exports = {
+  snapshotSession,
+  waitSessionChange,
   loadEnv,
   sessionApiCall,
   getPgSession,

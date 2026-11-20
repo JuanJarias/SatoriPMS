@@ -21,7 +21,16 @@ const CHECK_OUT = '2026-12-03';
 
 const API_HOST = process.env.API_HOST || 'localhost';
 const API_PORT = process.env.API_PORT || 8080;
-const SERVICE_KEY = require('./lib/env').loadEnv().SATORI_SERVICE_KEY || '';
+const { loadEnv, snapshotSession, waitSessionChange } = require('./lib/env');
+const ENV = loadEnv();
+const SERVICE_KEY = ENV.SATORI_SERVICE_KEY || '';
+
+// Envía el mensaje y espera a que el flujo lo procese (la sesión cambia), en vez de un tiempo fijo.
+async function say(text, fallbackMs) {
+  const before = await snapshotSession(WA_ID, ENV);
+  await sendMsg(text);
+  if (!(await waitSessionChange(WA_ID, before, Math.max(fallbackMs * 5, 20000), ENV))) await sleep(fallbackMs);
+}
 const N8N_HOST = process.env.N8N_HOST || 'localhost';
 const N8N_PORT = process.env.N8N_PORT || 5678;
 
@@ -102,44 +111,34 @@ async function run() {
 
   try {
     console.log('[1/10] Enviando "menu"...');
-    await sendMsg('menu');
-    await sleep(2000);
+    await say('menu', 2000);
 
     console.log('[2/10] Seleccionando Opción 1 (Hacer una reserva)...');
-    await sendMsg('1');
-    await sleep(2000);
+    await say('1', 2000);
 
     console.log(`[3/10] Ingresando fechas en un solo mensaje (${CHECK_IN} al ${CHECK_OUT})...`);
-    await sendMsg(`${CHECK_IN} al ${CHECK_OUT}`);
-    await sleep(4500);
+    await say(`${CHECK_IN} al ${CHECK_OUT}`, 4500);
 
     console.log('[4/10] Seleccionando habitación disponible (Opción 1)...');
-    await sendMsg('1');
-    await sleep(3500);
+    await say('1', 3500);
 
     console.log('[5/10] Ingresando huéspedes (2 adultos)...');
-    await sendMsg('2 adultos');
-    await sleep(3500);
+    await say('2 adultos', 3500);
 
     console.log(`[6/10] Ingresando nombre del titular (${TEST_NAME})...`);
-    await sendMsg(TEST_NAME);
-    await sleep(3000);
+    await say(TEST_NAME, 3000);
 
     console.log('[7/10] Ingresando cédula (1094888999)...');
-    await sendMsg('1094888999');
-    await sleep(3000);
+    await say('1094888999', 3000);
 
     console.log('[8/10] Mascota (no)...');
-    await sendMsg('no');
-    await sleep(3000);
+    await say('no', 3000);
 
     console.log('[9/10] Acompañante (Camila Soto)...');
-    await sendMsg('Camila Soto');
-    await sleep(3500);
+    await say('Camila Soto', 3500);
 
     console.log('[11/11] Seleccionando Modalidad de Pago: Opción 2 (50% de anticipo)...');
-    await sendMsg('2');
-    await sleep(4500);
+    await say('2', 4500);
 
     // ─── ASERCIÓN FINAL ───
     console.log('\n[Verificación] Consultando registros en Backend API...');

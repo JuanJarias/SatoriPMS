@@ -21,7 +21,7 @@
  */
 const http = require('http');
 const crypto = require('crypto');
-const { loadEnv, findWompiLinkInPg } = require('./lib/env');
+const { loadEnv, findWompiLinkInPg, snapshotSession, waitSessionChange } = require('./lib/env');
 
 const env = loadEnv();
 
@@ -85,9 +85,11 @@ async function run() {
       [TEST_NAME, 3000], ['1094888777', 3000], ['no', 3000], ['Mateo Pérez', 3500], ['2', 6000]];
     for (const [i, [msg, wait]] of steps.entries()) {
       console.log(`[${i + 1}/${steps.length}] Enviando "${msg}"...`);
+      const before = await snapshotSession(WA_ID, env);
       const r = await sendMsg(msg);
       if (r.status !== 200) throw new Error(`Webhook WhatsApp respondio HTTP ${r.status}: ${r.body}`);
-      await sleep(wait);
+      // Espera a que el flujo procese el mensaje (la sesión cambia) en lugar de un tiempo fijo
+      if (!(await waitSessionChange(WA_ID, before, Math.max(wait * 5, 20000), env))) await sleep(wait);
     }
 
     console.log('\n[Verificacion 1] Reserva en la API...');
