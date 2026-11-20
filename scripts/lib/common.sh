@@ -63,6 +63,9 @@ detect_compose() {
         die "Docker Compose no está disponible ('docker compose' ni 'docker-compose'). En Arch/EndeavourOS: sudo pacman -S docker-compose"
     fi
     if ! docker info >/dev/null 2>&1; then
+        if [ -S /var/run/docker.sock ] && ! [ -w /var/run/docker.sock ]; then
+            die "Sin permisos en /var/run/docker.sock. Ejecuta una vez: sudo usermod -aG docker \$USER && newgrp docker"
+        fi
         die "El demonio de Docker no responde. Inícialo con: sudo systemctl start docker"
     fi
 }

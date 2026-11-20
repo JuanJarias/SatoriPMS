@@ -3,7 +3,7 @@
 # SatoriPMS - Levantar el entorno de desarrollo completo
 #
 # 1. Verifica herramientas y el archivo .env (secretos obligatorios).
-# 2. Levanta PostgreSQL, API (FastAPI), Redis (solo n8n) y n8n con Docker Compose y espera a que
+# 2. Levanta PostgreSQL, API (FastAPI) y n8n (si COMPOSE_PROFILES=n8n) con Docker Compose y espera a que
 #    cada servicio responda.
 # 3. Abre el túnel público zrok2 para n8n (WhatsApp y Wompi), si aplica.
 # 4. Inicia la aplicación web (Vite) en segundo plano.
@@ -30,7 +30,7 @@ Opciones:
   --frontend-only    Solo inicia la aplicación web (sin Docker).
   --no-tunnel        No abre el túnel público zrok2 para n8n.
   --no-build         No reconstruye la imagen de la API (más rápido si no cambió el código).
-  --sync-flow        Importa y publica el flujo V9 en n8n al terminar.
+  --sync-flow        Importa y publica el flujo V10 en n8n al terminar.
   --open             Abre en el navegador la aplicación web, n8n y la documentación de la API.
   -h, --help         Muestra esta ayuda.
 
@@ -38,7 +38,7 @@ Otros scripts:
   ./scripts/stop-dev.sh       Detiene todo conservando los datos.
   ./scripts/reset-dev.sh      Borra contenedores y datos (pide confirmación).
   ./scripts/status-dev.sh     Diagnóstico de servicios, túnel y WhatsApp.
-  ./scripts/sync-n8n-flow.sh  Importa y publica el flujo V9 en n8n.
+  ./scripts/sync-n8n-flow.sh  Importa y publica el flujo V10 en n8n.
 EOF
 }
 
@@ -98,6 +98,9 @@ if $START_INFRA; then
         env_ok=false
     fi
     service_key="$(env_get SATORI_SERVICE_KEY)"
+    if [ -z "$service_key" ]; then
+        service_key="$(env_get N8N_INTERNAL_API_KEY)"
+    fi
     if [ -z "$service_key" ] || [ "$service_key" = "cambia_esta_llave_de_servicio" ]; then
         log_error "Falta SATORI_SERVICE_KEY en .env (n8n no podrá llamar a la API). Genera una con: openssl rand -hex 32"
         env_ok=false
