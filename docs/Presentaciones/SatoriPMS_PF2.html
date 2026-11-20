@@ -203,7 +203,7 @@ h1 {
     <div style="font-size:28px;line-height:36px;color:#EDE0D4;">
       <p style="margin-bottom:22px;">• Mientras el huésped cotiza, la habitación queda apartada 15 minutos.</p>
       <p style="margin-bottom:22px;">• Si dos personas intentan reservar a la vez, una continúa y la otra recibe rechazo inmediato.</p>
-      <p>• Si no paga a tiempo, se libera sola.</p>
+      <p>• Si no paga a tiempo, se libera sola: 15 min al cotizar y 24 h con el link de pago.</p>
     </div>
   </div>
   <div style="font-size:48px;font-weight:700;color:#9C5A3C;">→</div>
@@ -332,7 +332,7 @@ h1 {
       <p style="margin-bottom:16px;">• Check-in, check-out y liquidación de saldos</p>
       <p style="margin-bottom:16px;">• Salgados Café y tienda con cargo a habitación</p>
       <p style="margin-bottom:16px;">• Eventos y tarifas dinámicas por temporada</p>
-      <p>• Finanzas, reportes Excel y bitácora de auditoría</p>
+      <p>• Bandeja de WhatsApp: pausar el bot y responder desde la web<br>• Finanzas, reportes Excel y bitácora de auditoría</p>
     </div>
   </div>
 </div>
@@ -438,31 +438,38 @@ h1 {
     <div style="font-size:34px;font-weight:700;">Bitácora inmutable</div>
   </div>
   <div style="font-size:32px;line-height:42px;color:#634B3F;">Cada cambio de tarifa, check-in, cancelación o consumo queda auditado con fecha, actor y entidad.</div>
-</div></div><div class="page-num">14</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 · VALIDACIÓN</div><h1>Validación y pruebas</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div><div style="position:absolute;top:280px;left:120px;display:flex;gap:40px;">
-<div class="card" style="width:390px;height:600px;padding:36px 32px;">
+</div></div><div class="page-num">14</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 · VALIDACIÓN</div><h1>Validación y pruebas</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div><div style="position:absolute;top:280px;left:120px;display:flex;gap:30px;">
+<div class="card" style="width:312px;height:600px;padding:34px 28px;">
   <div class="pill pill-green">APROBADO</div>
-  <div class="serif" style="font-size:68px;font-weight:700;margin:48px 0 18px 0;">36/36</div>
-  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:24px;">pruebas del servidor (pytest)</div>
-  <div style="font-size:26px;line-height:34px;color:#634B3F;">Concurrencia, seguridad, tarifas y API FastAPI</div>
+  <div class="serif" style="font-size:60px;font-weight:700;margin:44px 0 16px 0;">37/37</div>
+  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:20px;">pruebas del servidor (pytest)</div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">Concurrencia, seguridad, tarifas y API</div>
 </div>
-<div class="card" style="width:390px;height:600px;padding:36px 32px;">
+<div class="card" style="width:312px;height:600px;padding:34px 28px;">
   <div class="pill pill-green">APROBADO</div>
-  <div class="serif" style="font-size:68px;font-weight:700;margin:48px 0 18px 0;">65/65</div>
-  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:24px;">pruebas de suite chatbot</div>
+  <div class="serif" style="font-size:60px;font-weight:700;margin:44px 0 16px 0;">4/4</div>
+  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:20px;">pruebas de la web (E2E)</div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">Login, reservas, tienda y auditoría con navegador real</div>
+</div>
+<div class="card" style="width:312px;height:600px;padding:34px 28px;">
+  <div class="pill pill-green">APROBADO</div>
+  <div class="serif" style="font-size:60px;font-weight:700;margin:44px 0 16px 0;">65/65</div>
+  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:20px;">pruebas de suite chatbot</div>
   <div style="font-size:26px;line-height:34px;color:#634B3F;">Flujos guiados, IA, cancelación y escalamiento</div>
 </div>
-<div class="card" style="width:390px;height:600px;padding:36px 32px;">
+<div class="card" style="width:312px;height:600px;padding:34px 28px;">
   <div class="pill pill-green">APROBADO</div>
-  <div class="serif" style="font-size:68px;font-weight:700;margin:48px 0 18px 0;">11/11</div>
-  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:24px;">pruebas pasarela Wompi</div>
-  <div style="font-size:26px;line-height:34px;color:#634B3F;">Links de pago, firma HMAC e idempotencia</div>
+  <div class="serif" style="font-size:60px;font-weight:700;margin:44px 0 16px 0;">11/11</div>
+  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:20px;">pruebas pasarela Wompi</div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">Links de pago, firma e idempotencia</div>
 </div>
-<div class="card" style="width:390px;height:600px;padding:36px 32px;">
+<div class="card" style="width:312px;height:600px;padding:34px 28px;">
   <div class="pill pill-green">APROBADO</div>
-  <div class="serif" style="font-size:68px;font-weight:700;margin:48px 0 18px 0;">7/7</div>
-  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:24px;">pruebas en vivo E2E</div>
-  <div style="font-size:26px;line-height:34px;color:#634B3F;">WhatsApp/n8n real contra FastAPI y Wompi</div>
-</div></div><div class="source-foot">Fuente: ejecución de las pruebas del repositorio (corte 19–20 nov 2026).</div><div class="page-num">15</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 · RENDIMIENTO</div><h1>Concurrencia y rendimiento</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
+  <div class="serif" style="font-size:60px;font-weight:700;margin:44px 0 16px 0;">7/7</div>
+  <div style="font-size:30px;font-weight:700;color:#9C5A3C;line-height:39px;margin-bottom:20px;">pruebas en vivo E2E</div>
+  <div style="font-size:26px;line-height:34px;color:#634B3F;">WhatsApp y n8n reales contra FastAPI y Wompi</div>
+</div>
+</div><div class="source-foot">Fuente: ejecución de las pruebas del repositorio (corte 19–20 nov 2026).</div><div class="page-num">15</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 3 · RENDIMIENTO</div><h1>Concurrencia y rendimiento</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot active">3</div><div class="dot ">4</div><div class="dot ">5</div></div>
 <div class="card-espresso" style="position:absolute;top:270px;left:120px;width:540px;height:630px;padding:48px 44px;">
   <div style="font-size:30px;line-height:40px;color:#EDE0D4;">50 solicitudes simultáneas sobre la misma habitación</div>
   <div class="serif" style="font-size:132px;font-weight:700;margin:36px 0 8px 0;">0</div>
@@ -473,7 +480,7 @@ h1 {
 <div class="card" style="width:540px;height:300px;padding:34px 36px;">
   <div class="serif" style="font-size:56px;font-weight:700;margin-bottom:12px;">&lt; 0,4 s</div>
   <div style="font-size:28px;line-height:36px;color:#634B3F;margin-bottom:14px;">respuesta más lenta con 50 cotizaciones simultáneas</div>
-  <div style="font-size:26px;font-weight:600;color:#2F6F4E;">Promedio 0,13–0,31 s · meta &lt; 1,5 s</div>
+  <div style="font-size:26px;font-weight:600;color:#2F6F4E;">Promedio 0,12–0,31 s · meta &lt; 1,5 s</div>
 </div>
 <div class="card" style="width:540px;height:300px;padding:34px 36px;">
   <div class="serif" style="font-size:56px;font-weight:700;margin-bottom:12px;">&lt; 1 s</div>
@@ -490,7 +497,7 @@ h1 {
   <div style="font-size:28px;line-height:36px;color:#634B3F;margin-bottom:14px;">para emitir el código de reserva TS-XXXX</div>
   <div style="font-size:26px;font-weight:600;color:#2F6F4E;">Visible de inmediato en recepción</div>
 </div></div>
-<div class="source-foot">Mediciones propias del servidor (3 corridas, 20 nov 2026), sin contar la red de WhatsApp.</div>
+<div class="source-foot">Mediciones propias del servidor (6 corridas, 20 nov 2026), sin contar la red de WhatsApp.</div>
 <div class="page-num">16</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 4 DE 5</div><h1>Inversión del proyecto</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot done">3</div><div class="dot active">4</div><div class="dot ">5</div></div>
 <div style="position:absolute;top:270px;left:120px;display:flex;flex-direction:column;gap:30px;">
 <div class="card" style="width:780px;height:180px;padding:40px;display:flex;align-items:center;gap:28px;">
@@ -556,7 +563,7 @@ h1 {
 <div class="page-num">18</div></section><section class="slide"><div class="header"><div class="pill">PREGUNTA 4 · CONTINUIDAD Y SOPORTE</div><h1>Disponibilidad, fallos y soporte</h1></div><div class="dots"><div class="dot done">1</div><div class="dot done">2</div><div class="dot done">3</div><div class="dot active">4</div><div class="dot ">5</div></div><div style="position:absolute;top:270px;left:120px;width:1680px;display:flex;flex-wrap:wrap;gap:30px 40px;">
 <div class="card" style="width:820px;height:300px;padding:32px 36px;">
   <div class="pill pill-green" style="margin-bottom:22px;">Disponibilidad y respaldos</div>
-  <div style="font-size:26px;line-height:34px;">• Uptime garantizado ≥ 99,5 % mensual.<br>• Respaldos automáticos diarios a las 03:00 a. m. (30 diarios + 12 mensuales).<br>• Restauración de respaldo probada: &lt; 1 s con los datos actuales.</div>
+  <div style="font-size:26px;line-height:34px;">• Uptime garantizado ≥ 99,5 % mensual.<br>• Respaldo cifrado diario a las 03:00 a. m. en almacenamiento externo (Cloudflare R2).<br>• Restauración de respaldo probada: &lt; 1 s con los datos actuales.</div>
 </div>
 <div class="card" style="width:820px;height:300px;padding:32px 36px;">
   <div class="pill pill-blue" style="margin-bottom:22px;">Plan ante posibles fallos</div>
@@ -615,11 +622,11 @@ h1 {
 </div>
 <div style="background:#FAF5F0;border:1px solid #D6C2B0;border-radius:10px;height:78px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
   <div style="font-size:26px;">Pruebas API y chatbot</div>
-  <div style="font-size:28px;font-weight:700;color:#2F6F4E;">36/36 · 65/65</div>
+  <div style="font-size:28px;font-weight:700;color:#2F6F4E;">37/37 · 65/65</div>
 </div>
 <div style="background:#E6D5C3;border:1px solid #D6C2B0;border-radius:10px;height:78px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
-  <div style="font-size:26px;">Pruebas Wompi y vivo</div>
-  <div style="font-size:28px;font-weight:700;color:#2F6F4E;">11/11 · 7/7</div>
+  <div style="font-size:26px;">Pruebas Wompi, vivo y web</div>
+  <div style="font-size:28px;font-weight:700;color:#2F6F4E;">11/11 · 7/7 · 4/4</div>
 </div>
 <div style="background:#FAF5F0;border:1px solid #D6C2B0;border-radius:10px;height:78px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;">
   <div style="font-size:26px;">Personal capacitado</div>
@@ -668,7 +675,7 @@ h1 {
       <p style="margin-bottom:20px;">• Estimar con holgura las integraciones externas</p>
       <p style="margin-bottom:20px;">• Iniciar trámites comerciales con Meta desde el día 1</p>
       <p style="margin-bottom:20px;">• Documentación continua al ritmo del código</p>
-      <p>• Pruebas de concurrencia en CI con base de datos real</p>
+      <p>• Alertas de errores en producción con Sentry</p>
     </div>
   </div>
 </div>
