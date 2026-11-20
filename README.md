@@ -56,7 +56,7 @@ SatoriPMS/
 ├── scripts/                 # Scripts de desarrollo: levantar, detener, reiniciar, diagnosticar y publicar el flujo n8n
 └── tests/
     ├── chatbot/             # Suite integral del chatbot y scripts de validación (Node.js y Python)
-    └── test_*.py            # Pruebas del servidor central (pytest, base aislada satoripms_test)
+    └── backend/             # Pruebas del servidor central (pytest, base aislada satoripms_test)
 ```
 
 ---

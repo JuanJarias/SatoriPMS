@@ -15,7 +15,7 @@ def _resolve_env_database_url() -> str:
     if env_val:
         return env_val
 
-    root_env = Path(__file__).resolve().parents[1] / ".env"
+    root_env = Path(__file__).resolve().parents[2] / ".env"
     if root_env.is_file():
         for raw_line in root_env.read_text(encoding="utf-8").splitlines():
             line = raw_line.strip()
@@ -60,7 +60,7 @@ def _ensure_test_database_and_schema(test_url_str: str) -> None:
             if cur.fetchone() is None:
                 cur.execute(f'CREATE DATABASE "{url.database}"')
 
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
     alembic_ini = repo_root / "apps" / "api" / "alembic.ini"
     alembic_cfg = AlembicConfig(str(alembic_ini))
     alembic_cfg.set_main_option(

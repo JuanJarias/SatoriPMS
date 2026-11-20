@@ -17,7 +17,7 @@ _SVC_HEADERS = {"X-Service-Key": settings.N8N_INTERNAL_API_KEY}
 
 def test_n8n_v10_workflow_has_zero_redis_nodes() -> None:
     """Verifica que flows/n8n/V10_ChatbotReservas.json haya eliminado los 7 nodos Redis y use /api/v1/conversations/session/."""
-    flow_path = Path(__file__).resolve().parents[1] / "flows" / "n8n" / "V10_ChatbotReservas.json"
+    flow_path = Path(__file__).resolve().parents[2] / "flows" / "n8n" / "V10_ChatbotReservas.json"
     assert flow_path.exists()
     data = json.loads(flow_path.read_text(encoding="utf-8"))
 

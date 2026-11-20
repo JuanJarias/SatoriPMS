@@ -286,7 +286,7 @@ node tests/chatbot/test_cancelacion_reembolso.js
 
 ## Pruebas del Servidor Central (Python)
 
-Las pruebas del servidor FastAPI están en `tests/` (raíz del repositorio) y se ejecutan con `pytest` (configuración en `pytest.ini`). Crean y migran por su cuenta la base `satoripms_test`, así que no tocan los datos reales; solo necesitan PostgreSQL levantado y `DATABASE_URL` en formato `postgresql+psycopg://...`.
+Las pruebas del servidor FastAPI están en [tests/backend/](../backend) y se ejecutan con `pytest` (configuración en `pytest.ini`). Crean y migran por su cuenta la base `satoripms_test`, así que no tocan los datos reales; solo necesitan PostgreSQL levantado y `DATABASE_URL` en formato `postgresql+psycopg://...`.
 
 | Archivo | Qué verifica |
 | :--- | :--- |
