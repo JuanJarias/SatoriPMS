@@ -1,6 +1,6 @@
 # Suite de Pruebas y Herramientas del Chatbot — Torre Satori
 
-Este directorio contiene las herramientas de construcción, verificación de integridad arquitectónica y la suite automatizada de pruebas para el asistente conversacional en WhatsApp (V8) y los servicios transaccionales del servidor central (API) del Hotel Torre Satori.
+Este directorio contiene las herramientas de construcción, verificación de integridad arquitectónica y la suite automatizada de pruebas para el asistente conversacional en WhatsApp (flujo V9) y los servicios transaccionales del servidor central (API) del Hotel Torre Satori.
 
 El propósito principal de este conjunto de pruebas es validar de manera determinista y reproducible las transiciones de estado conversacionales, la interpretación de lenguaje natural con Inteligencia Artificial, el cálculo financiero estricto de tarifas y reembolsos, y las garantías de calidad y concurrencia bajo el marco ITIL 4 (Actividad 5).
 
@@ -10,16 +10,18 @@ El propósito principal de este conjunto de pruebas es validar de manera determi
 
 ```text
 tests/chatbot/
-├── suite_pruebas_chatbot_v8.js      # Suite integral de 60 casos (incluye bloque V9 TC-56 a TC-60)
+├── suite_pruebas_chatbot_v8.js      # Suite integral de 65 casos (incluye bloque V9 TC-56 a TC-65)
 ├── verify_n8n_flow_integrity.py     # Validador de topologia: 0 enlaces rotos, 0 huerfanos, 0 switch errors
 ├── test_pago_wompi_v9.js            # Suite de pruebas de cobro Wompi (11 en memoria, 5 en vivo)
 ├── test_e2e_v9_completo.js          # Prueba E2E en vivo de 9 pasos (fechas en 1 mensaje, mascota y aislamiento Redis)
-├── test_e2e_reserva_wompi_v9.js     # Prueba de integracion E2E de reserva con pasarela Wompi
-├── test_reserva_guiada_abono_50.js  # Prueba de integracion de reserva guiada con abono del 50%
-├── test_asistente_ia_autonomo.js    # Prueba de integracion del agente autonomo con extraccion JSON
-├── test_cancelacion_reembolso.js    # Prueba de integracion de cancelacion y regla RN-03
-├── test_pago_saldo_restante.js      # Prueba de integracion de liquidacion de saldo pendiente
-└── test_escalamiento_agente_humano.js # Prueba de integracion de escalamiento y silencio operativo
+├── test_e2e_reserva_wompi_v9.js     # E2E de reserva con Wompi: pendiente de pago -> link -> evento firmado -> confirmada
+├── test_reserva_guiada_abono_50.js  # Reserva guiada con 50%: queda pendiente de pago (pending_payment)
+├── test_asistente_ia_autonomo.js    # Agente autonomo con extraccion JSON: queda pendiente de pago
+├── test_cancelacion_reembolso.js    # Cancelacion y regla RN-03
+├── test_pago_saldo_restante.js      # Liquidacion de saldo pendiente
+├── test_escalamiento_agente_humano.js # Escalamiento: verifica agent_active=true en la sesion de Redis
+└── lib/
+    └── env.js                       # Carga las variables del proceso y, si faltan, las del .env de la raiz
 ```
 
 ---
@@ -29,8 +31,8 @@ tests/chatbot/
 | Tecnología / Herramienta | Rol en Pruebas | Versión / Estándar |
 | :--- | :--- | :--- |
 | Node.js | Entorno de ejecución de la suite automatizada y scripts de prueba | >= 18.x LTS |
-| Python | Generación, reestructuración espacial y análisis topológico del flujo n8n | >= 3.10 |
-| n8n Workflow Schema | Especificación del motor de orquestación de nodos y conmutadores | n8n v1.x (TypeVersion 2/3.4/4.2) |
+| Python | Análisis topológico del flujo n8n (`verify_n8n_flow_integrity.py`) | >= 3.10 |
+| n8n Workflow Schema | Especificación del motor de orquestación de nodos y conmutadores | n8n 2.47.3 (TypeVersion 2/3.4/4.2) |
 | JSON Schema / REST API | Contratos de comunicación HTTP entre el chatbot y el servidor central | RFC 8259 |
 | ITIL 4 Practices | Marco de validación de gestión de cambios, calidad y disponibilidad | Service Design & Transition |
 
@@ -58,7 +60,7 @@ flowchart TD
         Parser --> Engine --> Runner
     end
 
-    subgraph Modulos ["3. Modulos Evaluados (55 Casos de Prueba)"]
+    subgraph Modulos ["3. Modulos Evaluados (65 Casos de Prueba)"]
         direction TB
         subgraph Col1 ["Flujos Conversacionales"]
             F1["Flujo 1: Reserva Guiada (10)"]
@@ -87,9 +89,11 @@ flowchart TD
     FITIL --> ReportGen
 ```
 
+> **Alcance real de la suite integral:** de los 65 casos, 11 (TC-42 y TC-56 a TC-65) ejecutan el código real de los nodos del flujo V9. Los otros 54 evalúan las reglas de negocio con un motor en memoria que replica esas reglas dentro de la propia suite (reembolsos, tarifas, validaciones, formatos); sirven como especificación ejecutable, pero no detectan cambios en el flujo. El comportamiento del flujo en vivo lo cubren los scripts `test_*.js` de integración.
+
 ---
 
-## Catálogo Detallado de Pruebas (55 Casos)
+## Catálogo Detallado de Pruebas (65 Casos)
 
 ### Flujo 1: Reserva Guiada Paso a Paso (TC-01 a TC-10)
 Valida la interacción guiada estructurada para usuarios que prefieren navegación menú a menú.
@@ -151,7 +155,7 @@ Valida la gestión de reservas confirmadas bajo la nomenclatura oficial `TS-XXXX
 Valida la transferencia fluida de conversaciones complejas a recepción humana.
 
 - **TC-41:** Activación de atención humana por palabras clave en cualquier momento ("agente", "recepcionista", "humano", "secretaria").
-- **TC-42:** Activación mediante la Opción 6 del Menú Principal.
+- **TC-42:** Activación mediante la opción de agente del Menú Principal (la 5 en V9; la 6 heredada de V8 sigue enrutando igual). Ejecuta el código real del nodo evaluador.
 - **TC-43:** Bloqueo de respuestas automáticas del bot mientras la bandera `agent_active` sea `true`.
 - **TC-44:** Comandos de escape ("menú", "hola", "inicio") desactivan el modo agente y devuelven el control al bot.
 - **TC-45:** Generación de evento de notificación para el panel web de recepción.
@@ -170,12 +174,18 @@ Valida la resiliencia transaccional y la prevención absoluta de sobreventa (sob
 - **TC-54:** Tarifas dinámicas con eventos especiales: Aplicación de descuentos y recargos porcentuales estacionales.
 - **TC-55:** Cálculo estricto de reembolso sobre el monto efectivamente pagado (`paid_amount`). Caso crítico: ante una reserva de $500.000 con $250.000 abonados cancelada a tiempo, se reembolsan exactamente $250.000 (el 100% de lo pagado), nunca los $500.000 del valor total de la estadía.
 
+### Novedades del Flujo V9 (TC-56 a TC-65)
+Valida el código real de los nodos del flujo V9: integración con Wompi, fechas en un solo mensaje, reasignación de habitaciones con mascota, validación de acompañantes y el contrato de seguridad con el servidor central.
+
+- **TC-64:** Todas las llamadas del flujo a la API central envían la llave de servicio `X-Service-Key` tomada de `SATORI_SERVICE_KEY`.
+- **TC-65:** El documento del titular viaja a la API al consultar (encabezado `X-Guest-Document`), pagar el saldo, cancelar y revertir una reserva por fallo de Wompi; la verificación ya no se hace dentro de n8n.
+
 ---
 
 ## Guía de Ejecución
 
 ### Ejecución Completa por Consola
-Ejecuta los 55 casos de prueba con salida formateada para terminal:
+Ejecuta los 65 casos de prueba con salida formateada para terminal:
 
 ```bash
 node tests/chatbot/suite_pruebas_chatbot_v8.js
@@ -253,12 +263,25 @@ El flujo principal y único en operación es [V9_ChatbotReservas.json](../../flo
 | Archivo | Propósito |
 | :--- | :--- |
 | `test_pago_wompi_v9.js` | 11 pruebas en memoria (W-01 a W-11) que ejecutan el código real de los nodos del V9. Con `--live` se suman 5 pruebas reales contra la API de Wompi (L-01 a L-05). |
-| `test_e2e_reserva_wompi_v9.js` | E2E con el stack levantado: conversación completa → reserva → link en Wompi → evento firmado. |
+| `test_e2e_reserva_wompi_v9.js` | E2E con el stack levantado: conversación completa → reserva pendiente de pago → link en Wompi (por el 50%) → evento firmado → reserva confirmada con el 50% abonado. Crea y desactiva un link real. |
 | `verify_n8n_flow_integrity.py` | Validador topológico del flujo n8n V9. |
 
 ```bash
 node tests/chatbot/test_pago_wompi_v9.js [--live]
-python3 tests/chatbot/verify_n8n_flow_integrity.py
-API_HOST=localhost node tests/chatbot/test_e2e_reserva_wompi_v9.js
+python3 tests/chatbot/verify_n8n_flow_integrity.py flows/n8n/V9_ChatbotReservas.json
+node tests/chatbot/test_e2e_reserva_wompi_v9.js
 ```
+
+**Pruebas en vivo contra la API:** el servidor central exige autenticación. Los scripts `test_*.js` de integración toman `SATORI_SERVICE_KEY` de la variable de entorno o, si no existe, del archivo `.env` de la raíz (`lib/env.js`), y llegan a la API en `localhost:8080` y a n8n en `localhost:5678` (se pueden cambiar con `API_HOST`, `API_PORT`, `N8N_HOST` y `N8N_PORT`). Requieren el entorno levantado (`./scripts/start-dev.sh`) y acceso a Docker para leer Redis:
+
+```bash
+node tests/chatbot/test_cancelacion_reembolso.js
 ```
+
+**Resultado esperado en V9:** como el cobro es con Wompi, una reserva recién creada por el chatbot queda en `pending_payment` / `pending` con `paid_amount = 0`; pasa a `confirmed` / `partial` (o `paid`) solo cuando llega el evento firmado de Wompi.
+
+---
+
+## Integración Continua
+
+El flujo de GitHub Actions (`.github/workflows/ci.yml`) ejecuta sin necesidad de servicios externos: `verify_n8n_flow_integrity.py`, `suite_pruebas_chatbot_v8.js` y `test_pago_wompi_v9.js`. Las pruebas `test_*.js` en vivo no se ejecutan en CI porque necesitan n8n, Redis y la API.

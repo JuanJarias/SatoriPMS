@@ -1,5 +1,5 @@
 /**
- * Test: Pago de Saldo Restante de Reserva Parcial (CU-06 / V8)
+ * Test: Pago de Saldo Restante de Reserva Parcial (CU-06 / V9)
  *
  * Flujo: Menú -> Opción 5 (Revisar Reserva) -> Ingreso de Código ->
  *        Opción 1 (Pagar Saldo Restante).
@@ -13,8 +13,9 @@ const http = require('http');
 
 const WA_ID = '573009988776';
 
-const API_HOST = process.env.API_HOST || 'api';
+const API_HOST = process.env.API_HOST || 'localhost';
 const API_PORT = process.env.API_PORT || 8080;
+const SERVICE_KEY = require('./lib/env').loadEnv().SATORI_SERVICE_KEY || '';
 const N8N_HOST = process.env.N8N_HOST || 'localhost';
 const N8N_PORT = process.env.N8N_PORT || 5678;
 
@@ -72,7 +73,8 @@ function fetchBookings() {
     http.get({
       hostname: API_HOST,
       port: API_PORT,
-      path: '/api/bookings/debug'
+      path: '/api/bookings/debug',
+      headers: { 'X-Service-Key': SERVICE_KEY }
     }, (res) => {
       let body = '';
       res.on('data', c => body += c);
@@ -87,12 +89,13 @@ function fetchBookings() {
   });
 }
 
-function fetchBookingDetails(code) {
+function fetchBookingDetails(code, document) {
   return new Promise((resolve, reject) => {
     http.get({
       hostname: API_HOST,
       port: API_PORT,
-      path: `/api/bookings/group/${code}`
+      path: `/api/bookings/group/${encodeURIComponent(code)}`,
+      headers: { 'X-Service-Key': SERVICE_KEY, 'X-Guest-Document': String(document || '') }
     }, (res) => {
       let body = '';
       res.on('data', c => body += c);
@@ -121,11 +124,7 @@ async function run() {
       throw new Error('No se encontró ninguna reserva activa con estado de pago "partial" para liquidar saldo.');
     }
 
-    const codePrefix = partialBooking.companions && partialBooking.companions.startsWith('TS-')
-      ? partialBooking.companions
-      : (partialBooking.reservationGroupId
-          ? 'TS-' + partialBooking.reservationGroupId.replace(/-/g, '').slice(-4).toUpperCase()
-          : 'TS-' + partialBooking.id);
+    const codePrefix = partialBooking.bookingCode;
 
     console.log(`  • Reserva encontrada: ID ${partialBooking.id}, Código: ${codePrefix}`);
     console.log(`  • Total: $${partialBooking.totalPrice}, Pagado actualmente: $${partialBooking.paidAmount}`);
@@ -152,7 +151,7 @@ async function run() {
 
     // ─── ASERCIÓN FINAL ───
     console.log('\n[Verificación] Consultando estado actualizado en Backend API...');
-    const details = await fetchBookingDetails(codePrefix);
+    const details = await fetchBookingDetails(codePrefix, partialBooking.guestDocument);
 
     console.log(`  • Código: ${details.code}`);
     console.log(`  • Estado de Reserva: ${details.status}`);

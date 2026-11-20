@@ -1,5 +1,5 @@
 /**
- * Test: Cancelación de Reserva con Regla de Reembolso RN-03 (CU-05 / V8)
+ * Test: Cancelación de Reserva con Regla de Reembolso RN-03 (CU-05 / V9)
  *
  * Flujo: Menú -> Opción 5 (Revisar o Cancelar) -> Código de reserva ->
  *        Opción Cancelar -> 'Sí, confirmar'.
@@ -13,8 +13,9 @@ const http = require('http');
 
 const WA_ID = '573117778888';
 
-const API_HOST = process.env.API_HOST || 'api';
+const API_HOST = process.env.API_HOST || 'localhost';
 const API_PORT = process.env.API_PORT || 8080;
+const SERVICE_KEY = require('./lib/env').loadEnv().SATORI_SERVICE_KEY || '';
 const N8N_HOST = process.env.N8N_HOST || 'localhost';
 const N8N_PORT = process.env.N8N_PORT || 5678;
 
@@ -72,7 +73,8 @@ function fetchBookings() {
     http.get({
       hostname: API_HOST,
       port: API_PORT,
-      path: '/api/bookings/debug'
+      path: '/api/bookings/debug',
+      headers: { 'X-Service-Key': SERVICE_KEY }
     }, (res) => {
       let body = '';
       res.on('data', c => body += c);
@@ -87,12 +89,13 @@ function fetchBookings() {
   });
 }
 
-function fetchBookingDetails(code) {
+function fetchBookingDetails(code, document) {
   return new Promise((resolve, reject) => {
     http.get({
       hostname: API_HOST,
       port: API_PORT,
-      path: `/api/bookings/group/${code}`
+      path: `/api/bookings/group/${encodeURIComponent(code)}`,
+      headers: { 'X-Service-Key': SERVICE_KEY, 'X-Guest-Document': String(document || '') }
     }, (res) => {
       let body = '';
       res.on('data', c => body += c);
@@ -121,11 +124,7 @@ async function run() {
       throw new Error('No se encontró ninguna reserva en estado "confirmed" para cancelar.');
     }
 
-    const codePrefix = activeBooking.companions && activeBooking.companions.startsWith('TS-')
-      ? activeBooking.companions
-      : (activeBooking.reservationGroupId
-          ? 'TS-' + activeBooking.reservationGroupId.replace(/-/g, '').slice(-4).toUpperCase()
-          : 'TS-' + activeBooking.id);
+    const codePrefix = activeBooking.bookingCode;
 
     console.log(`  • Reserva a cancelar: ID ${activeBooking.id}, Código: ${codePrefix}`);
     console.log(`  • Habitación: ${activeBooking.roomNumber}, Fechas: ${activeBooking.checkIn} a ${activeBooking.checkOut}`);
@@ -156,7 +155,7 @@ async function run() {
 
     // ─── ASERCIÓN FINAL ───
     console.log('\n[Verificación] Consultando estado final en Backend API...');
-    const details = await fetchBookingDetails(codePrefix);
+    const details = await fetchBookingDetails(codePrefix, activeBooking.guestDocument);
 
     console.log(`  • Código: ${details.code}`);
     console.log(`  • Estado de Reserva: ${details.status}`);

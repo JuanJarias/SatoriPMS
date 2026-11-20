@@ -1,5 +1,5 @@
 /**
- * Suite Integral de Pruebas Automatizadas — SatoriPMS Chatbot V8 y API
+ * Suite Integral de Pruebas Automatizadas — SatoriPMS Chatbot V9 y API
  *
  * Esta suite valida el comportamiento funcional, las transiciones de estado,
  * las reglas de negocio hoteleras y las garantías de calidad ITIL 4 / Actividad 5
@@ -11,9 +11,10 @@
  * Flujo 4: Consulta, Pago de Saldo y Cancelación con código TS-XXXX (TC-31 a TC-40)
  * Flujo 5: Escalamiento a Secretaria / Atención Humana (TC-41 a TC-50)
  * Bloque ITIL 4: Concurrencia Doble Candado, Carga, Tarifas y Reembolso Estricto (TC-51 a TC-55)
+ * Novedades Flujo V9: Wompi, acompanantes, llave de servicio y documento del titular (TC-56 a TC-65)
  *
  * Interfaz de Ejecución para Agente de Inteligencia Artificial (AI Runner):
- *   - CLI: node suite_pruebas_chatbot_v8.js [--all] [--flow <1-5|itil>] [--test <TC-XX>] [--json] [--live]
+ *   - CLI: node suite_pruebas_chatbot_v8.js [--all] [--flow <1-5|itil>] [--test <TC-XX>] [--json]
  *   - Programático: require('./suite_pruebas_chatbot_v8.js').runTestSuite({ ... })
  *
  * Convenciones:
@@ -22,14 +23,11 @@
  *   - Estilo: Sobrio, profesional, sin emojis en registros ni salidas
  */
 
-const http = require('http');
-
 // ============================================================================
 // 1. CONFIGURACIÓN Y PARÁMETROS GLOBALES
 // ============================================================================
 const CONFIG = {
   apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:8080',
-  n8nWebhookUrl: process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/whatsapp',
   timeoutMs: 8000,
   defaultWaId: '573009988776',
   defaultSenderName: 'Huesped de Prueba'
@@ -881,15 +879,21 @@ const TEST_CASES = [
     id: 'TC-42',
     flow: '5',
     flowName: 'Escalamiento a Secretaria',
-    title: 'Activacion mediante Opcion 6 del Menu Principal',
-    description: 'Seleccionar la opcion 6 desde el menu enruta inmediatamente al canal de atencion humana.',
+    title: 'Activacion mediante la opcion de agente del Menu Principal (opcion 5 en V9)',
+    description: 'Ejecuta el codigo real de H Menu Evaluador Opcion en V9: "5", el boton "menu_agente" y la opcion 6 heredada de V8 deben enrutar a la atencion humana.',
     run: async () => {
-      const option = '6';
-      const isOption6 = option === '6' || Engine.normalize(option) === 'agente';
-      return {
-        passed: isOption6 === true,
-        details: `Opcion 6 del menu redirige correctamente a recepcion`
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const node = V9.nodes.find(n => n.name === 'H Menú Evaluador Opción');
+      const evalOption = (text) => {
+        const j = { wa_id: '573001112233', message_text: text };
+        const wrap = { first: () => ({ json: j }), all: () => [{ json: j }] };
+        return new Function('$input', '$', '$env', node.parameters.jsCode)(wrap, () => wrap, {})[0].json.opcion;
       };
+      const results = { '5': evalOption('5'), menu_agente: evalOption('menu_agente'), '6': evalOption('6'), agente: evalOption('agente') };
+      const passed = Object.values(results).every(v => v === '5');
+      return { passed, details: 'Opcion resultante por entrada: ' + JSON.stringify(results) };
     }
   },
   {
@@ -1401,6 +1405,69 @@ const TEST_CASES = [
         && acceptTwo.session?.reservation_draft?.companions === 'Maria Gomez, Carlos Perez';
       return { passed: ok, details: `pregunta="${ask.session?.step}", rechazo_ninguno="${rejectNone.session?.step}", rechazo_1="${rejectOne.session?.step}", acepta_2="${acceptTwo.session?.step}"` };
     }
+  },
+  {
+    id: 'TC-64',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'Todas las llamadas a la API central envian la llave de servicio X-Service-Key',
+    description: 'Verifica que cada nodo HTTP que apunta a API_BASE_URL incluya el encabezado X-Service-Key tomado de $env.SATORI_SERVICE_KEY.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const apiNodes = V9.nodes.filter(n => n.type.endsWith('httpRequest') && String(n.parameters.url || '').includes('API_BASE_URL'));
+      const missing = apiNodes.filter(n => {
+        const headers = (n.parameters.headerParameters && n.parameters.headerParameters.parameters) || [];
+        return !(n.parameters.sendHeaders === true
+          && headers.some(h => h.name === 'X-Service-Key' && String(h.value).includes('SATORI_SERVICE_KEY')));
+      }).map(n => n.name);
+      return { passed: apiNodes.length > 0 && missing.length === 0, details: `nodos API=${apiNodes.length}, sin llave=${JSON.stringify(missing)}` };
+    }
+  },
+  {
+    id: 'TC-65',
+    flow: 'v9',
+    flowName: 'Novedades Flujo V9',
+    title: 'El documento del titular viaja a la API en consulta, pago de saldo, cancelacion y reversion Wompi',
+    description: 'Verifica que la consulta envie X-Guest-Document, que pago y cancelacion envien {document} con el documento ingresado por el huesped, y que la reversion por fallo de Wompi use el documento de la reserva.',
+    run: async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const byName = (name) => V9.nodes.find(n => n.name === name);
+      const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
+      const normalize = byName('H Normalizar Revisar Reserva');
+      const run = (session, msg) => new Function('$input', '$', '$env', normalize.parameters.jsCode)(
+        wrap({ wa_id: '573001112233', sender_name: 'Ana', message_text: msg, session }), () => wrap({}), {}
+      )[0].json;
+
+      const lookup = run({ step: 'pedir_documento', review_draft: { inputCode: 'TS-7K4Q' } }, '1094555666');
+      const reviewDraft = { code: 'TS-7K4Q', inputDocument: '1094555666', reservation: { canPayRemaining: true } };
+      const pay = run({ step: 'opciones_reserva', review_draft: reviewDraft }, '1');
+      const cancel = run({ step: 'confirmar_cancelacion', review_draft: reviewDraft }, 'si');
+
+      const consultHeaders = byName('API Consultar Reserva').parameters.headerParameters.parameters;
+      const headerOk = consultHeaders.some(h => h.name === 'X-Guest-Document' && h.value.includes('search_document'));
+      const bodyOk = ['API Cancelar Reserva', 'API Pagar Saldo', 'API Cancelar por Fallo Wompi']
+        .every(name => String(byName(name).parameters.jsonBody || '').includes('document'));
+
+      // La respuesta de consulta conserva el documento para las acciones siguientes
+      const format = byName('H Formatear Consulta Reserva');
+      const formatted = new Function('$input', '$', '$env', format.parameters.jsCode)(
+        wrap({ code: 'TS-7K4Q', guestDocument: '******5666', status: 'confirmed', canCancel: true, checkIn: '2026-12-01', checkOut: '2026-12-03', nights: 2, adults: 2, children: 0 }),
+        () => wrap({ wa_id: '573001112233', sender_name: 'Ana', session: { review_draft: { inputDocument: '1094555666' } } }),
+        {}
+      )[0].json;
+
+      const ok = lookup.search_document === '1094555666'
+        && pay.guest_document === '1094555666'
+        && cancel.guest_document === '1094555666'
+        && headerOk && bodyOk
+        && formatted.session.review_draft.inputDocument === '1094555666'
+        && !format.parameters.jsCode.includes('expectedDoc');
+      return { passed: ok, details: `consulta=${lookup.search_document}, pago=${pay.guest_document}, cancelacion=${cancel.guest_document}, encabezado=${headerOk}, cuerpos=${bodyOk}, documento_conservado=${formatted.session.review_draft.inputDocument}` };
+    }
   }
 ];
 
@@ -1536,7 +1603,7 @@ if (require.main === module) {
 Para ejecutar pruebas puntuales o flujos completos desde un script o agente de IA:
 1. Toda la suite: node tests/chatbot/suite_pruebas_chatbot_v8.js --json
 2. Por flujo (1, 2, 3, 4, 5, itil): node tests/chatbot/suite_pruebas_chatbot_v8.js --flow 2 --json
-3. Por caso unitario (TC-01 a TC-55): node tests/chatbot/suite_pruebas_chatbot_v8.js --test TC-55 --json
+3. Por caso unitario (TC-01 a TC-65): node tests/chatbot/suite_pruebas_chatbot_v8.js --test TC-65 --json
 4. De manera programatica en Node.js:
    const { runTestSuite } = require('./tests/chatbot/suite_pruebas_chatbot_v8.js');
    const report = await runTestSuite({ flow: '4' });

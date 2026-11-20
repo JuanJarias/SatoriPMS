@@ -1085,6 +1085,15 @@
         "jsonBody": "={{ JSON.stringify({ wa_id: $json.wa_id, name: $json.sender_name, context: 'Solicitud de agente desde WhatsApp' }) }}",
         "options": {
           "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         }
       },
       "id": "c68ef6f8-0bc3-4bd3-b4c6-5a4448ea3119",
@@ -1154,6 +1163,15 @@
         "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/rooms/availability?checkIn=' + $('H F1 CheckOut').first().json.checkIn + '&checkOut=' + $('H F1 CheckOut').first().json.checkOut + '&adults=' + $('H F1 CheckOut').first().json.adults + '&children=' + $('H F1 CheckOut').first().json.children + '&pet=' + $('H F1 CheckOut').first().json.pet }}",
         "options": {
           "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         }
       },
       "id": "04e33d5e-e141-46bb-96ce-c08651a4d55f",
@@ -1402,8 +1420,8 @@
         "headerParameters": {
           "parameters": [
             {
-              "name": "ngrok-skip-browser-warning",
-              "value": "true"
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
             }
           ]
         },
@@ -1456,7 +1474,12 @@
         "url": "={{ ($env.API_BASE_URL || 'http://api:8080') + '/api/bookings/confirm' }}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": []
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         },
         "sendBody": true,
         "specifyBody": "json",
@@ -1573,7 +1596,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const J = $input.first().json;\nconst S = J.session || {};\nconst draft = S.review_draft || {};\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n\nconst keep = (newDraft, nextStep) => ({\n    state: 'revisar_reserva',\n    step: nextStep,\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    review_draft: newDraft\n});\n\nconst reset = () => ({\n    state: 'menu',\n    step: 'esperando_opcion',\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    reservation_draft: {}\n});\n\nconst reply = (msg, newSession, extra = {}) => [{\n    json: Object.assign({\n        wa_id: J.wa_id,\n        sender_name: J.sender_name,\n        response_text: msg,\n        session: newSession,\n        api_action: 'reply'\n    }, extra)\n}];\n\n// PASO 1: Ingreso de Código\nif (S.step === 'pedir_codigo') {\n    const codeMatch = text.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase();\n    if (!codeMatch || codeMatch.length < 4) {\n        return reply('El código debe tener al menos 4 caracteres (ejemplo: *TS-4156*). Inténtalo de nuevo o escribe *menú* para cancelar.', S);\n    }\n    const msg = `🔒 *Verificación de Identidad*\\n\\n` +\n                `Para consultar la reserva *${codeMatch}*, por favor escribe el *número de cédula o documento de identidad* del titular que realizó la reserva:\\n\\n` +\n                `💡 _Escribe *menú* para cancelar._`;\n    return reply(msg, keep(Object.assign({}, draft, { inputCode: codeMatch }), 'pedir_documento'));\n}\n\n// PASO 1.5: Ingreso de Documento / Cédula del Titular\nif (S.step === 'pedir_documento') {\n    const docMatch = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();\n    if (!docMatch || docMatch.length < 4) {\n        return reply('⚠️ Por favor ingresa un número de documento válido (mínimo 4 caracteres). Inténtalo de nuevo o escribe *menú* para salir.', S);\n    }\n    return [{\n        json: Object.assign({}, J, {\n            api_action: 'get_booking',\n            search_code: draft.inputCode,\n            session: keep(Object.assign({}, draft, { inputDocument: docMatch }), 'buscando')\n        })\n    }];\n}\n\n// PASO 2: Opciones sobre la Reserva\nif (S.step === 'opciones_reserva') {\n    const res = draft.reservation || {};\n    const canPay = res.canPayRemaining === true;\n\n    // Si tiene saldo pendiente y elige pagar (Opción 1 con canPay)\n    if (canPay && ['1', 'pagar', 'pagar saldo', 'saldo', 'completar pago'].some(k => normalized.includes(k))) {\n        return [{\n            json: Object.assign({}, J, {\n                api_action: 'pay_remaining',\n                pay_code: draft.code,\n                session: keep(draft, 'pagando')\n            })\n        }];\n    }\n\n    // Cancelar reserva: Opción 2 si canPay, u Opción 1 si no canPay\n    const isCancel = (canPay && ['2', 'cancelar', 'cancelar reserva'].some(k => normalized.includes(k))) ||\n                     (!canPay && ['1', 'cancelar', 'cancelar reserva'].some(k => normalized.includes(k)));\n\n    if (isCancel) {\n        const policy = res.refundPolicy || {};\n        const hours = policy.hoursUntilCheckin != null ? policy.hoursUntilCheckin : 0;\n        const policyDesc = policy.policyDescription || 'Políticas de Torre Satori';\n        const refundAmt = policy.estimatedRefund != null ? Number(policy.estimatedRefund).toFixed(2) : '0.00';\n        const paidAmt = res.paidAmount != null ? Number(res.paidAmount).toFixed(2) : '0.00';\n\n        const msg = `*Políticas de Cancelación (Torre Satori)*\\n\\n` +\n                    `• Más de 72h antes: Reembolso del 100% de lo abonado.\\n` +\n                    `• Entre 24h y 72h antes: Reembolso del 50% de lo abonado.\\n` +\n                    `• Menos de 24h o no-show: Sin reembolso (0%).\\n\\n` +\n                    `*Detalle de tu reserva (${draft.code}):*\\n` +\n                    `• Total abonado: *$${paidAmt}*\\n` +\n                    `• Horas restantes: *${hours}h*\\n` +\n                    `• Política aplicable: *${policyDesc}*\\n` +\n                    `• Reembolso estimado: *$${refundAmt}*\\n\\n` +\n                    `*¿Confirmas la cancelación definitiva de tu reserva?*\\n` +\n                    `Esta acción no se puede deshacer.\\n\\n` +\n                    `Responde *Sí, confirmar* para cancelar o *No* para mantener tu reserva.`;\n\n        return reply(msg, keep(draft, 'confirmar_cancelacion'));\n    }\n\n    // Volver al menú\n    return reply('Operación finalizada. Tu reserva sigue activa. Escribe *menú* para ver más opciones.', reset());\n}\n\n// PASO 3: Doble Confirmación de Cancelación\nif (S.step === 'confirmar_cancelacion') {\n    const isAffirmative = /^(si|sí|confirmar|si confirmar|si, confirmar|cancelar|de acuerdo|afirmativo|proceder)$/i.test(normalized);\n    const isNegative = /^(no|no cancelar|mantener|cancelar no|volver|menu|inicio|no gracias)$/i.test(normalized);\n\n    if (isAffirmative) {\n        return [{\n            json: Object.assign({}, J, {\n                api_action: 'cancel_booking',\n                cancel_code: draft.code,\n                session: keep(draft, 'cancelando')\n            })\n        }];\n    }\n\n    if (isNegative) {\n        return reply(`Tu reserva *${draft.code}* sigue activa y protegida. ¡Te esperamos en Satori Hotel! Escribe *menú* para volver al inicio.`, reset());\n    }\n\n    return reply('No entendí tu respuesta. Por favor responde *Sí, confirmar* para cancelar la reserva o *No* para mantenerla.', S);\n}\n\nreturn reply('Escribe *menú* para volver al inicio.', reset());"
+        "jsCode": "const J = $input.first().json;\nconst S = J.session || {};\nconst draft = S.review_draft || {};\nconst text = String(J.message_text || '').trim();\nconst normalized = text.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();\n\nconst keep = (newDraft, nextStep) => ({\n    state: 'revisar_reserva',\n    step: nextStep,\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    review_draft: newDraft\n});\n\nconst reset = () => ({\n    state: 'menu',\n    step: 'esperando_opcion',\n    agent_active: false,\n    wa_id: J.wa_id,\n    sender_name: J.sender_name,\n    reservation_draft: {}\n});\n\nconst reply = (msg, newSession, extra = {}) => [{\n    json: Object.assign({\n        wa_id: J.wa_id,\n        sender_name: J.sender_name,\n        response_text: msg,\n        session: newSession,\n        api_action: 'reply'\n    }, extra)\n}];\n\n// PASO 1: Ingreso de Código\nif (S.step === 'pedir_codigo') {\n    const codeMatch = text.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase();\n    if (!codeMatch || codeMatch.length < 4) {\n        return reply('El código debe tener al menos 4 caracteres (ejemplo: *TS-4156*). Inténtalo de nuevo o escribe *menú* para cancelar.', S);\n    }\n    const msg = `🔒 *Verificación de Identidad*\\n\\n` +\n                `Para consultar la reserva *${codeMatch}*, por favor escribe el *número de cédula o documento de identidad* del titular que realizó la reserva:\\n\\n` +\n                `💡 _Escribe *menú* para cancelar._`;\n    return reply(msg, keep(Object.assign({}, draft, { inputCode: codeMatch }), 'pedir_documento'));\n}\n\n// PASO 1.5: Ingreso de Documento / Cédula del Titular\nif (S.step === 'pedir_documento') {\n    const docMatch = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();\n    if (!docMatch || docMatch.length < 4) {\n        return reply('⚠️ Por favor ingresa un número de documento válido (mínimo 4 caracteres). Inténtalo de nuevo o escribe *menú* para salir.', S);\n    }\n    return [{\n        json: Object.assign({}, J, {\n            api_action: 'get_booking',\n            search_code: draft.inputCode,\n            search_document: docMatch,\n            session: keep(Object.assign({}, draft, { inputDocument: docMatch }), 'buscando')\n        })\n    }];\n}\n\n// PASO 2: Opciones sobre la Reserva\nif (S.step === 'opciones_reserva') {\n    const res = draft.reservation || {};\n    const canPay = res.canPayRemaining === true;\n\n    // Si tiene saldo pendiente y elige pagar (Opción 1 con canPay)\n    if (canPay && ['1', 'pagar', 'pagar saldo', 'saldo', 'completar pago'].some(k => normalized.includes(k))) {\n        return [{\n            json: Object.assign({}, J, {\n                api_action: 'pay_remaining',\n                pay_code: draft.code,\n                guest_document: draft.inputDocument || '',\n                session: keep(draft, 'pagando')\n            })\n        }];\n    }\n\n    // Cancelar reserva: Opción 2 si canPay, u Opción 1 si no canPay\n    const isCancel = (canPay && ['2', 'cancelar', 'cancelar reserva'].some(k => normalized.includes(k))) ||\n                     (!canPay && ['1', 'cancelar', 'cancelar reserva'].some(k => normalized.includes(k)));\n\n    if (isCancel) {\n        const policy = res.refundPolicy || {};\n        const hours = policy.hoursUntilCheckin != null ? policy.hoursUntilCheckin : 0;\n        const policyDesc = policy.policyDescription || 'Políticas de Torre Satori';\n        const refundAmt = policy.estimatedRefund != null ? Number(policy.estimatedRefund).toFixed(2) : '0.00';\n        const paidAmt = res.paidAmount != null ? Number(res.paidAmount).toFixed(2) : '0.00';\n\n        const msg = `*Políticas de Cancelación (Torre Satori)*\\n\\n` +\n                    `• Más de 72h antes: Reembolso del 100% de lo abonado.\\n` +\n                    `• Entre 24h y 72h antes: Reembolso del 50% de lo abonado.\\n` +\n                    `• Menos de 24h o no-show: Sin reembolso (0%).\\n\\n` +\n                    `*Detalle de tu reserva (${draft.code}):*\\n` +\n                    `• Total abonado: *$${paidAmt}*\\n` +\n                    `• Horas restantes: *${hours}h*\\n` +\n                    `• Política aplicable: *${policyDesc}*\\n` +\n                    `• Reembolso estimado: *$${refundAmt}*\\n\\n` +\n                    `*¿Confirmas la cancelación definitiva de tu reserva?*\\n` +\n                    `Esta acción no se puede deshacer.\\n\\n` +\n                    `Responde *Sí, confirmar* para cancelar o *No* para mantener tu reserva.`;\n\n        return reply(msg, keep(draft, 'confirmar_cancelacion'));\n    }\n\n    // Volver al menú\n    return reply('Operación finalizada. Tu reserva sigue activa. Escribe *menú* para ver más opciones.', reset());\n}\n\n// PASO 3: Doble Confirmación de Cancelación\nif (S.step === 'confirmar_cancelacion') {\n    const isAffirmative = /^(si|sí|confirmar|si confirmar|si, confirmar|cancelar|de acuerdo|afirmativo|proceder)$/i.test(normalized);\n    const isNegative = /^(no|no cancelar|mantener|cancelar no|volver|menu|inicio|no gracias)$/i.test(normalized);\n\n    if (isAffirmative) {\n        return [{\n            json: Object.assign({}, J, {\n                api_action: 'cancel_booking',\n                cancel_code: draft.code,\n                guest_document: draft.inputDocument || '',\n                session: keep(draft, 'cancelando')\n            })\n        }];\n    }\n\n    if (isNegative) {\n        return reply(`Tu reserva *${draft.code}* sigue activa y protegida. ¡Te esperamos en Satori Hotel! Escribe *menú* para volver al inicio.`, reset());\n    }\n\n    return reply('No entendí tu respuesta. Por favor responde *Sí, confirmar* para cancelar la reserva o *No* para mantenerla.', S);\n}\n\nreturn reply('Escribe *menú* para volver al inicio.', reset());"
       },
       "id": "70b8cec5-c09d-4970-9e38-98ebbcc23d62",
       "name": "H Normalizar Revisar Reserva",
@@ -1686,6 +1709,19 @@
             }
           },
           "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            },
+            {
+              "name": "X-Guest-Document",
+              "value": "={{ $json.search_document }}"
+            }
+          ]
         }
       },
       "id": "650b7cf1-120c-4519-ad63-5ea9123adba5",
@@ -1709,7 +1745,19 @@
             }
           },
           "timeout": 15000
-        }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ document: $json.guest_document || '' }) }}"
       },
       "id": "c04975e0-7302-4d6e-b68e-966e35733810",
       "name": "API Cancelar Reserva",
@@ -1723,7 +1771,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const apiResponse = $input.first().json || {};\nconst source = $('H Normalizar Revisar Reserva').first().json;\nconst wa_id = source.wa_id;\nconst sender_name = source.sender_name;\nconst draft = source.session?.review_draft || {};\n\nif (!apiResponse.code && !apiResponse.reservationGroupId) {\n    const errorMsg = apiResponse.error || 'No se encontró ninguna reserva activa con ese código';\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: `*Reserva no encontrada*\\n\\n${errorMsg}.\\n\\nPor favor verifica el código e inténtalo de nuevo, o escribe *menú* para volver al inicio.`,\n            session: {\n                state: 'revisar_reserva',\n                step: 'pedir_codigo',\n                agent_active: false,\n                wa_id,\n                sender_name,\n                review_draft: {}\n            }\n        }\n    }];\n}\n\nconst res = apiResponse;\n\n// Verificación estricta de Cédula / Documento de Identidad del titular\nconst expectedDoc = String(res.guestDocument || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();\nconst enteredDoc = String(draft.inputDocument || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();\n\nif (!expectedDoc || expectedDoc !== enteredDoc) {\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: `⚠️ *Validación de Identidad Fallida*\\n\\nEl documento ingresado no coincide con el titular registrado para la reserva *${res.code}*.\\n\\nPor motivos de seguridad y privacidad, no es posible acceder a la información de esta reserva.\\n\\nVerifica tus datos e inténtalo de nuevo escribiendo el documento correcto, o escribe *menú* para salir.`,\n            session: {\n                state: 'revisar_reserva',\n                step: 'pedir_documento',\n                agent_active: false,\n                wa_id,\n                sender_name,\n                review_draft: { inputCode: res.code }\n            }\n        }\n    }];\n}\n\nconst roomNames = Array.isArray(res.rooms) ? res.rooms.map(r => `#${r.number} (${r.name || r.type})`).join(', ') : 'Habitación reservada';\nconst total = res.totalPrice != null ? Number(res.totalPrice).toFixed(2) : '0.00';\nconst paid = res.paidAmount != null ? Number(res.paidAmount).toFixed(2) : '0.00';\nconst pending = res.pendingBalance != null ? Number(res.pendingBalance).toFixed(2) : '0.00';\n\nlet msg = `🔎 *Detalles de tu Reserva*\\n\\n` +\n          `• Código: *${res.code}*\\n` +\n          `• Titular: *${res.guestName || sender_name}*\\n` +\n          `• Documento: *${res.guestDocument}*\\n` +\n          `• Estado: *${res.statusLabel || res.status}* (${res.paymentStatusLabel || res.paymentStatus})\\n` +\n          `• Fechas: *${res.checkIn}* al *${res.checkOut}* (${res.nights} noche${res.nights > 1 ? 's' : ''})\\n` +\n          `• Habitaciones: *${roomNames}*\\n` +\n          `• Huéspedes: *${res.adults} adulto(s), ${res.children} niño(s)*\\n` +\n          `• Mascota: *${res.withPet ? 'Sí' : 'No'}*\\n` +\n          `• Total reserva: *$${total}*\\n` +\n          `• Abonado a la fecha: *$${paid}*\\n`;\n\nif (Number(pending) > 0) {\n    msg += `• Saldo pendiente: *$${pending}*\\n`;\n}\n\nif (res.status === 'cancelled') {\n    msg += `\\nℹ️ Esta reserva se encuentra *Cancelada*. Escribe *menú* para volver al inicio.`;\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: msg,\n            session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }\n        }\n    }];\n}\n\nif (res.canPayRemaining) {\n    msg += `\\n¿Qué deseas hacer?\\n` +\n           `1. *Pagar saldo restante ($${pending})*\\n` +\n           `2. *Cancelar reserva*\\n` +\n           `3. *Volver al menú*`;\n} else if (res.canCancel) {\n    msg += `\\n¿Qué deseas hacer?\\n` +\n           `1. *Cancelar reserva*\\n` +\n           `2. *Volver al menú*`;\n} else {\n    msg += `\\nℹ️ Esta reserva no admite cancelaciones automáticas. Escribe *menú* para volver.`;\n}\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: msg,\n        session: {\n            state: 'revisar_reserva',\n            step: 'opciones_reserva',\n            agent_active: false,\n            wa_id,\n            sender_name,\n            review_draft: {\n                code: res.code,\n                reservation: res,\n                refundPolicy: res.refundPolicy\n            }\n        }\n    }\n}];"
+        "jsCode": "const apiResponse = $input.first().json || {};\nconst source = $('H Normalizar Revisar Reserva').first().json;\nconst wa_id = source.wa_id;\nconst sender_name = source.sender_name;\nconst draft = source.session?.review_draft || {};\n\nif (!apiResponse.code && !apiResponse.reservationGroupId) {\n    const errorMsg = apiResponse.error || 'No se encontró una reserva con ese código y documento';\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: `*Reserva no encontrada*\\n\\n${errorMsg}.\\n\\nPor favor verifica el código e inténtalo de nuevo, o escribe *menú* para volver al inicio.`,\n            session: {\n                state: 'revisar_reserva',\n                step: 'pedir_codigo',\n                agent_active: false,\n                wa_id,\n                sender_name,\n                review_draft: {}\n            }\n        }\n    }];\n}\n\nconst res = apiResponse;\n\n// La verificación del documento del titular la realiza la API: si no coincide responde 404\n// y la respuesta llega a la rama de \"Reserva no encontrada\". El documento llega enmascarado.\n\nconst roomNames = Array.isArray(res.rooms) ? res.rooms.map(r => `#${r.number} (${r.name || r.type})`).join(', ') : 'Habitación reservada';\nconst total = res.totalPrice != null ? Number(res.totalPrice).toFixed(2) : '0.00';\nconst paid = res.paidAmount != null ? Number(res.paidAmount).toFixed(2) : '0.00';\nconst pending = res.pendingBalance != null ? Number(res.pendingBalance).toFixed(2) : '0.00';\n\nlet msg = `🔎 *Detalles de tu Reserva*\\n\\n` +\n          `• Código: *${res.code}*\\n` +\n          `• Titular: *${res.guestName || sender_name}*\\n` +\n          `• Documento: *${res.guestDocument}*\\n` +\n          `• Estado: *${res.statusLabel || res.status}* (${res.paymentStatusLabel || res.paymentStatus})\\n` +\n          `• Fechas: *${res.checkIn}* al *${res.checkOut}* (${res.nights} noche${res.nights > 1 ? 's' : ''})\\n` +\n          `• Habitaciones: *${roomNames}*\\n` +\n          `• Huéspedes: *${res.adults} adulto(s), ${res.children} niño(s)*\\n` +\n          `• Mascota: *${res.withPet ? 'Sí' : 'No'}*\\n` +\n          `• Total reserva: *$${total}*\\n` +\n          `• Abonado a la fecha: *$${paid}*\\n`;\n\nif (Number(pending) > 0) {\n    msg += `• Saldo pendiente: *$${pending}*\\n`;\n}\n\nif (res.status === 'cancelled') {\n    msg += `\\nℹ️ Esta reserva se encuentra *Cancelada*. Escribe *menú* para volver al inicio.`;\n    return [{\n        json: {\n            wa_id,\n            sender_name,\n            response_text: msg,\n            session: { state: 'menu', step: 'esperando_opcion', agent_active: false, wa_id, sender_name, reservation_draft: {} }\n        }\n    }];\n}\n\nif (res.canPayRemaining) {\n    msg += `\\n¿Qué deseas hacer?\\n` +\n           `1. *Pagar saldo restante ($${pending})*\\n` +\n           `2. *Cancelar reserva*\\n` +\n           `3. *Volver al menú*`;\n} else if (res.canCancel) {\n    msg += `\\n¿Qué deseas hacer?\\n` +\n           `1. *Cancelar reserva*\\n` +\n           `2. *Volver al menú*`;\n} else {\n    msg += `\\nℹ️ Esta reserva no admite cancelaciones automáticas. Escribe *menú* para volver.`;\n}\n\nreturn [{\n    json: {\n        wa_id,\n        sender_name,\n        response_text: msg,\n        session: {\n            state: 'revisar_reserva',\n            step: 'opciones_reserva',\n            agent_active: false,\n            wa_id,\n            sender_name,\n            review_draft: {\n                code: res.code,\n                inputDocument: draft.inputDocument,\n                reservation: res,\n                refundPolicy: res.refundPolicy\n            }\n        }\n    }\n}];"
       },
       "id": "7855a941-25c5-4d19-bf82-eb3278d5b2e0",
       "name": "H Formatear Consulta Reserva",
@@ -1758,7 +1806,19 @@
             }
           },
           "timeout": 15000
-        }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ document: $json.guest_document || '' }) }}"
       },
       "id": "e89d1001-0001-4000-8000-000000000001",
       "name": "API Pagar Saldo",
@@ -1974,6 +2034,15 @@
             }
           },
           "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         }
       },
       "id": "e89d1015-0015-4000-8000-000000000015",
@@ -2013,6 +2082,15 @@
             }
           },
           "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         }
       },
       "id": "e89d1017-0017-4000-8000-000000000017",
@@ -2086,6 +2164,15 @@
             }
           },
           "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         }
       },
       "id": "e89d1021-0021-4000-8000-000000000021",
@@ -2112,6 +2199,15 @@
             }
           },
           "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         }
       },
       "id": "e89d1022-0022-4000-8000-000000000022",
@@ -2139,7 +2235,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// V9 · Prepara el cobro de la reserva en Wompi segun la modalidad elegida (50% o 100%).\nconst api = $input.first().json || {};\nconst env = (typeof $env !== 'undefined' && $env) ? $env : {};\n\nconst source = (() => {\n  try { return $('H Procesar Reserva Paso').first().json; } catch (e) {}\n  try { return $('H Normalizar IA').first().json; } catch (e) {}\n  return {};\n})();\nconst payload = source.payload || {};\n\nconst confirmed = Boolean(api.reservationGroupId);\nconst code = api.code || (confirmed ? ('TS-' + String(api.reservationGroupId).replace(/-/g, '').slice(-4).toUpperCase()) : null);\nconst totalPrice = Number(api.totalPrice || 0);\nconst isPartial = api.paymentStatus === 'partial' || payload.paymentOption === 'deposit' || payload.paymentOption === 'wompi_deposit';\n// Valor a cobrar ahora: lo que la API registro para la modalidad elegida\n// (deposit = 50% del total, full = 100% del total).\nlet amountToCharge = (api.paidAmount != null && Number(api.paidAmount) > 0) ? Number(api.paidAmount) : (isPartial ? totalPrice / 2 : totalPrice);\nif (!(amountToCharge > 0)) amountToCharge = isPartial ? totalPrice / 2 : totalPrice;\nconst amountInCents = Math.round(amountToCharge * 100);\n\nconst enabled = String(env.WOMPI_ENABLED == null ? 'true' : env.WOMPI_ENABLED).toLowerCase() !== 'false';\nconst hasKey = Boolean(env.WOMPI_PRIVATE_KEY);\nconst hours = Math.max(1, Number(env.WOMPI_LINK_EXPIRATION_HOURS || 24));\nconst expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();\n\nconst optionLabel = isPartial ? 'Anticipo 50%' : 'Pago total 100%';\nconst stay = (payload.checkIn && payload.checkOut) ? ` (${payload.checkIn} a ${payload.checkOut})` : '';\nconst wompiRequest = {\n  name: `Reserva ${code || ''} - Torre Satori`.trim().slice(0, 60),\n  description: `${optionLabel} de la reserva ${code || ''}${stay}`.slice(0, 250),\n  single_use: true,\n  collect_shipping: false,\n  currency: 'COP',\n  amount_in_cents: amountInCents,\n  expires_at: expiresAt,\n  sku: String(code || '').slice(0, 36)\n};\nif (env.WOMPI_REDIRECT_URL) wompiRequest.redirect_url = env.WOMPI_REDIRECT_URL;\n\nlet skipReason = null;\nif (!confirmed) skipReason = 'reserva_no_confirmada';\nelse if (!enabled) skipReason = 'wompi_deshabilitado';\nelse if (!hasKey) skipReason = 'sin_llave_privada';\nelse if (!(amountInCents >= 150000)) skipReason = 'monto_invalido';\n\nreturn [{\n  json: {\n    wa_id: source.wa_id || payload.waId || '',\n    sender_name: source.sender_name || payload.guestName || 'Huésped',\n    reservation_code: code,\n    payment_option: isPartial ? 'deposit' : 'full',\n    total_price: totalPrice,\n    amount_to_charge: amountInCents / 100,\n    amount_in_cents: amountInCents,\n    expires_at: expiresAt,\n    wompi_should_charge: skipReason === null,\n    wompi_skip_reason: skipReason,\n    wompi_request: wompiRequest\n  }\n}];"
+        "jsCode": "// V9 · Prepara el cobro de la reserva en Wompi segun la modalidad elegida (50% o 100%).\nconst api = $input.first().json || {};\nconst env = (typeof $env !== 'undefined' && $env) ? $env : {};\n\nconst source = (() => {\n  try { return $('H Procesar Reserva Paso').first().json; } catch (e) {}\n  try { return $('H Normalizar IA').first().json; } catch (e) {}\n  return {};\n})();\nconst payload = source.payload || {};\n\nconst confirmed = Boolean(api.reservationGroupId);\nconst code = api.code || (confirmed ? ('TS-' + String(api.reservationGroupId).replace(/-/g, '').slice(-4).toUpperCase()) : null);\nconst totalPrice = Number(api.totalPrice || 0);\nconst isPartial = api.paymentStatus === 'partial' || payload.paymentOption === 'deposit' || payload.paymentOption === 'wompi_deposit';\n// Valor a cobrar ahora: lo que la API registro para la modalidad elegida\n// (deposit = 50% del total, full = 100% del total).\nlet amountToCharge = (api.paidAmount != null && Number(api.paidAmount) > 0) ? Number(api.paidAmount) : (isPartial ? totalPrice / 2 : totalPrice);\nif (!(amountToCharge > 0)) amountToCharge = isPartial ? totalPrice / 2 : totalPrice;\nconst amountInCents = Math.round(amountToCharge * 100);\n\nconst enabled = String(env.WOMPI_ENABLED == null ? 'true' : env.WOMPI_ENABLED).toLowerCase() !== 'false';\nconst hasKey = Boolean(env.WOMPI_PRIVATE_KEY);\nconst hours = Math.max(1, Number(env.WOMPI_LINK_EXPIRATION_HOURS || 24));\nconst expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();\n\nconst optionLabel = isPartial ? 'Anticipo 50%' : 'Pago total 100%';\nconst stay = (payload.checkIn && payload.checkOut) ? ` (${payload.checkIn} a ${payload.checkOut})` : '';\nconst wompiRequest = {\n  name: `Reserva ${code || ''} - Torre Satori`.trim().slice(0, 60),\n  description: `${optionLabel} de la reserva ${code || ''}${stay}`.slice(0, 250),\n  single_use: true,\n  collect_shipping: false,\n  currency: 'COP',\n  amount_in_cents: amountInCents,\n  expires_at: expiresAt,\n  sku: String(code || '').slice(0, 36)\n};\nif (env.WOMPI_REDIRECT_URL) wompiRequest.redirect_url = env.WOMPI_REDIRECT_URL;\n\nlet skipReason = null;\nif (!confirmed) skipReason = 'reserva_no_confirmada';\nelse if (!enabled) skipReason = 'wompi_deshabilitado';\nelse if (!hasKey) skipReason = 'sin_llave_privada';\nelse if (!(amountInCents >= 150000)) skipReason = 'monto_invalido';\n\nreturn [{\n  json: {\n    wa_id: source.wa_id || payload.waId || '',\n    sender_name: source.sender_name || payload.guestName || 'Huésped',\n    reservation_code: code,\n    guest_document: String(payload.guestDocument || ''),\n    payment_option: isPartial ? 'deposit' : 'full',\n    total_price: totalPrice,\n    amount_to_charge: amountInCents / 100,\n    amount_in_cents: amountInCents,\n    expires_at: expiresAt,\n    wompi_should_charge: skipReason === null,\n    wompi_skip_reason: skipReason,\n    wompi_request: wompiRequest\n  }\n}];"
       },
       "id": "677f6a9d-1599-5675-8186-0dd1a694c07f",
       "name": "H Preparar Cobro Wompi",
@@ -2507,6 +2603,15 @@
             }
           },
           "timeout": 10000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         }
       },
       "id": "api-unlock-pet-v9",
@@ -2528,6 +2633,15 @@
             }
           },
           "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         }
       },
       "id": "api-avail-pet-v9",
@@ -2598,7 +2712,19 @@
             }
           },
           "timeout": 15000
-        }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ document: $('H Preparar Cobro Wompi').first().json.guest_document || '' }) }}"
       },
       "id": "api-cancel-wompi-fail-v9",
       "name": "API Cancelar por Fallo Wompi",
@@ -2671,6 +2797,15 @@
             }
           },
           "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "={{ $env.SATORI_SERVICE_KEY || '' }}"
+            }
+          ]
         }
       },
       "id": "api-confirm-ext-pay-v9",
@@ -3972,7 +4107,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "1a1404b6-b28d-4904-9b3e-ae5a43d062eb",
+  "versionId": "307d1a51-cff9-4556-bc39-591687201b10",
   "meta": {
     "instanceId": "1c47d3693687f728d0d716490d7251af1174190f3701b869f8b18c4476a8908b"
   },

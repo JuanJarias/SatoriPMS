@@ -1,13 +1,16 @@
 /**
- * Test: Reserva Guiada Paso a Paso con Abono del 50% (CU-01 / V8)
+ * Test: Reserva Guiada Paso a Paso con Abono del 50% (CU-01 / V9)
  *
  * Flujo: Menú -> Opción 1 -> Fechas -> Habitación -> Huéspedes -> Titular ->
  *        Identificación -> Mascota -> Acompañante -> Modalidad 2 (50% anticipo).
  *
- * Aserción: La reserva debe persistirse en PostgreSQL con:
- *   - status: 'confirmed'
- *   - payment_status: 'partial'
- *   - paid_amount: total_price / 2
+ * Aserción (V9, cobro con Wompi): al elegir el 50% la reserva queda registrada a la
+ * espera del pago, sin dinero abonado todavía:
+ *   - status: 'pending_payment'
+ *   - payment_status: 'pending'
+ *   - paid_amount: 0
+ * La confirmación (confirmed / partial / 50% abonado) ocurre cuando llega el evento
+ * firmado de Wompi y la cubre test_e2e_reserva_wompi_v9.js.
  */
 const http = require('http');
 
@@ -16,8 +19,9 @@ const TEST_NAME = 'Daniel Gomez';
 const CHECK_IN = '2026-12-01';
 const CHECK_OUT = '2026-12-03';
 
-const API_HOST = process.env.API_HOST || 'api';
+const API_HOST = process.env.API_HOST || 'localhost';
 const API_PORT = process.env.API_PORT || 8080;
+const SERVICE_KEY = require('./lib/env').loadEnv().SATORI_SERVICE_KEY || '';
 const N8N_HOST = process.env.N8N_HOST || 'localhost';
 const N8N_PORT = process.env.N8N_PORT || 5678;
 
@@ -75,7 +79,8 @@ function fetchBookings() {
     http.get({
       hostname: API_HOST,
       port: API_PORT,
-      path: '/api/bookings/debug'
+      path: '/api/bookings/debug',
+      headers: { 'X-Service-Key': SERVICE_KEY }
     }, (res) => {
       let body = '';
       res.on('data', c => body += c);
@@ -147,26 +152,25 @@ async function run() {
 
     const total = Number(created.totalPrice);
     const paid = Number(created.paidAmount);
-    const expectedHalf = total / 2;
 
     console.log(`  • ID Reserva: ${created.id}`);
     console.log(`  • Grupo / Código: ${created.reservationGroupId}`);
     console.log(`  • Estado de Reserva: ${created.status}`);
     console.log(`  • Estado de Pago: ${created.paymentStatus}`);
-    console.log(`  • Total estadía: $${total}`);
-    console.log(`  • Monto Abonado: $${paid} (Esperado 50%: $${expectedHalf})`);
+    console.log(`  • Total estadía: $${total} (anticipo a cobrar: $${total / 2})`);
+    console.log(`  • Monto Abonado: $${paid}`);
 
-    const isStatusOk = created.status === 'confirmed';
-    const isPaymentOk = created.paymentStatus === 'partial';
-    const isAmountOk = Math.abs(paid - expectedHalf) < 0.01;
+    const isStatusOk = created.status === 'pending_payment';
+    const isPaymentOk = created.paymentStatus === 'pending';
+    const isAmountOk = paid === 0;
 
-    if (!isStatusOk || !isPaymentOk || !isAmountOk) {
-      throw new Error(`Datos inconsistentes: status=${created.status} (esperado: confirmed), paymentStatus=${created.paymentStatus} (esperado: partial), paidAmount=${paid} (esperado: ${expectedHalf})`);
+    if (total <= 0 || !isStatusOk || !isPaymentOk || !isAmountOk) {
+      throw new Error(`Datos inconsistentes: status=${created.status} (esperado: pending_payment), paymentStatus=${created.paymentStatus} (esperado: pending), paidAmount=${paid} (esperado: 0), total=${total}`);
     }
 
     console.log('\n======================================================================');
     console.log('✅ RESULTADO: [EXITOSO]');
-    console.log(`Reserva creada correctamente con abono del 50% ($${paid}) y estado 'partial'.`);
+    console.log(`Reserva creada a la espera del pago del 50% ($${total / 2}) con Wompi.`);
     console.log('======================================================================\n');
     process.exit(0);
 

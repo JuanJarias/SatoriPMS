@@ -2,7 +2,7 @@
  * Test E2E Completo en Vivo — Chatbot V9 (n8n + API + Redis)
  *
  * Valida de punta a punta contra el stack Docker activo:
- *   1. Menú principal de 5 opciones ("Hola")
+ *   1. Menú principal de 5 opciones ("Hola"; la 5 es hablar con un agente)
  *   2. Opción 1 (Reserva guiada) -> paso directo a rango de fechas en un solo mensaje
  *   3. Reconocimiento de entrada y salida en un solo mensaje ("2026-12-01 al 2026-12-03")
  *   4. Selección y bloqueo temporal en Redis de una habitación sin mascotas (#103 o similar)

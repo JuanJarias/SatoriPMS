@@ -1,17 +1,25 @@
 /**
- * Test: Escalamiento a Agente Humano / Recepción (CU-07 / V8)
+ * Test: Escalamiento a Agente Humano / Recepción (CU-07 / V9)
  *
- * Flujo: Menú -> Opción 6 (Hablar con un agente).
+ * Flujo: Menú -> Opción 5 (Hablar con un agente).
  *
- * Aserción: El chatbot debe activar el modo de atención humana (agent_active: true)
- *           y transferir la conversación a recepción para atención personalizada.
+ * Aserción: El webhook responde 200 y la sesión en Redis queda con agent_active: true
+ *           (el bot guarda silencio y la conversación pasa a recepción).
+ * Requiere el stack levantado (n8n, Redis y la API).
  */
 const http = require('http');
+const { execSync } = require('child_process');
 
 const WA_ID = '573117778888';
 
 const N8N_HOST = process.env.N8N_HOST || 'localhost';
 const N8N_PORT = process.env.N8N_PORT || 5678;
+const REDIS_CONTAINER = process.env.REDIS_CONTAINER || 'satori_redis';
+
+const getSession = () => {
+  const raw = execSync(`docker exec ${REDIS_CONTAINER} redis-cli GET session:${WA_ID}`, { encoding: 'utf8' }).trim();
+  return raw ? JSON.parse(raw) : null;
+};
 
 function sendMsg(text) {
   return new Promise((resolve, reject) => {
@@ -68,6 +76,7 @@ async function run() {
   console.log('======================================================================');
 
   try {
+    execSync(`docker exec ${REDIS_CONTAINER} redis-cli DEL session:${WA_ID}`);
     console.log('[1/2] Enviando "menu"...');
     await sendMsg('menu');
     await sleep(2000);
@@ -83,7 +92,13 @@ async function run() {
     }
 
     console.log('  • Código de estado webhook: HTTP 200 (OK)');
-    console.log('  • Estado de la conversación: Transferido a recepción humana');
+
+    const session = getSession();
+    if (!session) throw new Error('No existe la sesión en Redis tras solicitar un agente');
+    if (session.agent_active !== true) {
+      throw new Error(`La sesión no quedó en atención humana (agent_active=${session.agent_active}, estado=${session.state})`);
+    }
+    console.log('  • Estado de la conversación: agent_active=true (transferido a recepción humana)');
 
     console.log('\n======================================================================');
     console.log('✅ RESULTADO: [EXITOSO]');

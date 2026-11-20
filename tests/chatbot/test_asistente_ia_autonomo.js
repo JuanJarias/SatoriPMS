@@ -1,14 +1,16 @@
 /**
- * Test: Asistente IA Autónomo de Reservas con Lenguaje Natural (CU-02 / V8)
+ * Test: Asistente IA Autónomo de Reservas con Lenguaje Natural (CU-02 / V9)
  *
  * Flujo: Menú -> Opción 2 (Asistente IA) -> Prompt en lenguaje natural con fechas,
- *        huéspedes e identidad -> Selección de Habitación -> Pago 100%.
+ *        huéspedes e identidad -> Confirmación de lo interpretado ("sí") ->
+ *        Selección de Habitación -> Pago 100%.
  *
- * Aserción: El modelo Gemini debe extraer los parámetros estructurados y generar
- *           la reserva en PostgreSQL con:
- *   - guestName: 'Carlos Alberto Mendoza'
- *   - status: 'confirmed'
- *   - payment_status: 'paid'
+ * Aserción (V9, cobro con Wompi): el modelo Gemini debe extraer los parámetros y la
+ * reserva queda registrada en PostgreSQL a la espera del pago:
+ *   - guestName: 'Carlos Alberto Mendoza', cédula 987654321
+ *   - status: 'pending_payment'
+ *   - payment_status: 'pending'
+ * La confirmación posterior la cubre test_e2e_reserva_wompi_v9.js.
  */
 const http = require('http');
 
@@ -17,8 +19,9 @@ const TEST_NAME = 'Carlos Alberto Mendoza';
 const CHECK_IN = '2026-12-10';
 const CHECK_OUT = '2026-12-12';
 
-const API_HOST = process.env.API_HOST || 'api';
+const API_HOST = process.env.API_HOST || 'localhost';
 const API_PORT = process.env.API_PORT || 8080;
+const SERVICE_KEY = require('./lib/env').loadEnv().SATORI_SERVICE_KEY || '';
 const N8N_HOST = process.env.N8N_HOST || 'localhost';
 const N8N_PORT = process.env.N8N_PORT || 5678;
 
@@ -76,7 +79,8 @@ function fetchBookings() {
     http.get({
       hostname: API_HOST,
       port: API_PORT,
-      path: '/api/bookings/debug'
+      path: '/api/bookings/debug',
+      headers: { 'X-Service-Key': SERVICE_KEY }
     }, (res) => {
       let body = '';
       res.on('data', c => body += c);
@@ -111,18 +115,22 @@ async function run() {
     await sendMsg(prompt);
     await sleep(10000); // Tiempo para Gemini AI y consulta de disponibilidad
 
-    console.log('[4/5] Seleccionando primera opción de habitación (1)...');
+    console.log('[4/6] Confirmando los datos interpretados ("sí")...');
+    await sendMsg('sí');
+    await sleep(8000); // Consulta de disponibilidad
+
+    console.log('[5/6] Seleccionando primera opción de habitación (1)...');
     await sendMsg('1');
     await sleep(5000); // Tiempo para bloqueo temporal en Redis
 
-    console.log('[5/5] Seleccionando Pago del 100% (Opción 1)...');
+    console.log('[6/6] Seleccionando Pago del 100% (Opción 1)...');
     await sendMsg('1');
     await sleep(6000); // Tiempo para confirmación de reserva
 
     // ─── ASERCIÓN FINAL ───
     console.log('\n[Verificación] Consultando persistencia en Backend API...');
     const bookings = await fetchBookings();
-    const created = bookings.find(b => b.guestDocument === '987654321' && b.checkIn === CHECK_IN && b.status === 'confirmed');
+    const created = bookings.find(b => b.guestDocument === '987654321' && b.checkIn === CHECK_IN && b.status === 'pending_payment');
 
     if (!created) {
       throw new Error(`No se encontró la reserva procesada por la IA para cédula 987654321 en ${CHECK_IN}`);
@@ -132,18 +140,18 @@ async function run() {
     console.log(`  • Titular: ${created.guestName}`);
     console.log(`  • Estado de Reserva: ${created.status}`);
     console.log(`  • Estado de Pago: ${created.paymentStatus}`);
-    console.log(`  • Total pagado: $${created.paidAmount}`);
+    console.log(`  • Total a cobrar: $${created.totalPrice}`);
 
-    const isConfirmed = created.status === 'confirmed';
-    const isPaid = created.paymentStatus === 'paid';
+    const isPending = created.status === 'pending_payment';
+    const isUnpaid = created.paymentStatus === 'pending';
 
-    if (!isConfirmed || !isPaid) {
+    if (!isPending || !isUnpaid) {
       throw new Error(`Estado inesperado en la reserva: status=${created.status}, paymentStatus=${created.paymentStatus}`);
     }
 
     console.log('\n======================================================================');
     console.log('✅ RESULTADO: [EXITOSO]');
-    console.log(`Asistente IA procesó correctamente el lenguaje natural y confirmó la reserva.`);
+    console.log(`Asistente IA procesó correctamente el lenguaje natural y dejó la reserva a la espera del pago.`);
     console.log('======================================================================\n');
     process.exit(0);
 

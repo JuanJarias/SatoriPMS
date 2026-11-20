@@ -1,7 +1,7 @@
 /**
  * Test: Cobro de la reserva con Wompi (Chatbot V9)
  *
- * Ejecuta el codigo REAL de los nodos del flujo flows/n8n/v9-wompi/V9_ChatbotReservas.json
+ * Ejecuta el codigo REAL de los nodos del flujo flows/n8n/V9_ChatbotReservas.json
  * en memoria (simulando $input, $() y $env de n8n) y valida:
  *
  *   W-01  El V9 conserva intactos todos los nodos y conexiones del V8 salvo el cobro.
@@ -150,7 +150,7 @@ async function runInMemory() {
     assert(out.wompi_should_charge === false && out.wompi_skip_reason === 'reserva_no_confirmada', JSON.stringify(out));
     const msg = runCode('H Reserva Exitosa', { refs: { 'API Confirmar Reserva': { error: 'Bloqueo expirado' }, 'H Preparar Cobro Wompi': out, 'H Procesar Reserva Paso': guided('full') }, env: TEST_ENV });
     assert(msg.locks_confirmed === false && /no pudimos completar tu reserva/.test(msg.response_text) && !msg.payment_url, 'Mensaje de error sin link');
-    return 'Sin cobro y mensaje de error original del V8';
+    return 'Sin cobro y mensaje de error original del flujo anterior (V8)';
   });
 
   await test('W-05', 'Sin llave privada o WOMPI_ENABLED=false: no se cobra', () => {

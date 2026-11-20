@@ -38,12 +38,13 @@ const env = (() => {
   return Object.assign(out, process.env);
 })();
 
-const WA_ID = env.TEST_WA_ID || '573009988771';
+const WA_ID = env.TEST_WA_ID || '573009988772';
 const TEST_NAME = 'Laura Wompi E2E';
 const CHECK_IN = env.TEST_CHECK_IN || '2026-12-10';
 const CHECK_OUT = env.TEST_CHECK_OUT || '2026-12-12';
-const API_HOST = env.API_HOST || 'api';
+const API_HOST = env.API_HOST || 'localhost';
 const API_PORT = env.API_PORT || 8080;
+const SERVICE_KEY = env.SATORI_SERVICE_KEY || '';
 const N8N_HOST = env.N8N_HOST || 'localhost';
 const N8N_PORT = env.N8N_PORT || 5678;
 const REDIS_CONTAINER = env.REDIS_CONTAINER || 'satori_redis';
@@ -77,7 +78,7 @@ function sendMsg(text) {
 
 function fetchBookings() {
   return new Promise((resolve, reject) => {
-    http.get({ hostname: API_HOST, port: API_PORT, path: '/api/bookings/debug' }, (res) => {
+    http.get({ hostname: API_HOST, port: API_PORT, path: '/api/bookings/debug', headers: { 'X-Service-Key': SERVICE_KEY } }, (res) => {
       let body = ''; res.on('data', c => body += c);
       res.on('end', () => { try { resolve(JSON.parse(body)); } catch (e) { reject(e); } });
     }).on('error', reject);
@@ -100,7 +101,7 @@ async function run() {
   let linkId = null;
   try {
     const steps = [['menu', 2000], ['1', 2000], [`${CHECK_IN} al ${CHECK_OUT}`, 4500], ['1', 3500], ['2 adultos', 3500],
-      [TEST_NAME, 3000], ['1094888777', 3000], ['no', 3000], ['ninguno', 3500], ['2', 6000]];
+      [TEST_NAME, 3000], ['1094888777', 3000], ['no', 3000], ['Mateo Pérez', 3500], ['2', 6000]];
     for (const [i, [msg, wait]] of steps.entries()) {
       console.log(`[${i + 1}/${steps.length}] Enviando "${msg}"...`);
       const r = await sendMsg(msg);
@@ -113,7 +114,9 @@ async function run() {
     if (!created) throw new Error(`No se encontro la reserva de ${TEST_NAME} (${CHECK_IN})`);
     const total = Number(created.totalPrice);
     console.log(`  • ${created.bookingCode} status=${created.status} paymentStatus=${created.paymentStatus} total=$${total}`);
-    if (created.status !== 'confirmed' || created.paymentStatus !== 'partial') throw new Error('Estado inesperado de la reserva');
+    if (created.status !== 'pending_payment' || created.paymentStatus !== 'pending') {
+      throw new Error(`Estado inesperado antes del pago: ${created.status}/${created.paymentStatus} (esperado pending_payment/pending)`);
+    }
 
     console.log('[Verificacion 2] Registro del link en Redis...');
     let reg = null;
@@ -146,8 +149,23 @@ async function run() {
     console.log(`  • /webhook/wompi-events -> HTTP ${w.status}`);
     if (w.status !== 200) throw new Error(`Webhook Wompi respondio HTTP ${w.status}: ${w.body}`);
 
+    console.log('[Verificacion 5] La reserva pasa a confirmada con el 50% abonado...');
+    let after = null;
+    for (let i = 0; i < 15; i++) {
+      await sleep(1000);
+      after = (await fetchBookings()).find(b => b.bookingCode === created.bookingCode);
+      if (after && after.status === 'confirmed') break;
+    }
+    if (!after || after.status !== 'confirmed' || after.paymentStatus !== 'partial') {
+      throw new Error(`La reserva no se confirmo tras el pago aprobado: ${after ? after.status + '/' + after.paymentStatus : 'no encontrada'}`);
+    }
+    if (Math.abs(Number(after.paidAmount) - total / 2) > 0.01) {
+      throw new Error(`Monto abonado ${after.paidAmount}, esperado ${total / 2}`);
+    }
+    console.log(`  • ${after.bookingCode} status=${after.status} paymentStatus=${after.paymentStatus} paidAmount=$${after.paidAmount}`);
+
     console.log('\n' + '='.repeat(70));
-    console.log('RESULTADO: [EXITOSO] Reserva creada y link de pago Wompi generado por el 50%.');
+    console.log('RESULTADO: [EXITOSO] Reserva pendiente, link Wompi por el 50% y confirmacion tras el pago aprobado.');
     console.log('='.repeat(70));
     return 0;
   } catch (err) {
