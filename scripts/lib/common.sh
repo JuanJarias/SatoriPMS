@@ -27,6 +27,9 @@ N8N_URL="http://localhost:$N8N_PORT"
 WEB_URL="http://localhost:$WEB_PORT"
 
 # ── Colores y mensajes ───────────────────────────────────────────────────────
+# (se decide una sola vez: dentro de $(...) la salida ya no es una terminal)
+LINKS_ENABLED=false
+[ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && LINKS_ENABLED=true
 if [ -t 1 ]; then
     RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'
     CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
@@ -182,6 +185,29 @@ public_n8n_url() {
 }
 
 # ── Resumen de enlaces ───────────────────────────────────────────────────────
+# Enlace clicable (hipervínculo OSC 8) en terminales que lo soportan; texto plano si no.
+link() {
+    local url="$1"
+    if $LINKS_ENABLED; then
+        printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$url" "$url"
+    else
+        printf '%s' "$url"
+    fi
+}
+
+# Abre una dirección en el navegador predeterminado (sin bloquear la terminal).
+open_url() {
+    local url="$1"
+    if command -v xdg-open >/dev/null 2>&1; then
+        (setsid xdg-open "$url" >/dev/null 2>&1 &)
+    elif command -v open >/dev/null 2>&1; then
+        open "$url" >/dev/null 2>&1 || true
+    else
+        log_warn "No encontré xdg-open ni open; abre $url manualmente."
+        return 1
+    fi
+}
+
 # Rellena una etiqueta a 22 caracteres (cuenta caracteres, no bytes, para las tildes).
 pad_label() {
     local text="$1" width=22
@@ -204,13 +230,13 @@ print_links() {
     echo -e "${BOLD}${GREEN}══════════════════════════════════════════════════════════════════${NC}"
     echo -e "${BOLD}${GREEN}  SatoriPMS — Enlaces de acceso${NC}"
     echo -e "${BOLD}${GREEN}══════════════════════════════════════════════════════════════════${NC}"
-    printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "Aplicación web")" "$WEB_URL" "$(status_label "$(http_code "$WEB_URL")")"
-    printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "Backend (API)")" "$API_URL" "$(status_label "$(http_code "$API_URL/api/v1/health")")"
-    printf "  %s ${CYAN}%s${NC}\n" "$(pad_label "Documentación API")" "$API_URL/docs"
+    printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "Aplicación web")" "$(link "$WEB_URL")" "$(status_label "$(http_code "$WEB_URL")")"
+    printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "Backend (API)")" "$(link "$API_URL")" "$(status_label "$(http_code "$API_URL/api/v1/health")")"
+    printf "  %s ${CYAN}%s${NC}\n" "$(pad_label "Documentación API")" "$(link "$API_URL/docs")"
     if n8n_enabled; then
-        printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "n8n (editor local)")" "$N8N_URL" "$(status_label "$(http_code "$N8N_URL/healthz")")"
+        printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "n8n (editor local)")" "$(link "$N8N_URL")" "$(status_label "$(http_code "$N8N_URL/healthz")")"
         if [ -n "$public" ]; then
-            printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "n8n (público)")" "$public" "$(status_label "$(http_code "$public/healthz" 8)")"
+            printf "  %s ${CYAN}%s${NC}  [%b]\n" "$(pad_label "n8n (público)")" "$(link "$public")" "$(status_label "$(http_code "$public/healthz" 8)")"
             printf "  %s ${CYAN}%s${NC}\n" "$(pad_label "Webhook WhatsApp")" "$public/webhook/whatsapp-webhook"
             printf "  %s ${CYAN}%s${NC}\n" "$(pad_label "Webhook Wompi")" "$public/webhook/wompi-events"
         fi
@@ -218,6 +244,7 @@ print_links() {
         printf "  %s ${YELLOW}%s${NC}\n" "$(pad_label "n8n")" "desactivado (agrega 'n8n' a COMPOSE_PROFILES en .env)"
     fi
     echo -e "${BOLD}${GREEN}══════════════════════════════════════════════════════════════════${NC}"
+    echo -e "  ${DIM}Acceso a la web (solo desarrollo): admin / admin123   ·   recepcion / recepcion123${NC}"
     echo -e "  ${DIM}Estado detallado: ./scripts/status-dev.sh   ·   Detener: ./scripts/stop-dev.sh${NC}"
     echo -e "  ${DIM}Logs: docker compose logs -f api   ·   Web: tail -f .dev/web.log${NC}"
 }

@@ -152,7 +152,7 @@ flowchart TB
 
    | Script | Para qué sirve |
    | :--- | :--- |
-   | `./scripts/start-dev.sh` | Levanta todo y muestra los enlaces. Opciones: `--no-frontend`, `--frontend-only`, `--no-tunnel`, `--no-build`, `--sync-flow`. |
+   | `./scripts/start-dev.sh` | Levanta todo y muestra los enlaces. Opciones: `--open` (abre los enlaces en el navegador), `--no-frontend`, `--frontend-only`, `--no-tunnel`, `--no-build`, `--sync-flow`. |
    | `./scripts/stop-dev.sh` | Detiene la web, el túnel y los contenedores **conservando los datos**. `--pause` solo pausa los contenedores. |
    | `./scripts/reset-dev.sh` | Borra contenedores y datos (pide escribir `RESET`). `--keep-n8n` conserva n8n; `--start --seed` vuelve a levantar todo con datos de prueba. |
    | `./scripts/status-dev.sh` | Diagnóstico: contenedores, servicios, túnel, vencimiento del token de WhatsApp y suscripción de la app en Meta. |

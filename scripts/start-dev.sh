@@ -7,7 +7,7 @@
 #    cada servicio responda.
 # 3. Abre el túnel público zrok2 para n8n (WhatsApp y Wompi), si aplica.
 # 4. Inicia la aplicación web (Vite) en segundo plano.
-# 5. Muestra los enlaces de acceso.
+# 5. Muestra los enlaces de acceso (clicables) y, con --open, los abre en el navegador.
 # ==============================================================================
 set -Eeuo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -17,6 +17,7 @@ START_WEB=true
 START_TUNNEL=true
 BUILD=true
 SYNC_FLOW=false
+OPEN_BROWSER=false
 
 show_help() {
     cat <<EOF
@@ -30,6 +31,7 @@ Opciones:
   --no-tunnel        No abre el túnel público zrok2 para n8n.
   --no-build         No reconstruye la imagen de la API (más rápido si no cambió el código).
   --sync-flow        Importa y publica el flujo V9 en n8n al terminar.
+  --open             Abre en el navegador la aplicación web, n8n y la documentación de la API.
   -h, --help         Muestra esta ayuda.
 
 Otros scripts:
@@ -49,6 +51,7 @@ while [[ $# -gt 0 ]]; do
         --no-build) BUILD=false ;;
         -u|--update) BUILD=true ;;   # compatibilidad con la versión anterior
         --sync-flow) SYNC_FLOW=true ;;
+        --open) OPEN_BROWSER=true ;;
         -d|--down)                    # compatibilidad con la versión anterior
             log_warn "'start-dev.sh $1' está obsoleto; usa ./scripts/stop-dev.sh"
             exec "$SCRIPTS_DIR/stop-dev.sh" ;;
@@ -174,3 +177,11 @@ if $SYNC_FLOW && $START_INFRA && n8n_enabled; then
 fi
 
 print_links
+
+if $OPEN_BROWSER; then
+    $START_WEB && open_url "$WEB_URL"
+    if $START_INFRA; then
+        n8n_enabled && open_url "$N8N_URL"
+        open_url "$API_URL/docs"
+    fi
+fi

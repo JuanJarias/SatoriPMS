@@ -104,6 +104,7 @@ Pasos que ejecuta, en orden:
 | `--frontend-only` | Solo inicia la aplicación web, sin Docker ni túnel. |
 | `--no-tunnel` | No abre el túnel público de n8n. |
 | `--no-build` | No reconstruye la imagen del servidor central (más rápido si el código no cambió). |
+| `--open` | Abre en el navegador la aplicación web, n8n y la documentación de la API al terminar. |
 | `--sync-flow` | Importa y publica el flujo V9 en n8n al terminar. |
 
 Las opciones antiguas siguen funcionando por compatibilidad: `-u` equivale a la construcción por defecto, `-d` redirige a `stop-dev.sh` y `-D` redirige a `reset-dev.sh`.
