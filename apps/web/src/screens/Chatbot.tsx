@@ -32,44 +32,34 @@ import {
 } from '../ui';
 
 export function Chatbot({ go }: { go?: (view: string, param?: string) => void }) {
-  const { rooms, bookings, addBooking, log } = useStore();
-  const [activeTab, setActiveTab] = useState<'inbox' | 'simulator'>('simulator');
+  const { rooms, conversations, addBooking, escalateConversation } = useStore();
+  const [activeTab, setActiveTab] = useState<'inbox' | 'simulator'>('inbox');
 
-  // --- ESTADO BANDEJA RECEPCIÓN ---
-  const [selectedChatPhone, setSelectedChatPhone] = useState<string>('+57 310 555 0142');
-  const [botPaused, setBotPaused] = useState<boolean>(false);
-  const [replyText, setReplyText] = useState<string>('');
-  const [chatHistory, setChatHistory] = useState<Record<string, { sender: 'guest' | 'bot' | 'reception'; text: string; time: string }[]>>({
-    '+57 310 555 0142': [
-      { sender: 'guest', text: 'Hola, buenos días. ¿Tienen habitación disponible para el próximo fin de semana?', time: '10:15 am' },
-      { sender: 'bot', text: '¡Hola! Bienvenido a Torre Satori en Sevilla, Valle. Con gusto te ayudo a consultar disponibilidad. ¿Para cuántas personas sería?', time: '10:15 am' },
-      { sender: 'guest', text: 'Somos 2 adultos y llevamos una mascota pequeña.', time: '10:17 am' },
-      { sender: 'bot', text: 'Perfecto. Para parejas con mascota te recomendamos la Hab. 101 Jardín (Sencilla, $180.000/noche), o la Hab. 202 Suite Satori ($380.000/noche). Ambas son Pet-Friendly.', time: '10:18 am' },
-    ],
-    '+57 315 555 0187': [
-      { sender: 'guest', text: 'Buenas tardes, ya hice la consignación del 50% de la reserva TS-2047.', time: 'Ayer' },
-      { sender: 'reception', text: 'Confirmado, don Andrés. Su anticipo de $435.000 quedó aplicado. Lo esperamos el 1 de octubre a partir de las 3:00 pm.', time: 'Ayer' },
-    ],
-  });
+  const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
+  const selectedConv =
+    conversations.find((c) => c.id === selectedConvId) || conversations[0] || null;
 
   const { show, node } = useToast();
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const twoDaysIso = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+
   // --- ESTADO SIMULADOR SANDBOX WHATSAPP ---
   const [simStep, setSimStep] = useState<number>(1);
-  const [simCheckIn, setSimCheckIn] = useState('2026-10-15');
-  const [simCheckOut, setSimCheckOut] = useState('2026-10-17');
+  const [simCheckIn, setSimCheckIn] = useState(todayIso);
+  const [simCheckOut, setSimCheckOut] = useState(twoDaysIso);
   const [simAdults, setSimAdults] = useState(2);
   const [simKids, setSimKids] = useState(0);
   const [simPet, setSimPet] = useState(false);
-  const [simSelectedRoom, setSimSelectedRoom] = useState<string>('101');
+  const [simSelectedRoom, setSimSelectedRoom] = useState<string>('1');
   const [simTimer, setSimTimer] = useState(900); // 15 minutos (900 seg)
   const [simPaymentMethod, setSimPaymentMethod] = useState<'tarjeta' | 'pse' | 'transferencia'>('transferencia');
   const [simConfirmedCode, setSimConfirmedCode] = useState<string | null>(null);
 
   const simNights = Math.max(1, Math.round((new Date(simCheckOut).getTime() - new Date(simCheckIn).getTime()) / (1000 * 60 * 60 * 24)));
   const simTotalGuests = simAdults + simKids;
-  const currentRoom = rooms.find((r) => r.number === simSelectedRoom || r.id === simSelectedRoom) || rooms[0];
-  const simBasePrice = currentRoom.rate * simNights;
+  const currentRoom = rooms.find((r) => r.number === simSelectedRoom || String(r.id) === simSelectedRoom) || rooms[0];
+  const simBasePrice = (currentRoom?.rate || 0) * simNights;
 
   // Temporizador regresivo de 15 minutos en el simulador
   useEffect(() => {
@@ -86,38 +76,38 @@ export function Chatbot({ go }: { go?: (view: string, param?: string) => void })
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const handleSendReceptionReply = () => {
-    if (!replyText.trim()) return;
-    const nowTime = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
-    setChatHistory((prev) => ({
-      ...prev,
-      [selectedChatPhone]: [
-        ...(prev[selectedChatPhone] || []),
-        { sender: 'reception', text: replyText.trim(), time: nowTime },
-      ],
-    }));
-    log(`Envió mensaje manual a ${selectedChatPhone}`, 'WhatsApp');
-    setReplyText('');
-    show('Mensaje enviado', `Enviado al chat de ${selectedChatPhone}`);
+  const handleEscalateConv = async (id: number) => {
+    const res = await escalateConversation(id);
+    if (res.success) {
+      show('Conversación escalada', 'El bot queda en pausa para atención humana en PostgreSQL');
+    } else {
+      show('Error al escalar', res.message, 'bad');
+    }
   };
 
-  const handleSimConfirmBooking = () => {
-    const newCode = 'TS-' + Math.floor(1000 + Math.random() * 9000);
-    setSimConfirmedCode(newCode);
-    addBooking({
-      code: newCode,
-      guest: 'Huésped Sandbox (Prueba)',
-      room: currentRoom.number,
+  const handleSimConfirmBooking = async () => {
+    if (!currentRoom) {
+      show('Sin habitaciones', 'No hay habitaciones cargadas desde el servidor', 'bad');
+      return;
+    }
+    const res = await addBooking({
+      roomId: currentRoom.id,
       checkIn: simCheckIn,
       checkOut: simCheckOut,
-      guests: simTotalGuests,
-      channel: 'WhatsApp',
-      phone: '+57 300 000 0000',
-      total: simBasePrice,
-      paid: simBasePrice / 2,
-      status: 'confirmada',
-      note: 'Creada desde el Simulador Sandbox de WhatsApp.',
+      adults: simAdults,
+      children: simKids,
+      hasPet: simPet,
+      guestName: 'Huésped Sandbox WhatsApp',
+      phone: '+573000000000',
+      paymentOption: 'half',
+      source: 'chatbot',
     });
+    if (!res.success) {
+      show('Conflicto al reservar', res.message, 'bad');
+      return;
+    }
+    const newCode = (res.data as { code?: string } | undefined)?.code || 'TS-BOT';
+    setSimConfirmedCode(newCode);
     setSimStep(5);
   };
 
@@ -126,142 +116,99 @@ export function Chatbot({ go }: { go?: (view: string, param?: string) => void })
       <PageHeader
         eyebrow="Canal Directo & Automatización"
         title="WhatsApp & Asistente Satori"
-        desc="Monitorea las conversaciones con huéspedes en tiempo real o realiza pruebas interactivas en el Sandbox."
+        desc="Bandeja real de sesiones conversacionales en PostgreSQL 16 (n8n V10 sin Redis) y simulador de reservas."
         actions={
           <div className="flex gap-2">
-            <Button
-              variant={activeTab === 'simulator' ? 'primary' : 'secondary'}
-              icon={<Smartphone size={16} />}
-              onClick={() => setActiveTab('simulator')}
-            >
-              Simulador Sandbox (Pruebas)
-            </Button>
             <Button
               variant={activeTab === 'inbox' ? 'primary' : 'secondary'}
               icon={<MessageSquare size={16} />}
               onClick={() => setActiveTab('inbox')}
             >
-              Bandeja de Recepción en Vivo
+              Sesiones WhatsApp ({conversations.length})
+            </Button>
+            <Button
+              variant={activeTab === 'simulator' ? 'primary' : 'secondary'}
+              icon={<Smartphone size={16} />}
+              onClick={() => setActiveTab('simulator')}
+            >
+              Simulador Sandbox
             </Button>
           </div>
         }
       />
 
       {activeTab === 'inbox' ? (
-        /* BANDEJA DE ENTRADA EN VIVO */
+        /* BANDEJA REAL DE SESIONES POSTGRESQL */
         <div className="grid gap-6 min-[1000px]:grid-cols-[320px_1fr]">
-          {/* Lista de Chats */}
-          <Card className="p-4 h-[650px] flex flex-col">
-            <CardHeader title="Conversaciones" hint="Huéspedes en contacto" />
-            <div className="divide-y divide-sand-200 overflow-y-auto flex-1">
-              {[
-                { phone: '+57 310 555 0142', name: 'Laura Gómez', last: 'Ambas son Pet-Friendly.', time: '10:18 am', unread: false },
-                { phone: '+57 315 555 0187', name: 'Andrés Martínez', last: 'Lo esperamos el 1 de octubre...', time: 'Ayer', unread: false },
-                { phone: '+57 300 555 0164', name: 'María Fernanda Rojas', last: '¿Cuánto tiempo tengo para abonar?', time: 'Ayer', unread: true },
-              ].map((c) => (
-                <button
-                  key={c.phone}
-                  type="button"
-                  onClick={() => setSelectedChatPhone(c.phone)}
-                  className={cn(
-                    'w-full p-3 text-left flex items-start gap-3 cursor-pointer transition-colors',
-                    selectedChatPhone === c.phone ? 'bg-forest-50' : 'hover:bg-sand-50'
-                  )}
-                >
-                  <div className="h-9 w-9 rounded-full bg-forest-800 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    {c.name.split(' ').map((n) => n[0]).join('')}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex justify-between items-baseline">
-                      <p className="font-semibold text-sm text-ink truncate">{c.name}</p>
-                      <span className="text-[11px] text-ink-soft">{c.time}</span>
+          <Card className="p-4 h-[600px] flex flex-col">
+            <CardHeader title="Conversaciones WhatsApp" hint="Sesiones activas en PostgreSQL" />
+            {conversations.length === 0 ? (
+              <p className="text-xs text-ink-soft py-4">Aún no hay sesiones conversacionales registradas en PostgreSQL.</p>
+            ) : (
+              <div className="divide-y divide-sand-200 overflow-y-auto flex-1">
+                {conversations.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedConvId(c.id)}
+                    className={cn(
+                      'w-full p-3 text-left flex items-start gap-3 cursor-pointer transition-colors',
+                      selectedConv?.id === c.id ? 'bg-forest-50' : 'hover:bg-sand-50'
+                    )}
+                  >
+                    <div className="h-9 w-9 rounded-full bg-forest-800 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                      {(c.guestName || 'H').split(' ').map((n) => n[0]).slice(0, 2).join('')}
                     </div>
-                    <p className="text-xs text-ink-soft truncate mt-0.5">{c.last}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between items-baseline">
+                        <p className="font-semibold text-sm text-ink truncate">{c.guestName}</p>
+                        <span className="text-[11px] text-ink-soft">{c.status === 'escalated' ? 'Humano' : 'Bot'}</span>
+                      </div>
+                      <p className="text-xs text-ink-soft truncate mt-0.5">{c.waId} · {c.state}:{c.step}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </Card>
 
-          {/* Ventana de Chat Seleccionado */}
-          <Card className="flex flex-col h-[650px]">
-            {/* Header del Chat */}
-            <div className="p-4 border-b border-sand-200 flex justify-between items-center bg-sand-50/50">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-forest-700 text-white flex items-center justify-center font-bold text-sm">
-                  <User size={18} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-ink text-sm">Huésped ({selectedChatPhone})</h3>
-                  <p className="text-xs text-ok font-medium flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full bg-ok inline-block" /> WhatsApp Activo
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={botPaused ? 'danger' : 'secondary'}
-                  className="h-8 text-xs px-2.5"
-                  onClick={() => setBotPaused(!botPaused)}
-                >
-                  {botPaused ? 'Bot Pausado (Atención Humana)' : 'Pausar Bot y Atender'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Mensajes */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#fdfbf7]">
-              {(chatHistory[selectedChatPhone] || []).map((msg, idx) => {
-                const isGuest = msg.sender === 'guest';
-                const isBot = msg.sender === 'bot';
-                return (
-                  <div
-                    key={idx}
-                    className={cn('flex flex-col max-w-[80%]', isGuest ? 'mr-auto items-start' : 'ml-auto items-end')}
-                  >
-                    <span className="text-[10px] text-ink-soft mb-1 px-1">
-                      {isGuest ? 'Huésped' : isBot ? 'Bot Satori (IA)' : 'Recepción (Tú)'}
-                    </span>
-                    <div
-                      className={cn(
-                        'rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm',
-                        isGuest
-                          ? 'bg-white border border-sand-200 text-ink rounded-tl-sm'
-                          : isBot
-                          ? 'bg-forest-100 text-forest-900 rounded-tr-sm border border-forest-200'
-                          : 'bg-forest-800 text-white rounded-tr-sm'
-                      )}
-                    >
-                      {msg.text}
-                      <span className={cn('block text-[10px] text-right mt-1 opacity-70')}>
-                        {msg.time}
-                      </span>
+          <Card className="flex flex-col h-[600px]">
+            {selectedConv ? (
+              <>
+                <div className="p-4 border-b border-sand-200 flex justify-between items-center bg-sand-50/50">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-forest-700 text-white flex items-center justify-center font-bold text-sm">
+                      <User size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-ink text-sm">{selectedConv.guestName} ({selectedConv.waId})</h3>
+                      <p className="text-xs text-ok font-medium flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-ok inline-block" />
+                        Estado: {selectedConv.state} / Paso: {selectedConv.step}
+                      </p>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Barra de Entrada de Recepción */}
-            <div className="p-3 border-t border-sand-200 flex gap-2 bg-white">
-              <input
-                type="text"
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendReceptionReply()}
-                placeholder={botPaused ? 'Escribe como recepcionista…' : 'Pausa el bot o escribe para intervenir…'}
-                className="flex-1 h-10 rounded-lg border border-sand-300 px-3 text-sm focus:outline-none focus:border-forest-700"
-              />
-              <Button
-                variant="primary"
-                className="h-10 px-4"
-                icon={<Send size={16} />}
-                onClick={handleSendReceptionReply}
-              >
-                Enviar
-              </Button>
-            </div>
+                  <Button
+                    variant={selectedConv.agentActive ? 'danger' : 'secondary'}
+                    className="h-8 text-xs px-3"
+                    onClick={() => handleEscalateConv(selectedConv.id)}
+                  >
+                    {selectedConv.agentActive ? 'Escalamiento Humano Activo' : 'Activar Atención Humana'}
+                  </Button>
+                </div>
+                <div className="flex-1 p-6 space-y-3 text-sm text-ink-soft">
+                  <Alert tone="info" title="Sesión persistida en PostgreSQL 16 (sin Redis)">
+                    Número WhatsApp: <strong>{selectedConv.waId}</strong> · Modo actual:{' '}
+                    <strong>{selectedConv.agentActive ? 'Bot en silencio (Atención humana)' : 'Bot n8n V10 activo'}</strong>.
+                    {selectedConv.updatedAt && ` Última actividad: ${new Date(selectedConv.updatedAt).toLocaleString('es-CO')}.`}
+                  </Alert>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 grid place-items-center p-8 text-center text-sm text-ink-soft">
+                Selecciona una conversación de WhatsApp o prueba el flujo desde el Simulador Sandbox.
+              </div>
+            )}
           </Card>
         </div>
       ) : (

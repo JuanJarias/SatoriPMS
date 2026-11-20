@@ -1,19 +1,20 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { apiClient, downloadAuthorizedFile, getApiBaseUrl } from './api/client';
 import { RoomStatusKey, BookingStatusKey } from './ui';
 
 export interface RoomItem {
-  id: string | number;
+  id: number;
   number: string;
   name: string;
   type: string;
   capacity: number;
-  baseAdultsCapacity?: number;
-  maxAdultsCapacity?: number;
-  childrenCapacity?: number;
-  allowsPets?: boolean;
+  baseAdultsCapacity: number;
+  maxAdultsCapacity: number;
+  childrenCapacity: number;
+  allowsPets: boolean;
   status: RoomStatusKey;
   rate: number;
-  extraRate?: number;
+  extraRate: number;
   guest?: string;
   until?: string;
   next?: string;
@@ -22,6 +23,7 @@ export interface RoomItem {
 }
 
 export interface BookingItem {
+  id?: number;
   code: string;
   reservationGroupId?: string;
   guest: string;
@@ -45,6 +47,7 @@ export interface BookingItem {
 
 export interface ProductItem {
   id: string;
+  numericId?: number;
   name: string;
   price: number;
   stock: number;
@@ -53,6 +56,7 @@ export interface ProductItem {
 
 export interface MenuItem {
   id: string | number;
+  code?: string;
   name: string;
   category: 'breakfast' | 'coffee' | 'bakery' | 'beverage' | 'experience';
   price: number;
@@ -65,24 +69,25 @@ export interface RestaurantOrder {
   roomNumber?: string;
   tableNumber?: string;
   guestName?: string;
-  items: { menuItemId: string | number; name: string; qty: number; price: number }[];
+  items: { menuItemId?: string | number; name: string; qty: number; price: number }[];
   total: number;
-  status: 'pending' | 'preparing' | 'delivered' | 'paid' | 'charged_to_room';
+  status: 'pending' | 'preparing' | 'delivered' | 'paid' | 'charged_to_room' | 'cancelled';
   createdAt: string;
 }
 
 export interface SpecialEventItem {
-  id: string | number;
+  id: number | string;
   name: string;
   description?: string;
   startDate: string;
   endDate: string;
-  discountPercentage: number; // >0 descuento, <0 recargo
+  discountPercentage: number;
   active: boolean;
 }
 
 export interface ExpenseItem {
   id: string;
+  numericId?: number;
   date: string;
   amount: number;
   category: string;
@@ -90,7 +95,17 @@ export interface ExpenseItem {
   voided?: boolean;
 }
 
+export interface FinanceSummary {
+  totalIncome: number;
+  lodgingIncome: number;
+  chargesIncome: number;
+  totalExpenses: number;
+  netBalance: number;
+  channels: { channel: string; bookings: number; income: number; pct: string }[];
+}
+
 export interface AuditItem {
+  id?: number;
   at: string;
   user: string;
   role: string;
@@ -99,112 +114,89 @@ export interface AuditItem {
 }
 
 export interface UserItem {
-  id: string;
+  id: string | number;
+  username: string;
   name: string;
-  email: string;
-  phone: string;
   role: string;
   active: boolean;
   last: string;
 }
 
+export interface ConversationItem {
+  id: number;
+  waId: string;
+  guestName: string;
+  guestPhone: string;
+  status: 'escalated' | 'active';
+  step: string;
+  state: string;
+  agentActive: boolean;
+  updatedAt?: string;
+}
+
 export interface ChargeItem {
+  id?: number;
+  bookingId?: number;
+  roomId?: number;
+  roomNumber?: string;
   desc: string;
   qty: number;
   amount: number;
+  paid?: boolean;
   source?: 'tienda' | 'restaurante';
 }
 
-const INITIAL_ROOMS: RoomItem[] = [
-  { id: '101', number: '101', name: 'Jardín', type: 'Sencilla', capacity: 2, baseAdultsCapacity: 2, maxAdultsCapacity: 2, childrenCapacity: 0, allowsPets: true, status: 'ocupada', guest: 'Laura Gómez', until: 'Sale vie 2 oct, 11:00', next: 'Sin reservas próximas', rate: 180000, extraRate: 40000, active: true },
-  { id: '102', number: '102', name: 'Familiar', type: 'Familiar', capacity: 5, baseAdultsCapacity: 4, maxAdultsCapacity: 5, childrenCapacity: 1, allowsPets: false, status: 'libre', next: 'Andrés Martínez · hoy 3:00 pm', rate: 290000, extraRate: 40000, active: true },
-  { id: '103', number: '103', name: 'Patio', type: 'Sencilla', capacity: 2, baseAdultsCapacity: 2, maxAdultsCapacity: 2, childrenCapacity: 0, allowsPets: true, status: 'mantenimiento', note: 'Reparación de ducha · listo el sáb 3 oct', next: 'Camilo Herrera · dom 4 oct', rate: 170000, extraRate: 40000, active: true },
-  { id: '201', number: '201', name: 'Balcón', type: 'Doble', capacity: 3, baseAdultsCapacity: 2, maxAdultsCapacity: 3, childrenCapacity: 1, allowsPets: false, status: 'limpieza', note: 'Aseo de salida iniciado 10:50 am', next: 'Camilo Herrera · sáb 3 oct', rate: 210000, extraRate: 40000, active: true },
-  { id: '202', number: '202', name: 'Suite Satori', type: 'Suite', capacity: 4, baseAdultsCapacity: 2, maxAdultsCapacity: 4, childrenCapacity: 2, allowsPets: true, status: 'bloqueada', note: 'Bloqueo de María Fernanda Rojas · vence hoy 6:00 pm', next: 'Pendiente de anticipo', rate: 380000, extraRate: 40000, active: true },
-  { id: '203', number: '203', name: 'Cafetal', type: 'Doble', capacity: 3, baseAdultsCapacity: 2, maxAdultsCapacity: 3, childrenCapacity: 1, allowsPets: false, status: 'libre', next: 'Sin reservas inmediatas', rate: 220000, extraRate: 40000, active: true },
-  { id: '301', number: '301', name: 'Mirador del Valle', type: 'Suite', capacity: 4, baseAdultsCapacity: 2, maxAdultsCapacity: 4, childrenCapacity: 1, allowsPets: false, status: 'libre', next: 'Disponible fin de semana', rate: 350000, extraRate: 50000, active: true },
-  { id: '302', number: '302', name: 'Atardecer', type: 'Doble', capacity: 2, baseAdultsCapacity: 2, maxAdultsCapacity: 2, childrenCapacity: 0, allowsPets: false, status: 'libre', next: 'Disponible', rate: 200000, extraRate: 40000, active: true },
-  { id: '303', number: '303', name: 'Cordillera', type: 'Familiar', capacity: 6, baseAdultsCapacity: 4, maxAdultsCapacity: 6, childrenCapacity: 2, allowsPets: true, status: 'libre', next: 'Disponible', rate: 320000, extraRate: 45000, active: true },
-];
-
-const INITIAL_BOOKINGS: BookingItem[] = [
-  { code: 'TS-2391', guest: 'Maria', room: '103', checkIn: '2026-10-03', checkOut: '2026-10-08', guests: 2, status: 'confirmada', channel: 'Recepción', phone: '+57 300 222 2222', total: 850000, paid: 850000, doc: '222222', note: 'Reserva registrada en recepción para Habitación 103 Patio.' },
-  { code: 'TS-2041', guest: 'Laura Gómez', room: '101', checkIn: '2026-09-29', checkOut: '2026-10-02', guests: 2, status: 'enCurso', channel: 'WhatsApp', phone: '+57 310 555 0142', total: 540000, paid: 540000, doc: 'CC 1.113.555.201', note: 'Viaja con mascota pequeña. Desayuno a las 8:00 am.' },
-  { code: 'TS-2047', guest: 'Andrés Martínez', room: '102', checkIn: '2026-10-01', checkOut: '2026-10-04', guests: 4, status: 'confirmada', channel: 'WhatsApp', phone: '+57 315 555 0187', total: 870000, paid: 435000, doc: 'CC 94.333.712', note: 'Viaja con dos niños. Solicita cuna.' },
-  { code: 'BL-0318', guest: 'María Fernanda Rojas', room: '202', checkIn: '2026-10-01', checkOut: '2026-10-03', guests: 2, status: 'bloqueada', channel: 'WhatsApp', phone: '+57 300 555 0164', total: 760000, paid: 0, note: 'Retención vence hoy 6:00 pm si no se recibe el anticipo del 50 %.' },
-  { code: 'TS-2052', guest: 'Camilo Herrera', room: '201', checkIn: '2026-10-03', checkOut: '2026-10-05', guests: 3, status: 'pendiente', channel: 'Teléfono', phone: '+57 320 555 0119', total: 420000, paid: 100000, doc: 'CC 16.280.944' },
-  { code: 'TS-2036', guest: 'María Fernanda Rojas', room: '201', checkIn: '2026-09-28', checkOut: '2026-10-01', guests: 2, status: 'finalizada', channel: 'Recepción', phone: '+57 300 555 0164', total: 630000, paid: 630000, doc: 'CC 66.812.430' },
-  { code: 'TS-2033', guest: 'Laura Gómez', room: '202', checkIn: '2026-09-12', checkOut: '2026-09-14', guests: 2, status: 'finalizada', channel: 'WhatsApp', phone: '+57 310 555 0142', total: 760000, paid: 760000, doc: 'CC 1.113.555.201' },
-  { code: 'TS-2029', guest: 'Andrés Martínez', room: '101', checkIn: '2026-09-20', checkOut: '2026-09-22', guests: 2, status: 'cancelada', channel: 'WhatsApp', phone: '+57 315 555 0187', total: 360000, paid: 0, note: 'Cancelada por el huésped con 5 días de anticipación.' },
-];
-
-const INITIAL_PRODUCTS: ProductItem[] = [
-  { id: 'p1', name: 'Agua Cristal 600 ml', price: 3000, stock: 24, category: 'Bebidas' },
-  { id: 'p2', name: 'Gaseosa Postobón 400 ml', price: 4000, stock: 12, category: 'Bebidas' },
-  { id: 'p3', name: 'Cerveza Club Colombia', price: 7000, stock: 8, category: 'Bebidas' },
-  { id: 'p4', name: 'Papas Margarita pollo', price: 3500, stock: 15, category: 'Snacks' },
-  { id: 'p5', name: 'Chocolatina Jet', price: 2500, stock: 10, category: 'Snacks' },
-  { id: 'p6', name: 'Salgados Café Origen Especial 250g', price: 25000, stock: 20, category: 'Café de Origen' },
-  { id: 'p7', name: 'Salgados Café Drip Bag (Pack x 5)', price: 16000, stock: 18, category: 'Café de Origen' },
-  { id: 'p8', name: 'Protector solar FPS 50', price: 28000, stock: 4, category: 'Cuidado personal' },
-  { id: 'p9', name: 'Cepillo y crema dental', price: 6000, stock: 9, category: 'Cuidado personal' },
-];
-
-const INITIAL_MENU: MenuItem[] = [
-  { id: 'm1', name: 'Desayuno Típico Vallecaucano', category: 'breakfast', price: 18000, description: 'Huevos al gusto, calentado o arepa con queso, fruta de temporada y café Salgados.', available: true },
-  { id: 'm2', name: 'Desayuno Continental Satori', category: 'breakfast', price: 16000, description: 'Canasta de panes artesanales, mermelada de mora silvestre, mantequilla, huevos y jugo.', available: true },
-  { id: 'm3', name: 'Café Espresso Salgados', category: 'coffee', price: 5000, description: 'Extracción 30ml de café especial tostión media-alta.', available: true },
-  { id: 'm4', name: 'Café Filtrado V60 / Chemex', category: 'coffee', price: 9000, description: 'Método artesanal con notas a panela, cítricos y chocolate.', available: true },
-  { id: 'm5', name: 'Cappuccino de la Casa', category: 'coffee', price: 7500, description: 'Espresso doble con leche texturizada al vapor y canela.', available: true },
-  { id: 'm6', name: 'Cata Guiada & Barismo Salgados', category: 'experience', price: 45000, description: 'Recorrido sensorial por 3 variedades de café de origen Sevilla con barista profesional.', available: true },
-  { id: 'm7', name: 'Tarta de Café y Arequipe', category: 'bakery', price: 8500, description: 'Porción individual con reducción de café Salgados.', available: true },
-];
-
-const INITIAL_EVENTS: SpecialEventItem[] = [
-  { id: 'ev1', name: 'Temporada Festivales del Café (Sevilla)', description: 'Semana de la cultura cafetera con alta afluencia regional', startDate: '2026-10-10', endDate: '2026-10-18', discountPercentage: -15, active: true },
-  { id: 'ev2', name: 'Promoción Escapada Entre Semana', description: 'Descuento especial para reservas de lunes a jueves', startDate: '2026-10-01', endDate: '2026-10-31', discountPercentage: 10, active: true },
-  { id: 'ev3', name: 'Feria Navideña y Fin de Año', description: 'Temporada alta diciembre', startDate: '2026-12-15', endDate: '2027-01-10', discountPercentage: -20, active: true },
-];
-
-const INITIAL_EXPENSES: ExpenseItem[] = [
-  { id: 'e1', date: '2026-09-03', amount: 1420000, category: 'Servicios públicos', desc: 'Energía y acueducto agosto' },
-  { id: 'e2', date: '2026-09-05', amount: 2600000, category: 'Nómina', desc: 'Quincena recepción y aseo' },
-  { id: 'e3', date: '2026-09-12', amount: 640000, category: 'Insumos', desc: 'Lavandería y productos de aseo' },
-  { id: 'e4', date: '2026-09-15', amount: 2600000, category: 'Nómina', desc: 'Quincena recepción y aseo' },
-  { id: 'e5', date: '2026-09-18', amount: 520000, category: 'Compra de tienda', desc: 'Reposición de bebidas y Salgados Café' },
-  { id: 'e6', date: '2026-09-22', amount: 380000, category: 'Internet y telefonía', desc: 'Plan de fibra óptica' },
-  { id: 'e7', date: '2026-09-30', amount: 185000, category: 'Mantenimiento', desc: 'Mantenimiento ducha Hab. 103' },
-];
-
-const INITIAL_USERS: UserItem[] = [
-  { id: 'u1', name: 'Sofía Valencia', email: 'sofia.valencia@torresatori.co', phone: '+57 311 555 0120', role: 'Recepcionista', active: true, last: 'Hoy 7:58 am' },
-  { id: 'u2', name: 'Camila Ortiz', email: 'camila.ortiz@torresatori.co', phone: '+57 312 555 0188', role: 'Recepcionista', active: true, last: 'Ayer 6:02 pm' },
-  { id: 'u3', name: 'Frank Arias Salgado', email: 'gerencia@torresatori.co', phone: '+57 310 999 8888', role: 'Administrador', active: true, last: 'Hoy 8:30 am' },
-];
-
 export interface UserSession {
   id: string;
+  username: string;
   name: string;
   email: string;
   role: 'recepcion' | 'admin';
-  phone?: string;
   avatarUrl?: string;
   lastLogin?: string;
 }
 
-export const ROLE_PROFILES = {
-  recepcion: { name: 'Sofía Valencia', label: 'Recepcionista', email: 'sofia.valencia@torresatori.co' },
-  admin: { name: 'Frank Arias Salgado', label: 'Administrador', email: 'admin@gmail.com' },
+export interface ActionResult {
+  success: boolean;
+  message?: string;
+  data?: unknown;
+}
+
+const DB_ROOM_STATUS_TO_UI: Record<string, RoomStatusKey> = {
+  available: 'libre',
+  occupied: 'ocupada',
+  cleaning: 'limpieza',
+  maintenance: 'mantenimiento',
+};
+
+const UI_ROOM_STATUS_TO_DB: Record<RoomStatusKey, string> = {
+  libre: 'available',
+  ocupada: 'occupied',
+  limpieza: 'cleaning',
+  mantenimiento: 'maintenance',
+  bloqueada: 'available',
+};
+
+const DB_BOOKING_STATUS_TO_UI: Record<string, BookingStatusKey> = {
+  CONFIRMADA: 'confirmada',
+  confirmed: 'confirmada',
+  BLOQUEADA_TEMPORAL: 'bloqueada',
+  pending_payment: 'pendiente',
+  EN_CURSO: 'enCurso',
+  occupied: 'enCurso',
+  EXPIRADA: 'cancelada',
+  CANCELADA: 'cancelada',
+  cancelled: 'cancelada',
+  finished: 'finalizada',
 };
 
 interface StoreContextType {
   role: 'recepcion' | 'admin';
-  setRole: (r: 'recepcion' | 'admin') => void;
   currentUser: UserSession | null;
-  login: (userOrEmail: string, pass: string, roleHint?: 'recepcion' | 'admin') => { success: boolean; message?: string };
+  login: (username: string, pass: string) => Promise<{ success: boolean; role?: 'recepcion' | 'admin'; message?: string }>;
   logout: () => void;
   updateUserProfile: (data: Partial<UserSession>) => void;
-  changePassword: (currentPass: string, newPass: string) => { success: boolean; message: string };
+  changePassword: (currentPass: string, newPass: string) => Promise<{ success: boolean; message: string }>;
   rooms: RoomItem[];
   bookings: BookingItem[];
   charges: Record<string, ChargeItem[]>;
@@ -213,152 +205,316 @@ interface StoreContextType {
   orders: RestaurantOrder[];
   events: SpecialEventItem[];
   expenses: ExpenseItem[];
+  financeSummary: FinanceSummary | null;
   audit: AuditItem[];
   users: UserItem[];
+  conversations: ConversationItem[];
   log: (action: string, module: string) => void;
   // Room Actions
-  setRoomStatus: (id: string | number, status: RoomStatusKey, extra?: Partial<RoomItem>) => void;
-  addRoom: (room: Omit<RoomItem, 'id'>) => { success: boolean; message?: string };
-  updateRoom: (id: string | number, data: Partial<RoomItem>) => { success: boolean; message?: string };
-  deleteRoom: (id: string | number) => { success: boolean; message?: string };
+  setRoomStatus: (id: string | number, status: RoomStatusKey) => Promise<ActionResult>;
+  addRoom: (room: Omit<RoomItem, 'id'>) => Promise<ActionResult>;
+  updateRoom: (id: string | number, data: Partial<RoomItem>) => Promise<ActionResult>;
+  deleteRoom: (id: string | number) => Promise<ActionResult>;
   // Booking Actions
-  patchBooking: (code: string, patch: Partial<BookingItem>) => void;
-  setBookingStatus: (code: string, status: BookingStatusKey) => void;
-  addBooking: (booking: BookingItem) => void;
-  // Charge & Sales Actions
-  addCharges: (roomNum: string, newCharges: ChargeItem[]) => void;
-  clearCharges: (roomNum: string) => void;
-  sell: (cart: { id: string; qty: number }[]) => void;
+  setBookingStatus: (code: string, status: BookingStatusKey) => Promise<ActionResult>;
+  addBooking: (payload: {
+    roomId: number;
+    checkIn: string;
+    checkOut: string;
+    adults: number;
+    children?: number;
+    hasPet?: boolean;
+    guestName: string;
+    phone: string;
+    doc?: string;
+    paymentOption?: 'full' | 'half' | 'none';
+    source?: string;
+  }) => Promise<ActionResult>;
+  payRemainingBooking: (code: string) => Promise<ActionResult>;
+  // Store & Folio Actions
+  sell: (cart: { id: string; qty: number }[], chargeToRoom: boolean, roomNumber?: string) => Promise<ActionResult>;
   // Restaurant Actions
-  addRestaurantOrder: (order: Omit<RestaurantOrder, 'id' | 'createdAt'>) => void;
-  updateOrderStatus: (id: string, status: RestaurantOrder['status']) => void;
+  addRestaurantOrder: (order: {
+    roomNumber?: string;
+    tableNumber?: string;
+    guestName?: string;
+    items: { menuItemId?: string | number; name: string; qty: number; price: number }[];
+    status: RestaurantOrder['status'];
+  }) => Promise<ActionResult>;
+  updateOrderStatus: (id: string, status: RestaurantOrder['status']) => Promise<ActionResult>;
   // Events Actions
-  addEvent: (event: Omit<SpecialEventItem, 'id'>) => void;
-  toggleEventActive: (id: string | number) => void;
-  // Expenses & Users Actions
-  addExpense: (expense: Omit<ExpenseItem, 'id'>) => void;
-  voidExpense: (id: string) => void;
-  setUsers: React.Dispatch<React.SetStateAction<UserItem[]>>;
+  addEvent: (event: Omit<SpecialEventItem, 'id'>) => Promise<ActionResult>;
+  toggleEventActive: (id: number | string) => Promise<ActionResult>;
+  // Expenses, Users, Reports & Chatbot Actions
+  addExpense: (expense: Omit<ExpenseItem, 'id'>) => Promise<ActionResult>;
+  voidExpense: (id: string) => Promise<ActionResult>;
+  createUser: (payload: { username: string; name: string; password: string; role: string }) => Promise<ActionResult>;
+  toggleUserActive: (id: string | number, currentActive: boolean) => Promise<ActionResult>;
+  escalateConversation: (id: number) => Promise<ActionResult>;
+  exportExcelReport: () => Promise<ActionResult>;
   refreshBackendData: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  // Estado de usuario autenticado con persistencia
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
     try {
       const saved = localStorage.getItem('satori_auth_user');
-      return saved ? JSON.parse(saved) : null;
+      const token = localStorage.getItem('token');
+      return saved && token ? JSON.parse(saved) : null;
     } catch {
       return null;
     }
   });
 
-  const [role, setRoleState] = useState<'recepcion' | 'admin'>(() => {
-    return currentUser ? currentUser.role : 'recepcion';
-  });
+  const role: 'recepcion' | 'admin' = currentUser?.role ?? 'recepcion';
 
-  const setRole = (r: 'recepcion' | 'admin') => {
-    setRoleState(r);
-    if (currentUser) {
-      const updated = { ...currentUser, role: r };
-      setCurrentUser(updated);
-      localStorage.setItem('satori_auth_user', JSON.stringify(updated));
-    }
-  };
+  const [rooms, setRooms] = useState<RoomItem[]>([]);
+  const [bookings, setBookings] = useState<BookingItem[]>([]);
+  const [charges, setCharges] = useState<Record<string, ChargeItem[]>>({});
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [orders, setOrders] = useState<RestaurantOrder[]>([]);
+  const [events, setEvents] = useState<SpecialEventItem[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [audit, setAudit] = useState<AuditItem[]>([]);
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
 
-  const login = (userOrEmail: string, pass: string, roleHint?: 'recepcion' | 'admin') => {
-    const cleanUser = userOrEmail.trim().toLowerCase();
-    
-    // Si viene por acceso rápido con roleHint
-    if (roleHint) {
-      const sessionUser: UserSession = {
-        id: roleHint === 'admin' ? 'u3' : 'u1',
-        name: ROLE_PROFILES[roleHint].name,
-        email: ROLE_PROFILES[roleHint].email,
-        role: roleHint,
-        phone: roleHint === 'admin' ? '+57 310 999 8888' : '+57 311 555 0120',
-        lastLogin: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setCurrentUser(sessionUser);
-      setRoleState(roleHint);
-      localStorage.setItem('satori_auth_user', JSON.stringify(sessionUser));
-      return { success: true };
-    }
-
-    // Cuenta de Administrador (admin@gmail.com / admin123)
-    if (
-      cleanUser === 'admin@gmail.com' ||
-      cleanUser === 'admin' ||
-      cleanUser.includes('admin') ||
-      cleanUser === 'gerencia@torresatori.co' ||
-      cleanUser === 'admin@satoripms.com'
-    ) {
-      const storedPass = localStorage.getItem(`pass_${cleanUser}`) || 'admin123';
-      if (pass !== storedPass && pass !== 'admin123' && pass.length < 4) {
-        return { success: false, message: 'Contraseña incorrecta para la cuenta Administrador.' };
-      }
-      const sessionUser: UserSession = {
-        id: 'u3',
-        name: 'Frank Arias Salgado',
-        email: cleanUser === 'admin@gmail.com' ? 'admin@gmail.com' : 'admin@gmail.com',
-        role: 'admin',
-        phone: '+57 310 999 8888',
-        lastLogin: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setCurrentUser(sessionUser);
-      setRoleState('admin');
-      localStorage.setItem('satori_auth_user', JSON.stringify(sessionUser));
-      return { success: true };
-    }
-
-    if (cleanUser.includes('recep') || cleanUser.includes('sofia') || cleanUser === 'recepcion@satoripms.com') {
-      const storedPass = localStorage.getItem(`pass_${cleanUser}`) || 'recepcion123';
-      if (pass !== storedPass && pass !== 'recepcion123' && pass.length < 4) {
-        return { success: false, message: 'Contraseña incorrecta para Recepción.' };
-      }
-      const sessionUser: UserSession = {
-        id: 'u1',
-        name: 'Sofía Valencia',
-        email: 'sofia.valencia@torresatori.co',
-        role: 'recepcion',
-        phone: '+57 311 555 0120',
-        lastLogin: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setCurrentUser(sessionUser);
-      setRoleState('recepcion');
-      localStorage.setItem('satori_auth_user', JSON.stringify(sessionUser));
-      return { success: true };
-    }
-
-    // Si ingresó cualquier otro usuario de recepción válido
-    const matchedUser = INITIAL_USERS.find(
-      (u) => u.email.toLowerCase() === cleanUser || u.name.toLowerCase().includes(cleanUser)
-    );
-    if (matchedUser) {
-      const rKey = matchedUser.role.toLowerCase().includes('admin') ? 'admin' : 'recepcion';
-      const sessionUser: UserSession = {
-        id: matchedUser.id,
-        name: matchedUser.name,
-        email: matchedUser.email,
-        role: rKey,
-        phone: matchedUser.phone,
-        lastLogin: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setCurrentUser(sessionUser);
-      setRoleState(rKey);
-      localStorage.setItem('satori_auth_user', JSON.stringify(sessionUser));
-      return { success: true };
-    }
-
-    return { success: false, message: 'Usuario o contraseña no reconocidos en el sistema.' };
-  };
-
-  const logout = () => {
+  const logout = useCallback(() => {
     setCurrentUser(null);
-    setRoleState('recepcion');
+    setRooms([]);
+    setBookings([]);
+    setCharges({});
+    setProducts([]);
+    setMenu([]);
+    setOrders([]);
+    setEvents([]);
+    setExpenses([]);
+    setFinanceSummary(null);
+    setUsers([]);
+    setAudit([]);
+    setConversations([]);
+    localStorage.removeItem('token');
     localStorage.removeItem('satori_auth_user');
+  }, []);
+
+  const refreshBackendData = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const meRes = await apiClient.get<{ id: number; username: string; role: string; name: string }>('/api/v1/auth/me');
+      const uiRole: 'admin' | 'recepcion' = meRes.data.role === 'Administrador' ? 'admin' : 'recepcion';
+      const activeUser: UserSession = {
+        id: String(meRes.data.id),
+        username: meRes.data.username,
+        name: meRes.data.name,
+        email: `${meRes.data.username}@torresatori.co`,
+        role: uiRole,
+        avatarUrl: currentUser?.avatarUrl,
+      };
+      setCurrentUser(activeUser);
+      localStorage.setItem('satori_auth_user', JSON.stringify(activeUser));
+
+      const [roomsRes, bookingsRes, prodRes, menuRes, ordersRes, eventsRes, chargesRes, convRes] = await Promise.all([
+        apiClient.get<any[]>('/api/v1/rooms'),
+        apiClient.get<any[]>('/api/v1/bookings'),
+        apiClient.get<any[]>('/api/v1/store/products'),
+        apiClient.get<any[]>('/api/v1/restaurant/menu'),
+        apiClient.get<any[]>('/api/v1/restaurant/orders'),
+        apiClient.get<any[]>('/api/v1/events'),
+        apiClient.get<any[]>('/api/v1/folio-charges'),
+        apiClient.get<any[]>('/api/v1/conversations'),
+      ]);
+
+      const mappedBookings: BookingItem[] = (bookingsRes.data || []).map((b) => ({
+        id: b.id,
+        code: b.bookingCode || `TS-${b.id}`,
+        reservationGroupId: b.reservationGroupId,
+        guest: b.guestName || 'Huésped Torre Satori',
+        guestId: b.guestId,
+        room: b.roomNumber || String(b.roomId || ''),
+        roomId: b.roomId,
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        guests: (b.adults || 1) + (b.children || 0),
+        adults: b.adults,
+        children: b.children,
+        hasPet: b.withPet,
+        status: b.paymentStatus === 'paid' && b.status === 'EN_CURSO' ? 'enCurso' : (DB_BOOKING_STATUS_TO_UI[b.status] || 'confirmada'),
+        channel: b.source === 'chatbot' ? 'WhatsApp' : 'Recepción',
+        phone: b.guestPhone || '',
+        doc: b.guestDocument || '',
+        total: Number(b.totalPrice) || 0,
+        paid: Number(b.paidAmount) || 0,
+      }));
+      setBookings(mappedBookings);
+
+      const mappedRooms: RoomItem[] = (roomsRes.data || []).map((r) => {
+        const activeInHouse = mappedBookings.find((b) => b.roomId === r.id && b.status === 'enCurso');
+        const activeLock = mappedBookings.find((b) => b.roomId === r.id && b.status === 'bloqueada');
+        const upcoming = mappedBookings.find((b) => b.roomId === r.id && b.status === 'confirmada');
+        let uiStatus: RoomStatusKey = DB_ROOM_STATUS_TO_UI[r.status] || 'libre';
+        if (uiStatus === 'libre' && activeLock) {
+          uiStatus = 'bloqueada';
+        }
+        return {
+          id: r.id,
+          number: r.number,
+          name: r.name,
+          type: r.type,
+          capacity: r.maxAdultsCapacity || 2,
+          baseAdultsCapacity: r.baseAdultsCapacity || 2,
+          maxAdultsCapacity: r.maxAdultsCapacity || 2,
+          childrenCapacity: r.childrenCapacity || 0,
+          allowsPets: Boolean(r.allowsPets),
+          status: uiStatus,
+          rate: Number(r.pricePerNight) || 0,
+          extraRate: Number(r.extraGuestPrice) || 0,
+          guest: activeInHouse?.guest,
+          until: activeInHouse ? `Sale ${activeInHouse.checkOut}, 11:00` : undefined,
+          next: upcoming ? `${upcoming.guest} · ${upcoming.checkIn}` : undefined,
+          note: activeLock ? `Bloqueo activo de ${activeLock.guest}` : undefined,
+          active: r.active,
+        };
+      });
+      setRooms(mappedRooms);
+
+      setProducts(
+        (prodRes.data || []).map((p) => ({
+          id: p.code || String(p.id),
+          numericId: p.numericId,
+          name: p.name,
+          price: Number(p.price),
+          stock: Number(p.stock),
+          category: p.category,
+        }))
+      );
+      setMenu(menuRes.data || []);
+      setOrders(ordersRes.data || []);
+      setEvents(eventsRes.data || []);
+      setConversations(convRes.data || []);
+
+      const groupedCharges: Record<string, ChargeItem[]> = {};
+      (chargesRes.data || []).forEach((c) => {
+        if (c.paid || !c.roomNumber) return;
+        if (!groupedCharges[c.roomNumber]) groupedCharges[c.roomNumber] = [];
+        groupedCharges[c.roomNumber].push({
+          id: c.id,
+          bookingId: c.bookingId,
+          roomId: c.roomId,
+          roomNumber: c.roomNumber,
+          desc: c.desc,
+          qty: c.qty,
+          amount: Number(c.amount),
+          paid: c.paid,
+          source: c.source,
+        });
+      });
+      setCharges(groupedCharges);
+
+      if (uiRole === 'admin') {
+        const [expRes, finRes, usrRes, auditRes] = await Promise.all([
+          apiClient.get<ExpenseItem[]>('/api/v1/expenses'),
+          apiClient.get<FinanceSummary>('/api/v1/finance/summary'),
+          apiClient.get<any[]>('/api/v1/auth/users'),
+          apiClient.get<any[]>('/api/v1/auth/audit-logs'),
+        ]);
+        setExpenses(expRes.data || []);
+        setFinanceSummary(finRes.data || null);
+        setUsers(
+          (usrRes.data || []).map((u) => ({
+            id: u.id,
+            username: u.username,
+            name: u.name,
+            role: u.role,
+            active: u.active,
+            last: u.createdAt ? new Date(u.createdAt).toLocaleDateString('es-CO') : '—',
+          }))
+        );
+        setAudit(
+          (auditRes.data || []).map((a) => ({
+            id: a.id,
+            at: a.timestamp ? new Date(a.timestamp).toLocaleString('es-CO') : '',
+            user: a.actor_username,
+            role: 'Sistema',
+            action: `${a.action}${a.entity_id ? ` (${a.entity_id})` : ''}`,
+            module: a.entity,
+          }))
+        );
+      }
+    } catch {
+      // Mantiene estado actual en fallos transitorios; 401 se gestiona por evento
+    }
+  }, [currentUser?.avatarUrl]);
+
+  useEffect(() => {
+    const onUnauth = () => logout();
+    window.addEventListener('satori:unauthorized', onUnauth);
+    return () => window.removeEventListener('satori:unauthorized', onUnauth);
+  }, [logout]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    refreshBackendData();
+
+    const sseUrl = new URL('/api/v1/events/stream', getApiBaseUrl());
+    sseUrl.searchParams.set('token', token);
+    let source: EventSource | null = null;
+    try {
+      source = new EventSource(sseUrl.toString());
+      const reloadHandler = () => {
+        refreshBackendData();
+      };
+      ['booking.locked', 'booking.unlocked', 'booking.confirmed', 'booking.cancelled', 'booking.expired', 'booking.checkin', 'booking.checkout', 'room.status', 'store.sale', 'restaurant.order_created'].forEach((evName) => {
+        source?.addEventListener(evName, reloadHandler);
+      });
+    } catch {
+      // Fallback a polling si el navegador bloquea EventSource
+    }
+
+    const interval = setInterval(refreshBackendData, 15000);
+    return () => {
+      source?.close();
+      clearInterval(interval);
+    };
+  }, [currentUser?.username, refreshBackendData]);
+
+  const login = async (username: string, pass: string) => {
+    try {
+      const cleanUser = username.trim().split('@')[0];
+      const res = await apiClient.post<{
+        access_token: string;
+        username: string;
+        role: string;
+        name: string;
+      }>('/api/v1/auth/login', { username: cleanUser, password: pass });
+
+      localStorage.setItem('token', res.data.access_token);
+      const uiRole: 'admin' | 'recepcion' = res.data.role === 'Administrador' ? 'admin' : 'recepcion';
+      const sessionUser: UserSession = {
+        id: res.data.username,
+        username: res.data.username,
+        name: res.data.name,
+        email: `${res.data.username}@torresatori.co`,
+        role: uiRole,
+        lastLogin: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+      };
+      localStorage.setItem('satori_auth_user', JSON.stringify(sessionUser));
+      setCurrentUser(sessionUser);
+      await refreshBackendData();
+      return { success: true, role: uiRole };
+    } catch (err) {
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Credenciales inválidas',
+      };
+    }
   };
 
   const updateUserProfile = (data: Partial<UserSession>) => {
@@ -366,342 +522,280 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const updated = { ...currentUser, ...data };
     setCurrentUser(updated);
     localStorage.setItem('satori_auth_user', JSON.stringify(updated));
-    log(`Actualizó perfil de usuario: ${currentUser.name}`, 'Seguridad');
   };
 
-  const changePassword = (currentPass: string, newPass: string) => {
-    if (!currentUser) return { success: false, message: 'No hay sesión de usuario activa.' };
-    const storedPass = localStorage.getItem(`pass_${currentUser.email}`) || 'admin123';
-    if (currentPass !== storedPass && currentPass !== 'admin123' && currentPass !== 'recepcion123') {
-      return { success: false, message: 'La contraseña actual ingresada es incorrecta.' };
-    }
+  const changePassword = async (currentPass: string, newPass: string) => {
     if (!newPass || newPass.trim().length < 6) {
       return { success: false, message: 'La nueva contraseña debe tener mínimo 6 caracteres.' };
     }
-    localStorage.setItem(`pass_${currentUser.email}`, newPass.trim());
-    log(`Actualizó la contraseña de acceso (${currentUser.email})`, 'Seguridad');
-    return { success: true, message: 'Contraseña cambiada exitosamente.' };
-  };
-
-  const [rooms, setRooms] = useState<RoomItem[]>(INITIAL_ROOMS);
-  const [bookings, setBookings] = useState<BookingItem[]>(INITIAL_BOOKINGS);
-  const [charges, setCharges] = useState<Record<string, ChargeItem[]>>({
-    '101': [
-      { desc: 'Cerveza Club Colombia', qty: 2, amount: 14000, source: 'tienda' },
-      { desc: 'Papas Margarita pollo', qty: 1, amount: 3500, source: 'tienda' },
-      { desc: 'Gaseosa Postobón 400 ml', qty: 1, amount: 4000, source: 'tienda' },
-    ],
-  });
-  const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCTS);
-  const [menu, setMenu] = useState<MenuItem[]>(INITIAL_MENU);
-  const [orders, setOrders] = useState<RestaurantOrder[]>([
-    {
-      id: 'ord-101',
-      roomNumber: '101',
-      guestName: 'Laura Gómez',
-      items: [
-        { menuItemId: 'm1', name: 'Desayuno Típico Vallecaucano', qty: 2, price: 18000 },
-        { menuItemId: 'm4', name: 'Café Filtrado V60 / Chemex', qty: 2, price: 9000 },
-      ],
-      total: 54000,
-      status: 'charged_to_room',
-      createdAt: 'Hoy 08:15',
-    },
-  ]);
-  const [events, setEvents] = useState<SpecialEventItem[]>(INITIAL_EVENTS);
-  const [expenses, setExpenses] = useState<ExpenseItem[]>(INITIAL_EXPENSES);
-  const [users, setUsers] = useState<UserItem[]>(INITIAL_USERS);
-  const [audit, setAudit] = useState<AuditItem[]>([
-    { at: '2026-10-01 09:12', user: 'Sofía Valencia', role: 'Recepcionista', action: 'Registró check-in de Laura Gómez (TS-2041)', module: 'Check-in' },
-    { at: '2026-10-01 10:40', user: 'Sofía Valencia', role: 'Recepcionista', action: 'Registró check-out de María Fernanda Rojas (TS-2036)', module: 'Check-out' },
-    { at: '2026-10-01 10:52', user: 'Sofía Valencia', role: 'Recepcionista', action: 'Marcó Hab. 201 como En limpieza', module: 'Habitaciones' },
-    { at: '2026-10-01 11:05', user: 'Sofía Valencia', role: 'Recepcionista', action: 'Creó bloqueo temporal BL-0318 en Hab. 202', module: 'Reservas' },
-    { at: '2026-09-30 17:30', user: 'Frank Arias Salgado', role: 'Administrador', action: 'Registró egreso: Mantenimiento ducha Hab. 103 ($185.000)', module: 'Finanzas' },
-    { at: '2026-09-30 16:10', user: 'Frank Arias Salgado', role: 'Administrador', action: 'Configuró evento especial: Festival del Café (-15%)', module: 'Eventos' },
-  ]);
-
-  const log = (action: string, module: string) => {
-    const profile = ROLE_PROFILES[role];
-    const nowStr = '2026-10-01 ' + new Date().toTimeString().slice(0, 5);
-    setAudit((prev) => [{ at: nowStr, user: profile.name, role: profile.label, action, module }, ...prev]);
-  };
-
-  const setRoomStatus = (id: string | number, status: RoomStatusKey, extra: Partial<RoomItem> = {}) => {
-    setRooms((prev) =>
-      prev.map((r) => (String(r.id) === String(id) ? { ...r, status, ...extra } : r))
-    );
-  };
-
-  const addRoom = (roomData: Omit<RoomItem, 'id'>) => {
-    if (role !== 'admin') {
-      return { success: false, message: 'Operación denegada: Solo el Administrador puede agregar habitaciones.' };
-    }
-    const exists = rooms.some((r) => r.number === roomData.number);
-    if (exists) {
-      return { success: false, message: `Ya existe una habitación con el número ${roomData.number}.` };
-    }
-    const newRoom: RoomItem = {
-      ...roomData,
-      id: roomData.number,
-      active: true,
-      status: roomData.status || 'libre',
-    };
-    setRooms((prev) => [...prev, newRoom]);
-    log(`Creó nueva habitación: Hab. ${roomData.number} (${roomData.name})`, 'Habitaciones');
-    return { success: true };
-  };
-
-  const updateRoom = (id: string | number, data: Partial<RoomItem>) => {
-    if (role !== 'admin') {
-      return { success: false, message: 'Operación denegada: Solo el Administrador puede editar habitaciones.' };
-    }
-    if (data.number) {
-      const duplicate = rooms.some(
-        (r) => String(r.id) !== String(id) && r.number === data.number
-      );
-      if (duplicate) {
-        return {
-          success: false,
-          message: `Ya existe otra habitación con el número ${data.number}.`,
-        };
-      }
-    }
-    setRooms((prev) =>
-      prev.map((r) => (String(r.id) === String(id) ? { ...r, ...data } : r))
-    );
-    log(`Modificó parámetros de Hab. ${data.number || id}`, 'Habitaciones');
-    return { success: true };
-  };
-
-  const deleteRoom = (id: string | number) => {
-    if (role !== 'admin') {
-      return { success: false, message: 'Operación denegada: Solo el Administrador puede eliminar habitaciones.' };
-    }
-    const targetRoom = rooms.find((r) => String(r.id) === String(id));
-    if (!targetRoom) {
-      return { success: false, message: 'La habitación no existe.' };
-    }
-    // REGLA CLAVE: No se puede eliminar si tiene reservas activas o pendientes
-    const activeBookings = bookings.filter(
-      (b) =>
-        (b.roomId !== undefined ? String(b.roomId) === String(targetRoom.id) : b.room === targetRoom.number) &&
-        ['confirmada', 'pendiente', 'bloqueada', 'enCurso'].includes(b.status)
-    );
-    if (activeBookings.length > 0) {
-      return {
-        success: false,
-        message: `No se puede eliminar la habitación ${targetRoom.number}. Tiene ${activeBookings.length} reserva(s) activa(s) o en curso (ej. código ${activeBookings[0].code}).`,
-      };
-    }
-    setRooms((prev) => prev.filter((r) => String(r.id) !== String(id)));
-    log(`Eliminó la habitación ${targetRoom.number} (${targetRoom.name})`, 'Habitaciones');
-    return { success: true };
-  };
-
-  const patchBooking = (code: string, patch: Partial<BookingItem>) => {
-    setBookings((prev) => prev.map((b) => (b.code === code ? { ...b, ...patch } : b)));
-  };
-
-  const setBookingStatus = (code: string, status: BookingStatusKey) => {
-    patchBooking(code, { status });
     try {
-      const apiBase = (import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL ?? '';
-      if (status === 'enCurso') {
-        fetch(`${apiBase}/api/v1/bookings/${encodeURIComponent(code)}/check-in`, { method: 'POST' }).catch(() => {});
-      } else if (status === 'finalizada') {
-        fetch(`${apiBase}/api/v1/bookings/${encodeURIComponent(code)}/check-out`, { method: 'POST' }).catch(() => {});
-      } else if (status === 'cancelada') {
-        fetch(`${apiBase}/api/v1/bookings/group/${encodeURIComponent(code)}/cancellation`, { method: 'POST' }).catch(() => {});
-      }
-    } catch {
-      // Modo offline local
-    }
-  };
-
-  // Sincronización continua con el Backend (PostgreSQL 16 GiST + FastAPI + Chatbot)
-  const refreshBackendData = async () => {
-    try {
-      const apiBase = (import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL ?? '';
-      const res = await fetch(`${apiBase}/api/bookings/debug`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setBookings((prevLocal) => {
-            const statusMap: Record<string, BookingStatusKey> = {
-              confirmed: 'confirmada',
-              CONFIRMADA: 'confirmada',
-              pending_payment: 'pendiente',
-              BLOQUEADA_TEMPORAL: 'bloqueada',
-              finished: 'finalizada',
-              EXPIRADA: 'cancelada',
-              cancelled: 'cancelada',
-              CANCELADA: 'cancelada',
-              occupied: 'enCurso',
-              EN_CURSO: 'enCurso',
-            };
-
-            const backendItems: BookingItem[] = data.map((b: any) => {
-              let cleanCode = 'TS-' + b.id;
-              if (b.companions && b.companions.startsWith('TS-')) {
-                cleanCode = b.companions;
-              } else if (b.reservationGroupId) {
-                const sub = String(b.reservationGroupId).replace(/-/g, '').slice(-4).toUpperCase();
-                cleanCode = 'TS-' + sub;
-              }
-
-              return {
-                code: cleanCode,
-                reservationGroupId: b.reservationGroupId,
-                guest: b.guestName || 'Huésped Satori',
-                guestId: b.guestId,
-                room: b.roomNumber || String(b.roomId || '101'),
-                roomId: b.roomId,
-                checkIn: b.checkIn,
-                checkOut: b.checkOut,
-                guests: (b.adults || 1) + (b.children || 0),
-                adults: b.adults,
-                children: b.children,
-                hasPet: b.withPet,
-                status: statusMap[b.status] || 'confirmada',
-                channel: b.source === 'chatbot' ? 'WhatsApp' : 'Recepción',
-                phone: b.guestPhone || '',
-                doc: b.guestDocument || '',
-                total: Number(b.totalPrice) || 0,
-                paid: Number(b.paidAmount) || 0,
-              };
-            });
-
-            // Merge unificando por código de reserva
-            const codeMap = new Map<string, BookingItem>();
-            prevLocal.forEach((item) => codeMap.set(item.code, item));
-            backendItems.forEach((item) => codeMap.set(item.code, item));
-            return Array.from(codeMap.values());
-          });
-        }
-      }
-    } catch {
-      // Si el backend no responde, se mantiene el estado reactivo en memoria
-    }
-  };
-
-  useEffect(() => {
-    refreshBackendData();
-    const interval = setInterval(refreshBackendData, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const addBooking = (booking: BookingItem) => {
-    setBookings((prev) => [booking, ...prev]);
-    log(`Nueva reserva registrada: ${booking.code} (${booking.guest})`, 'Reservas');
-
-    // Sincronizar asíncronamente con el backend si está activo
-    try {
-      fetch('/api/bookings/test-paid', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rooms: [
-            {
-              roomId: Number(booking.room) || 1,
-              lockToken: 'sandbox-' + Date.now(),
-              checkIn: booking.checkIn,
-              checkOut: booking.checkOut,
-            },
-          ],
-          guest: {
-            name: booking.guest,
-            phone: booking.phone || '+57 300 000 0000',
-            documentNumber: booking.doc || 'CC 0000000',
-          },
-          companions: booking.code,
-        }),
-      }).catch(() => {
-        // En modo frontend-only se mantiene local sin error
+      const res = await apiClient.post<{ message: string }>('/api/v1/auth/change-password', {
+        current_password: currentPass,
+        new_password: newPass.trim(),
       });
-    } catch {
-      // Ignorar error de red si corre sin contenedor
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'No se pudo cambiar la contraseña' };
     }
   };
 
-  const addCharges = (roomNum: string, newCharges: ChargeItem[]) => {
-    setCharges((prev) => ({
-      ...prev,
-      [roomNum]: [...(prev[roomNum] ?? []), ...newCharges],
-    }));
+  const log = (_action: string, _module: string) => {
+    // La auditoría oficial se registra de forma inmutable en PostgreSQL desde FastAPI
   };
 
-  const clearCharges = (roomNum: string) => {
-    setCharges((prev) => ({ ...prev, [roomNum]: [] }));
-  };
-
-  const sell = (cart: { id: string; qty: number }[]) => {
-    setProducts((prev) =>
-      prev.map((p) => {
-        const item = cart.find((c) => c.id === p.id);
-        return item ? { ...p, stock: Math.max(0, p.stock - item.qty) } : p;
-      })
-    );
-  };
-
-  const addRestaurantOrder = (orderData: Omit<RestaurantOrder, 'id' | 'createdAt'>) => {
-    const newOrd: RestaurantOrder = {
-      ...orderData,
-      id: 'ord-' + Date.now().toString().slice(-4),
-      createdAt: 'Hoy ' + new Date().toTimeString().slice(0, 5),
-    };
-    setOrders((prev) => [newOrd, ...prev]);
-    if (orderData.status === 'charged_to_room' && orderData.roomNumber) {
-      const chargeItems: ChargeItem[] = orderData.items.map((i) => ({
-        desc: `Restaurante: ${i.name}`,
-        qty: i.qty,
-        amount: i.price * i.qty,
-        source: 'restaurante',
-      }));
-      addCharges(orderData.roomNumber, chargeItems);
+  const setRoomStatus = async (id: string | number, status: RoomStatusKey): Promise<ActionResult> => {
+    try {
+      await apiClient.patch(`/api/v1/rooms/${id}/status`, {
+        status: UI_ROOM_STATUS_TO_DB[status] || 'available',
+      });
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error al actualizar estado' };
     }
-    log(`Comanda de restaurante creada (${orderData.items.length} ítems)`, 'Restaurante');
   };
 
-  const updateOrderStatus = (id: string, status: RestaurantOrder['status']) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+  const addRoom = async (roomData: Omit<RoomItem, 'id'>): Promise<ActionResult> => {
+    try {
+      await apiClient.post('/api/v1/rooms', {
+        number: roomData.number,
+        name: roomData.name,
+        type: roomData.type,
+        baseAdultsCapacity: roomData.baseAdultsCapacity,
+        maxAdultsCapacity: roomData.maxAdultsCapacity,
+        childrenCapacity: roomData.childrenCapacity,
+        pricePerNight: roomData.rate,
+        extraGuestPrice: roomData.extraRate,
+        allowsPets: roomData.allowsPets,
+      });
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error al crear habitación' };
+    }
   };
 
-  const addEvent = (eventData: Omit<SpecialEventItem, 'id'>) => {
-    const newEv: SpecialEventItem = {
-      ...eventData,
-      id: 'ev-' + Date.now().toString().slice(-4),
-    };
-    setEvents((prev) => [newEv, ...prev]);
-    log(`Creó evento especial / descuento: ${eventData.name} (${eventData.discountPercentage}%)`, 'Eventos');
+  const updateRoom = async (id: string | number, data: Partial<RoomItem>): Promise<ActionResult> => {
+    try {
+      await apiClient.put(`/api/v1/rooms/${id}`, {
+        ...(data.number !== undefined ? { number: data.number } : {}),
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.type !== undefined ? { type: data.type } : {}),
+        ...(data.baseAdultsCapacity !== undefined ? { baseAdultsCapacity: data.baseAdultsCapacity } : {}),
+        ...(data.maxAdultsCapacity !== undefined ? { maxAdultsCapacity: data.maxAdultsCapacity } : {}),
+        ...(data.childrenCapacity !== undefined ? { childrenCapacity: data.childrenCapacity } : {}),
+        ...(data.rate !== undefined ? { pricePerNight: data.rate } : {}),
+        ...(data.extraRate !== undefined ? { extraGuestPrice: data.extraRate } : {}),
+        ...(data.allowsPets !== undefined ? { allowsPets: data.allowsPets } : {}),
+      });
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error al actualizar habitación' };
+    }
   };
 
-  const toggleEventActive = (id: string | number) => {
-    setEvents((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, active: !e.active } : e))
-    );
+  const deleteRoom = async (id: string | number): Promise<ActionResult> => {
+    try {
+      await apiClient.delete(`/api/v1/rooms/${id}`);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'No se puede eliminar la habitación' };
+    }
   };
 
-  const addExpense = (expenseData: Omit<ExpenseItem, 'id'>) => {
-    const newExp: ExpenseItem = {
-      ...expenseData,
-      id: 'e' + Date.now().toString().slice(-4),
-    };
-    setExpenses((prev) => [newExp, ...prev]);
-    log(`Registró egreso: ${expenseData.desc} ($${expenseData.amount.toLocaleString('es-CO')})`, 'Finanzas');
+  const setBookingStatus = async (code: string, status: BookingStatusKey): Promise<ActionResult> => {
+    try {
+      if (status === 'enCurso') {
+        await apiClient.post(`/api/v1/bookings/${encodeURIComponent(code)}/check-in`);
+      } else if (status === 'finalizada') {
+        await apiClient.post(`/api/v1/bookings/${encodeURIComponent(code)}/check-out`);
+      } else if (status === 'cancelada') {
+        await apiClient.post(`/api/v1/bookings/group/${encodeURIComponent(code)}/cancellation`);
+      }
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error actualizando reserva' };
+    }
   };
 
-  const voidExpense = (id: string) => {
-    setExpenses((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, voided: true } : e))
-    );
-    log(`Anuló comprobante de egreso ${id}`, 'Finanzas');
+  const addBooking = async (payload: {
+    roomId: number;
+    checkIn: string;
+    checkOut: string;
+    adults: number;
+    children?: number;
+    hasPet?: boolean;
+    guestName: string;
+    phone: string;
+    doc?: string;
+    paymentOption?: 'full' | 'half' | 'none';
+    source?: string;
+  }): Promise<ActionResult> => {
+    try {
+      const res = await apiClient.post<{ code: string }>('/api/v1/bookings/manual', {
+        rooms: [{ roomId: payload.roomId, checkIn: payload.checkIn, checkOut: payload.checkOut }],
+        adults: payload.adults,
+        children: payload.children || 0,
+        hasPet: Boolean(payload.hasPet),
+        guest: {
+          name: payload.guestName,
+          phone: payload.phone,
+          documentNumber: payload.doc || '',
+        },
+        source: payload.source || 'web',
+      });
+      await refreshBackendData();
+      return { success: true, data: res.data };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Conflicto al crear reserva' };
+    }
+  };
+
+  const payRemainingBooking = async (code: string): Promise<ActionResult> => {
+    try {
+      await apiClient.post(`/api/v1/bookings/group/${encodeURIComponent(code)}/pay-remaining`);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error registrando pago' };
+    }
+  };
+
+  const sell = async (
+    cart: { id: string; qty: number }[],
+    chargeToRoom: boolean,
+    roomNumber?: string
+  ): Promise<ActionResult> => {
+    try {
+      await apiClient.post('/api/v1/store/sales', {
+        items: cart.map((c) => ({ productId: c.id, qty: c.qty })),
+        chargeToRoom,
+        roomNumber,
+      });
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error registrando venta' };
+    }
+  };
+
+  const addRestaurantOrder = async (orderData: {
+    roomNumber?: string;
+    tableNumber?: string;
+    guestName?: string;
+    items: { menuItemId?: string | number; name: string; qty: number; price: number }[];
+    status: RestaurantOrder['status'];
+  }): Promise<ActionResult> => {
+    try {
+      await apiClient.post('/api/v1/restaurant/orders', orderData);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error creando comanda' };
+    }
+  };
+
+  const updateOrderStatus = async (id: string, status: RestaurantOrder['status']): Promise<ActionResult> => {
+    try {
+      await apiClient.patch(`/api/v1/restaurant/orders/${encodeURIComponent(id)}/status`, { status });
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error actualizando comanda' };
+    }
+  };
+
+  const addEvent = async (eventData: Omit<SpecialEventItem, 'id'>): Promise<ActionResult> => {
+    try {
+      await apiClient.post('/api/v1/events', eventData);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error creando evento' };
+    }
+  };
+
+  const toggleEventActive = async (id: number | string): Promise<ActionResult> => {
+    try {
+      await apiClient.patch(`/api/v1/events/${id}/toggle`);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error cambiando estado del evento' };
+    }
+  };
+
+  const addExpense = async (expenseData: Omit<ExpenseItem, 'id'>): Promise<ActionResult> => {
+    try {
+      await apiClient.post('/api/v1/expenses', expenseData);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error registrando egreso' };
+    }
+  };
+
+  const voidExpense = async (id: string): Promise<ActionResult> => {
+    try {
+      await apiClient.post(`/api/v1/expenses/${id}/void`, {});
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error anulando egreso' };
+    }
+  };
+
+  const createUser = async (payload: {
+    username: string;
+    name: string;
+    password: string;
+    role: string;
+  }): Promise<ActionResult> => {
+    try {
+      await apiClient.post('/api/v1/auth/users', payload);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error creando usuario' };
+    }
+  };
+
+  const toggleUserActive = async (id: string | number, currentActive: boolean): Promise<ActionResult> => {
+    try {
+      await apiClient.patch(`/api/v1/auth/users/${id}`, { active: !currentActive });
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error actualizando usuario' };
+    }
+  };
+
+  const escalateConversation = async (id: number): Promise<ActionResult> => {
+    try {
+      await apiClient.post(`/api/v1/conversations/${id}/escalation`, {});
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error escalando conversación' };
+    }
+  };
+
+  const exportExcelReport = async (): Promise<ActionResult> => {
+    try {
+      await downloadAuthorizedFile('/api/v1/reports/export.xlsx', 'Reporte_TorreSatori.xlsx');
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error exportando Excel' };
+    }
   };
 
   return (
     <StoreContext.Provider
       value={{
         role,
-        setRole,
         currentUser,
         login,
         logout,
@@ -715,18 +809,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         orders,
         events,
         expenses,
+        financeSummary,
         audit,
         users,
+        conversations,
         log,
         setRoomStatus,
         addRoom,
         updateRoom,
         deleteRoom,
-        patchBooking,
         setBookingStatus,
         addBooking,
-        addCharges,
-        clearCharges,
+        payRemainingBooking,
         sell,
         addRestaurantOrder,
         updateOrderStatus,
@@ -734,7 +828,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         toggleEventActive,
         addExpense,
         voidExpense,
-        setUsers,
+        createUser,
+        toggleUserActive,
+        escalateConversation,
+        exportExcelReport,
         refreshBackendData,
       }}
     >

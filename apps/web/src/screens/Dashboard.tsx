@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   BedDouble,
   Clock,
@@ -6,7 +6,6 @@ import {
   ShoppingBag,
   Plus,
   ArrowRight,
-  AlertTriangle,
   Info
 } from 'lucide-react';
 import { useStore } from '../store';
@@ -17,21 +16,17 @@ import {
   Button,
   BadgeStatus,
   Alert,
-  ConfirmModal,
-  useToast,
   formatCurrency,
   RoomStatusKey,
-  ROOM_STATUS_META,
   useRealtimeClock,
 } from '../ui';
 
-export function Dashboard({ go }: { go: (view: string) => void }) {
-  const { rooms, bookings, currentUser, setRoomStatus, log } = useStore();
-  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
-  const { show, node } = useToast();
+export function Dashboard({ go }: { go: (view: string, param?: string) => void }) {
+  const { rooms, bookings, orders, charges, currentUser } = useStore();
   const { formattedDate, formattedTime, greeting } = useRealtimeClock();
 
-  const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : 'Sofía';
+  const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : 'Equipo';
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   const totalRooms = rooms.length;
   const occupiedRooms = rooms.filter((r) => r.status === 'ocupada').length;
@@ -40,6 +35,17 @@ export function Dashboard({ go }: { go: (view: string) => void }) {
   const blockedRooms = rooms.filter((r) => r.status === 'bloqueada').length;
   const freeRooms = rooms.filter((r) => r.status === 'libre').length;
   const occupancyPct = Math.round((occupiedRooms / (totalRooms || 1)) * 100);
+
+  const upcomingCheckins = bookings.filter((b) => b.status === 'confirmada');
+  const activeInHouse = bookings.filter((b) => b.status === 'enCurso');
+  const activeLocks = bookings.filter((b) => b.status === 'bloqueada');
+  const todayArrivalsCount = upcomingCheckins.filter((b) => b.checkIn === todayIso).length;
+  const todayDeparturesCount = activeInHouse.filter((b) => b.checkOut === todayIso).length;
+
+  const pendingChargesTotal = Object.values(charges)
+    .flat()
+    .reduce((acc, c) => acc + c.amount, 0);
+  const cafeOrdersTotal = orders.reduce((acc, o) => acc + (o.total || 0), 0);
 
   const kpis = [
     {
@@ -50,26 +56,26 @@ export function Dashboard({ go }: { go: (view: string) => void }) {
     },
     {
       label: 'Llegadas de hoy',
-      value: '1',
-      sub: 'Andrés Martínez · 3:00 pm',
+      value: `${todayArrivalsCount}`,
+      sub: `${upcomingCheckins.length} reservas confirmadas`,
       icon: Clock,
     },
     {
       label: 'Salidas de hoy',
-      value: '1',
-      sub: 'Laura Gómez · Salida lista',
+      value: `${todayDeparturesCount}`,
+      sub: `${activeInHouse.length} huéspedes en casa`,
       icon: ArrowRight,
     },
     {
       label: 'En limpieza',
       value: `${cleaningRooms}`,
-      sub: 'Hab. 201 Balcón',
+      sub: `${freeRooms} listas para ingreso`,
       icon: Sparkles,
     },
     {
-      label: 'Ventas del día',
-      value: formatCurrency(186500),
-      sub: 'Tienda & Salgados Café',
+      label: 'Consumos & Café',
+      value: formatCurrency(pendingChargesTotal + cafeOrdersTotal),
+      sub: `${orders.length} comandas registradas`,
       icon: ShoppingBag,
     },
   ];
@@ -87,12 +93,12 @@ export function Dashboard({ go }: { go: (view: string) => void }) {
       <PageHeader
         eyebrow={`${formattedDate} · ${formattedTime}`}
         title={`${greeting}, ${firstName}`}
-        desc="Panel central de control y atención prioritaria para la recepción."
+        desc="Panel central de control conectado en tiempo real con PostgreSQL 16."
         actions={
           <Button
             variant="primary"
             icon={<Plus size={16} />}
-            onClick={() => go('calendario')}
+            onClick={() => go('reservas')}
           >
             Nueva reserva
           </Button>
@@ -131,8 +137,8 @@ export function Dashboard({ go }: { go: (view: string) => void }) {
               >
                 <Plus size={20} className="text-terra-100" />
                 <span>
-                  <span className="block text-sm font-semibold">Nueva reserva</span>
-                  <span className="text-xs text-sand-200">Verificar fechas</span>
+                  <span className="block text-sm font-semibold">Calendario</span>
+                  <span className="text-xs text-sand-200">Ocupación semanal</span>
                 </span>
               </button>
 
@@ -143,18 +149,18 @@ export function Dashboard({ go }: { go: (view: string) => void }) {
                 <Clock size={20} className="text-terra-600" />
                 <span>
                   <span className="block text-sm font-semibold text-ink">Check-in</span>
-                  <span className="text-xs text-ink-soft">1 llegada hoy</span>
+                  <span className="text-xs text-ink-soft">{upcomingCheckins.length} pendientes</span>
                 </span>
               </button>
 
               <button
-                onClick={() => setCheckoutModalOpen(true)}
+                onClick={() => go('salidas')}
                 className="flex cursor-pointer flex-col items-start gap-3 rounded-xl border border-sand-200 bg-sand-50 p-4 text-left transition-colors hover:border-forest-700"
               >
                 <ArrowRight size={20} className="text-terra-600" />
                 <span>
                   <span className="block text-sm font-semibold text-ink">Check-out</span>
-                  <span className="text-xs text-ink-soft">Laura Gómez (Hab. 101)</span>
+                  <span className="text-xs text-ink-soft">{activeInHouse.length} en casa</span>
                 </span>
               </button>
 
@@ -175,68 +181,73 @@ export function Dashboard({ go }: { go: (view: string) => void }) {
           <div className="grid gap-6 min-[1100px]:grid-cols-2">
             <Card className="p-5">
               <CardHeader title="Próximos check-ins" />
-              <div className="divide-y divide-sand-200">
-                <div className="py-3 first:pt-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">Andrés Martínez</p>
-                      <p className="text-[13px] text-ink-soft">Hab. 102 Familiar · 4 huéspedes</p>
-                    </div>
-                    <span className="flex items-center gap-1 rounded-md bg-sand-100 px-2 py-1 text-xs font-semibold text-forest-800">
-                      <Clock size={12} />
-                      Hoy 3:00 pm
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-xs font-medium text-ok">✓ Anticipo del 50% confirmado ($435.000)</p>
+              {upcomingCheckins.length === 0 ? (
+                <p className="text-xs text-ink-soft py-2">No hay llegadas confirmadas pendientes.</p>
+              ) : (
+                <div className="divide-y divide-sand-200">
+                  {upcomingCheckins.slice(0, 4).map((b) => {
+                    const roomObj = rooms.find((r) => r.id === b.roomId || r.number === b.room);
+                    const pending = Math.max(0, b.total - b.paid);
+                    return (
+                      <div key={b.code} className="py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-ink">{b.guest}</p>
+                            <p className="text-[13px] text-ink-soft">
+                              Hab. {b.room} {roomObj?.name} · {b.guests} huéspedes
+                            </p>
+                          </div>
+                          <span className="flex items-center gap-1 rounded-md bg-sand-100 px-2 py-1 text-xs font-semibold text-forest-800">
+                            <Clock size={12} />
+                            {b.checkIn}
+                          </span>
+                        </div>
+                        <p className={`mt-1.5 text-xs font-medium ${pending > 0 ? 'text-warn' : 'text-ok'}`}>
+                          {pending > 0
+                            ? `▲ Saldo pendiente ${formatCurrency(pending)}`
+                            : '✓ 100% Pagado'}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
-
-                <div className="py-3 last:pb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">Camilo Herrera</p>
-                      <p className="text-[13px] text-ink-soft">Hab. 201 Balcón · 3 huéspedes</p>
-                    </div>
-                    <span className="flex items-center gap-1 rounded-md bg-sand-100 px-2 py-1 text-xs font-semibold text-forest-800">
-                      <Clock size={12} />
-                      Sáb 3 oct
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-xs font-medium text-warn">▲ Saldo pendiente de $320.000 al check-in</p>
-                </div>
-              </div>
+              )}
             </Card>
 
             <Card className="p-5">
-              <CardHeader title="Próximos check-outs" />
-              <div className="divide-y divide-sand-200">
-                <div className="py-3 first:pt-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">Laura Gómez</p>
-                      <p className="text-[13px] text-ink-soft">Hab. 101 Jardín · 2 huéspedes</p>
-                    </div>
-                    <span className="flex items-center gap-1 rounded-md bg-sand-100 px-2 py-1 text-xs font-semibold text-forest-800">
-                      <Clock size={12} />
-                      Vie 2 oct, 11:00 am
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-xs font-medium text-ok">✓ Habitación saldada · 3 consumos en tienda</p>
+              <CardHeader title="Huéspedes en casa (Check-outs)" />
+              {activeInHouse.length === 0 ? (
+                <p className="text-xs text-ink-soft py-2">No hay huéspedes con estadía EN_CURSO.</p>
+              ) : (
+                <div className="divide-y divide-sand-200">
+                  {activeInHouse.slice(0, 4).map((b) => {
+                    const roomObj = rooms.find((r) => r.id === b.roomId || r.number === b.room);
+                    const pending = Math.max(0, b.total - b.paid);
+                    return (
+                      <div key={b.code} className="py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-ink">{b.guest}</p>
+                            <p className="text-[13px] text-ink-soft">
+                              Hab. {b.room} {roomObj?.name} · {b.guests} huéspedes
+                            </p>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            className="h-7 px-2.5 text-xs"
+                            onClick={() => go('checkout', b.code)}
+                          >
+                            Check-out
+                          </Button>
+                        </div>
+                        <p className={`mt-1.5 text-xs font-medium ${pending > 0 ? 'text-warn' : 'text-ok'}`}>
+                          {pending > 0 ? `Saldo por liquidar: ${formatCurrency(pending)}` : '✓ Cuenta saldada'}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
-
-                <div className="py-3 last:pb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">Andrés Martínez</p>
-                      <p className="text-[13px] text-ink-soft">Hab. 102 Familiar</p>
-                    </div>
-                    <span className="flex items-center gap-1 rounded-md bg-sand-100 px-2 py-1 text-xs font-semibold text-forest-800">
-                      <Clock size={12} />
-                      Dom 4 oct, 11:00 am
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-xs font-medium text-warn">▲ Saldo restante $435.000</p>
-                </div>
-              </div>
+              )}
             </Card>
           </div>
         </div>
@@ -245,26 +256,35 @@ export function Dashboard({ go }: { go: (view: string) => void }) {
         <div className="space-y-6">
           <Card className="p-5">
             <CardHeader
-              title="Bloqueos temporales por vencer"
-              hint="Reservas en espera de comprobante de pago"
+              title="Bloqueos temporales activos"
+              hint="Reservas en espera de confirmación de pago (15 min)"
             />
-            <Alert
-              tone="warn"
-              title="Suite Satori (202) vence hoy 6:00 pm"
-              action={
-                <Button
-                  variant="secondary"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => show('Recordatorio enviado', 'WhatsApp enviado a María Fernanda Rojas')}
-                >
-                  Recordar
-                </Button>
-              }
-            >
-              María Fernanda Rojas · Faltan 5h 20m. Si no se registra el abono, la habitación vuelve a estado libre automáticamente.
-            </Alert>
+            {activeLocks.length === 0 ? (
+              <p className="text-xs text-ink-soft">No hay bloqueos temporales pendientes en este momento.</p>
+            ) : (
+              <div className="space-y-2">
+                {activeLocks.map((b) => (
+                  <Alert
+                    key={b.code}
+                    tone="warn"
+                    title={`Hab. ${b.room} · ${b.guest}`}
+                    action={
+                      <Button
+                        variant="secondary"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => go('reservas', b.code)}
+                      >
+                        Ver
+                      </Button>
+                    }
+                  >
+                    {b.checkIn} → {b.checkOut} · {formatCurrency(b.total)}
+                  </Alert>
+                ))}
+              </div>
+            )}
             <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-soft">
-              <Info size={14} /> Los bloqueos temporales en línea expiran a los 15 minutos sin confirmación.
+              <Info size={14} /> Los bloqueos temporales expiran automáticamente a los 15 minutos sin pago.
             </p>
           </Card>
 
@@ -289,26 +309,6 @@ export function Dashboard({ go }: { go: (view: string) => void }) {
           </Card>
         </div>
       </div>
-
-      {/* Checkout Modal */}
-      {checkoutModalOpen && (
-        <ConfirmModal
-          title="¿Registrar check-out de Laura Gómez?"
-          confirm="Registrar salida"
-          onCancel={() => setCheckoutModalOpen(false)}
-          onConfirm={() => {
-            setCheckoutModalOpen(false);
-            setRoomStatus('101', 'limpieza', { note: 'Aseo de salida iniciado' });
-            log('Registró check-out de Laura Gómez (Hab. 101)', 'Check-out');
-            show('Check-out registrado exitosamente', 'Hab. 101 Jardín pasó a estado En limpieza');
-          }}
-        >
-          La habitación 101 Jardín quedará en estado de <strong>limpieza</strong> y se notificará al personal de camarería.
-          Verifica que la cuenta de habitación y consumos de Salgados Café se encuentren completamente liquidados.
-        </ConfirmModal>
-      )}
-
-      {node}
     </div>
   );
 }

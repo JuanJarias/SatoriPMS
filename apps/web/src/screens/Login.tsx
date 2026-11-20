@@ -15,26 +15,23 @@ interface LoginProps {
 
 export function Login({ onLoginSuccess }: LoginProps) {
   const { login } = useStore();
-  const [emailOrUser, setEmailOrUser] = useState('admin@gmail.com');
-  const [password, setPassword] = useState('admin123');
+  const [emailOrUser, setEmailOrUser] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setLoading(true);
 
-    setTimeout(() => {
-      const result = login(emailOrUser, password);
-      setLoading(false);
-      if (result.success) {
-        const targetRole = emailOrUser.toLowerCase().includes('admin') ? 'admin' : 'recepcion';
-        onLoginSuccess(targetRole);
-      } else {
-        setErrorMsg(result.message || 'Credenciales incorrectas');
-      }
-    }, 250);
+    const result = await login(emailOrUser, password);
+    setLoading(false);
+    if (result.success && result.role) {
+      onLoginSuccess(result.role);
+    } else {
+      setErrorMsg(result.message || 'Credenciales incorrectas');
+    }
   };
 
   return (
@@ -77,7 +74,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
                 type="text"
                 value={emailOrUser}
                 onChange={(e) => setEmailOrUser(e.target.value)}
-                placeholder="admin@gmail.com"
+                placeholder="Usuario (ej. admin o recepcion)"
                 required
                 className="w-full h-11 pl-10 pr-3 rounded-xl border border-sand-300 bg-sand-50/50 text-sm text-ink placeholder:text-sand-300 focus:outline-none focus:ring-2 focus:ring-forest-800 focus:border-transparent transition"
               />

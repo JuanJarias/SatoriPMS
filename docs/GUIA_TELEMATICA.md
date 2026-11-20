@@ -385,7 +385,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 | `P3` | Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` | `AGY` | [x] |
 | `P4` | Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) | `AGY` | [x] |
 | `P5` | Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel | `AGY` | [x] |
-| `P6` | Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) | `AGY` | [ ] |
+| `P6` | Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) | `AGY` | [x] |
 | `P7` | Reconciliación flujo n8n `V10` (Wompi `ec8eace` sin Redis) y prueba Meta live | `AGY` | [ ] |
 | `P8` | Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 | `AGY` | [ ] |
 | `P9` | Docker prod (Nginx HTTPS, R2 `pg_dump`, Sentry) y limpieza del repositorio | `AGY` | [ ] |
@@ -497,9 +497,9 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 
 ---
 
-### `P6` — Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) (`GUIADO`)
+### `P6` — Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) (`AGY`)
 - **Objetivo:** eliminar `INITIAL_*`, credenciales prellenadas y `localStorage` auth fake de `Login.tsx` y `store.tsx`; conectar `api/client.ts` con token JWT (Bearer) e interceptores 401; migrar todas las referencias `'101'..'303'` en UI a `'1'..'9'`; conectar las 12 pantallas (`Login`, `Dashboard`, `Rooms`, `CalendarView`, `Reservas`, `Operacion`, `Tienda`, `Restaurante`, `Eventos`, `Resenas`, `Chatbot`→`/api/v1/conversations` con escalamiento real, `Admin`→`/audit`, usuarios, egresos, KPIs y `.xlsx` real) + cambio de contraseña real en `AccountSettingsModal`.
-- **Archivos afectados:** `apps/web/src/api/client.ts`, `apps/web/src/store.tsx`, `apps/web/src/App.tsx`, `apps/web/src/screens/*.tsx`, `apps/web/src/pages/Conversations.tsx`, `apps/web/src/pages/ReservasDebug.tsx`, `docs/aprendizaje/P6.md`.
+- **Archivos afectados:** `apps/web/src/api/client.ts`, `apps/web/src/store.tsx`, `apps/web/src/App.tsx`, `apps/web/src/screens/*.tsx`, `docs/aprendizaje/P6.md`.
 - **Criterio de aceptación:** 0 datos ficticios al iniciar con DB vacía (salvo las 9 habitaciones semilla); `F5` conserva exactamente lo guardado en PostgreSQL; Recepcionista nunca ve ni puede ejecutar acciones de Administrador.
 - **Comandos:**
   ```bash
@@ -510,7 +510,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
   1. Iniciar sesión en `http://localhost:5173` como `admin` y como `recepcion` con JWT real.
   2. Recargar (`F5`) tras crear una reserva manual, cargar una bebida de Tienda a la hab. `1`, hacer check-in y exportar `.xlsx`.
   3. Verificar en **WhatsApp & Bot** las sesiones reales de PostgreSQL y el botón de escalamiento humano.
-- **Casilla:** `[ ]` Completado y verificado.
+- **Casilla:** `[x]` Completado y verificado.
 - **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
 
 ---

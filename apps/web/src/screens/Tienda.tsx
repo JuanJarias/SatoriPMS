@@ -28,14 +28,14 @@ import {
 } from '../ui';
 
 export function Tienda({ go }: { go: (view: string, param?: string) => void }) {
-  const { products, rooms, sell, addCharges, log } = useStore();
+  const { products, rooms, sell } = useStore();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('todas');
 
   // Carrito de compras
   const [cart, setCart] = useState<{ id: string; qty: number }[]>([]);
   const [paymentTarget, setPaymentTarget] = useState<'efectivo' | 'habitacion'>('habitacion');
-  const [targetRoom, setTargetRoom] = useState<string>('101');
+  const [targetRoom, setTargetRoom] = useState<string>('');
 
   const { show, node } = useToast();
 
@@ -99,31 +99,28 @@ export function Tienda({ go }: { go: (view: string, param?: string) => void }) {
     return acc + (prod ? prod.price * item.qty : 0);
   }, 0);
 
-  const handleCheckout = () => {
+  const effectiveTargetRoom = targetRoom || occupiedRooms[0]?.number || rooms[0]?.number || '';
+
+  const handleCheckout = async () => {
     if (cart.length === 0) return;
 
     if (paymentTarget === 'habitacion') {
-      if (!targetRoom) {
+      if (!effectiveTargetRoom) {
         show('Selecciona una habitación', 'Debes indicar a qué habitación cargar el consumo', 'bad');
         return;
       }
-      const chargeItems = cart.map((item) => {
-        const prod = products.find((p) => p.id === item.id)!;
-        return {
-          desc: prod.name,
-          qty: item.qty,
-          amount: prod.price * item.qty,
-          source: 'tienda' as const,
-        };
-      });
-
-      addCharges(targetRoom, chargeItems);
-      sell(cart);
-      log(`Cargó ${cart.length} productos de tienda a la Hab. ${targetRoom} (${formatCurrency(cartTotal)})`, 'Tienda');
-      show('Consumo cargado a habitación', `Hab. ${targetRoom} · Total: ${formatCurrency(cartTotal)}`);
+      const res = await sell(cart, true, effectiveTargetRoom);
+      if (!res.success) {
+        show('Error al cargar consumo', res.message, 'bad');
+        return;
+      }
+      show('Consumo cargado a habitación', `Hab. ${effectiveTargetRoom} · Total: ${formatCurrency(cartTotal)}`);
     } else {
-      sell(cart);
-      log(`Venta directa en recepción (${formatCurrency(cartTotal)})`, 'Tienda');
+      const res = await sell(cart, false);
+      if (!res.success) {
+        show('Error en venta', res.message, 'bad');
+        return;
+      }
       show('Venta completada', `Recaudado en caja: ${formatCurrency(cartTotal)}`);
     }
 
