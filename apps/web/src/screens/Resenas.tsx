@@ -409,7 +409,7 @@ export function Resenas() {
               >
                 {summary?.placesApiConfigured
                   ? 'No se recibieron comentarios individuales desde Google Places API en este momento.'
-                  : `El resumen oficial (${averageRating ?? '—'} estrellas y ${totalCount} opiniones con su distribución exacta) se extrajo en tiempo real desde Google Reviews. Para visualizar también los textos individuales de cada reseña dentro de esta aplicación, configure la variable GOOGLE_PLACES_API_KEY en el archivo .env (Place ID: ${
+                  : `Configura GOOGLE_PLACES_API_KEY en el archivo .env y recrea el contenedor API para consultar en vivo la calificación oficial y comentarios reales de Google Reviews (Place ID: ${
                       summary?.placeId || 'ChIJQRr4FV2zOY4RvqM_8_EfzsY'
                     }).`}
               </EmptyState>
