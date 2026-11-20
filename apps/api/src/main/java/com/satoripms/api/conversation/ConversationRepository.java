@@ -2,20 +2,17 @@ package com.satoripms.api.conversation;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
     @Query("SELECT c FROM Conversation c JOIN FETCH c.guest ORDER BY c.updatedAt DESC")
     List<Conversation> findAllWithGuestOrderByUpdatedAtDesc();
 
-    // Al ser el whatsapp_phone único por conversación activa (índice
-    // uq_active_conversation_guest en el schema), esto sirve para que n8n
-    // recupere el estado en curso de un número dado.
-    @Query("SELECT c FROM Conversation c JOIN FETCH c.guest " +
-           "WHERE c.guest.whatsappPhone = :phone AND c.status = 'active'")
-    Optional<Conversation> findActiveByWhatsappPhone(@Param("phone") String phone);
+    // Conversación en curso (activa o ya escalada) de un número de WhatsApp.
+    @Query("SELECT c FROM Conversation c JOIN FETCH c.guest g " +
+           "WHERE g.whatsappPhone = :phone AND c.status IN ('active', 'escalated') " +
+           "ORDER BY c.updatedAt DESC")
+    List<Conversation> findOpenByWhatsappPhone(@org.springframework.data.repository.query.Param("phone") String phone);
 }

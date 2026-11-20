@@ -30,33 +30,31 @@ jobs:
       - name: Build
         run: npm run build
 
+  # ── Chatbot (flujo n8n + suites en memoria) ───────────────
+  chatbot:
+    name: Chatbot (integridad del flujo y pruebas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Integridad del flujo V9
+        run: python3 tests/chatbot/verify_n8n_flow_integrity.py flows/n8n/V9_ChatbotReservas.json
+
+      - name: Suite integral del chatbot (en memoria)
+        run: node tests/chatbot/suite_pruebas_chatbot_v8.js
+
+      - name: Pruebas de cobro Wompi (en memoria)
+        run: node tests/chatbot/test_pago_wompi_v9.js
+
   # ── Backend ───────────────────────────────────────────────
   backend:
     name: Backend (Java 21 + Spring Boot)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: satori
-          POSTGRES_PASSWORD: satori_dev
-          POSTGRES_DB: satoripms
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
     defaults:
       run:
         working-directory: apps/api
@@ -71,15 +69,12 @@ jobs:
           cache: 'maven'
           cache-dependency-path: apps/api/pom.xml
 
+      # Las pruebas de persistencia levantan su propio PostgreSQL con Testcontainers
+      # (Docker ya viene en el runner), por lo que no se declaran servicios aparte.
       - name: Compile and run tests
         run: mvn -B test
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/satoripms
-          SPRING_DATASOURCE_USERNAME: satori
-          SPRING_DATASOURCE_PASSWORD: satori_dev
-          SPRING_DATA_REDIS_HOST: localhost
-          SPRING_DATA_REDIS_PORT: 6379
-          SPRING_DATA_REDIS_PASSWORD: ""
+          ENABLE_DOCKER_TESTS: 'true'
 
       - name: Package JAR
         run: mvn -B package -DskipTests

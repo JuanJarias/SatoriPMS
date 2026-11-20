@@ -1,17 +1,18 @@
--- V2__seed_rooms.sql.example
+-- R__seed_rooms.sql.example
 --
--- PLANTILLA — este archivo SÍ se sube al repo, con datos de ejemplo
--- inventados. Para usarlo:
---   1. Copia este archivo como V2__seed_rooms.sql (mismo directorio,
---      quitando el sufijo .example).
---   2. Llena las filas con las habitaciones reales de TU hotel.
---   3. V2__seed_rooms.sql queda fuera de git automáticamente (ver
---      .gitignore) — así el repo no expone nombres/precios/capacidades
---      reales del hotel, igual que .env vs .env.example.
---   4. Corre `mvn flyway:migrate` (o el contenedor `api` al arrancar).
+-- PLANTILLA de habitaciones. Este archivo SÍ se versiona, con datos de
+-- ejemplo inventados. Para usarlo:
+--   1. Cópialo como R__seed_rooms.sql (mismo directorio, sin ".example").
+--   2. Llénalo con las habitaciones reales de TU hotel.
+--   3. R__seed_rooms.sql queda fuera de git automáticamente (ver .gitignore),
+--      así el repositorio no expone nombres, precios ni capacidades reales.
+--   4. Arranca el contenedor `api` (o `mvn flyway:migrate`).
 --
--- Si el archivo real no existe, Flyway simplemente no aplica esta
--- migración — la tabla room queda vacía hasta que la crees, no rompe nada.
+-- Es una migración REPETIBLE de Flyway (prefijo R__): no ocupa número de
+-- versión, así que puede crearse en cualquier momento sin chocar con las
+-- migraciones versionadas. Flyway la vuelve a ejecutar cuando su contenido
+-- cambia; "ON CONFLICT (number) DO NOTHING" evita duplicar habitaciones.
+-- Si el archivo real no existe, la tabla room queda vacía y nada se rompe.
 
 INSERT INTO room (number, name, type, base_adults_capacity, max_adults_capacity, children_capacity, allows_pets, price_per_night, extra_guest_price) VALUES
 ('101', 'Habitación de referencia 101', 'ESTANDAR', 2, 3, 1, TRUE,  120000, 20000),
@@ -22,4 +23,5 @@ INSERT INTO room (number, name, type, base_adults_capacity, max_adults_capacity,
 ('203', 'Habitación de referencia 203', 'DOBLE',    2, 4, 2, FALSE, 160000, 25000),
 ('301', 'Habitación de referencia 301', 'SUITE',    4, 6, 2, TRUE,  220000, 30000),
 ('302', 'Habitación de referencia 302', 'SUITE',    4, 6, 2, TRUE,  220000, 30000),
-('303', 'Habitación de referencia 303', 'SUITE',    4, 6, 2, TRUE,  250000, 30000);
+('303', 'Habitación de referencia 303', 'SUITE',    4, 6, 2, TRUE,  250000, 30000)
+ON CONFLICT (number) DO NOTHING;

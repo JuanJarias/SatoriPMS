@@ -50,7 +50,13 @@ public class ConversationController {
      */
     @PostMapping("/{id}/escalation")
     public ResponseEntity<?> escalateToHuman(@PathVariable Long id) {
-        // En un paso posterior se notificará a los recepcionistas vía WebSocket (STOMP).
-        return ResponseEntity.ok().build();
+        // La bandeja de la web consulta por polling, así que basta con marcar el estado.
+        return conversationRepository.findById(id)
+                .map(conversation -> {
+                    conversation.setStatus("escalated");
+                    conversationRepository.save(conversation);
+                    return ResponseEntity.ok().build();
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

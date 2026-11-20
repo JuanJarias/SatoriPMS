@@ -1,5 +1,5 @@
 # Stage 1: Build backend JAR inside container (no host Java/Maven needed)
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /app
 
 # Cache dependencies
