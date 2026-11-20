@@ -92,6 +92,36 @@ WOMPI_LINK_EXPIRATION_HOURS=24
 
 Si en el salón bloquean el túnel o vence el token de Meta, el **cliente sí puede probar todas las pantallas y reservas directamente en el navegador (`http://localhost:5173`)**:
 
+### Cómo inicializar todo desde cero en Plan B (sin `zrok2` ni Meta)
+
+1. **Requisitos previos (solo una vez en el portátil):**
+   - Permisos de Docker activos en tu usuario (`sudo usermod -aG docker "$USER" && newgrp docker`).
+   - En `.env`: `JWT_SECRET` (≥ 32 caracteres), `SATORI_SERVICE_KEY`, `DATABASE_URL=postgresql+psycopg://...` y `COMPOSE_PROFILES=n8n` (opcional `GOOGLE_PLACES_API_KEY` si habrá WiFi para ver reseñas).
+
+2. **Opción A — Arrancar todo limpio sin túnel (conservando datos actuales):**
+   ```bash
+   ./scripts/stop-dev.sh
+   ./scripts/start-dev.sh --no-tunnel --sync-flow --open
+   ./scripts/status-dev.sh --no-meta
+   ```
+
+3. **Opción B — Reiniciar la base de datos 100% desde cero (recomendado antes de exponer si hiciste pruebas):**
+   Borra reservas, ventas y sesiones anteriores, deja intactas las **9 habitaciones reales**, el catálogo inicial y las cuentas `admin / admin123` y `recepcion / recepcion123`, conservando tu usuario de n8n:
+   ```bash
+   ./scripts/reset-dev.sh --keep-n8n -y
+   ./scripts/start-dev.sh --no-tunnel --sync-flow --open
+   ./scripts/status-dev.sh --no-meta
+   ```
+   > **Si necesitas borrar absolutamente todo (incluido n8n e imagen Docker de la API):** usa `./scripts/reset-dev.sh --images -y` seguido de `./scripts/start-dev.sh --no-tunnel --sync-flow --open` *(tendrás que abrir `http://localhost:5678` una vez para crear el usuario dueño de n8n).*
+
+4. **Comprobación rápida de 10 segundos tras arrancar:**
+   - Web abierta en `http://localhost:5173` (entra con `admin / admin123`).
+   - Bot n8n `V10` activo contra PostgreSQL:
+     ```bash
+     node tests/chatbot/test_e2e_v9_completo.js
+     node tests/chatbot/test_escalamiento_agente_humano.js
+     ```
+
 ### Qué SÍ funciona al 100% para que el cliente pruebe en Plan B
 1. **Operación hotelera completa en PostgreSQL:** Habitaciones `1–9` (crear, editar, eliminar), Calendario semanal, Reservas manuales (con **bloqueo automático 409** ante solapes y cancelación con reembolso RN-03), Llegadas (Check-in), Salidas (Check-out consolidando consumos).
 2. **Tienda Torre Satori & Salgados Café:** crear/editar/eliminar productos como Admin (**+ Nuevo producto** / **Editar** / **Eliminar** en `Tienda Hotel`), vender en efectivo o cargar a la habitación, y pedidos de cafetería a cocina/folio.
