@@ -20,6 +20,7 @@ from routers.auth import router as auth_router
 from routers.bookings import router as bookings_router
 from routers.conversations import router as conversations_router
 from routers.events_stream import router as events_stream_router
+from routers.finance_reports import router as finance_reports_router
 from routers.n8n_compat import router as n8n_compat_router
 from routers.payments import router as payments_router
 from routers.rooms import router as rooms_router
@@ -66,6 +67,7 @@ app.include_router(bookings_router)
 app.include_router(payments_router)
 app.include_router(conversations_router)
 app.include_router(events_stream_router)
+app.include_router(finance_reports_router)
 app.include_router(n8n_compat_router)
 app.include_router(web_operations_router)
 

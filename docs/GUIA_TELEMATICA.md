@@ -384,7 +384,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 | `P2` | RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers | `AGY` | [x] |
 | `P3` | Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` | `AGY` | [x] |
 | `P4` | Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) | `AGY` | [x] |
-| `P5` | Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel | `AGY` | [ ] |
+| `P5` | Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel | `AGY` | [x] |
 | `P6` | Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) | `AGY` | [ ] |
 | `P7` | Reconciliación flujo n8n `V10` (Wompi `ec8eace` sin Redis) y prueba Meta live | `AGY` | [ ] |
 | `P8` | Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 | `AGY` | [ ] |
@@ -480,7 +480,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 
 ---
 
-### `P5` — Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel (`GUIADO`)
+### `P5` — Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel (`AGY`)
 - **Objetivo:** retirar listas RAM en `web_operations.py`; implementar cliente `httpx` para Google Places API con caché TTL y `?refresh=true` (retornando `placesApiConfigured: false` real si falta `GOOGLE_PLACES_API_KEY`); implementar CRUD completo en PostgreSQL para Tienda (`product`), Cargos al folio (`folio_charge`), Salgados Café (`cafe_menu`/`cafe_order`), Eventos (`special_event` + cálculo descuento `HU-12`), Egresos (`expense`), Usuarios (`system_users`) y exportación `.xlsx` real con `openpyxl`.
 - **Archivos afectados:** `apps/api/requirements.txt`, `apps/api/services/reviews_service.py` (nuevo), `apps/api/routers/web_operations.py`, `apps/api/routers/finance_reports.py` (nuevo), `apps/api/routers/auth.py`, `tests/test_web_operations.py`, `docs/aprendizaje/P5.md`.
 - **Criterio de aceptación:** reiniciar `satori_api` no borra comandas, ventas, eventos, egresos ni usuarios; `GET /api/v1/reports/export.xlsx` descarga un `.xlsx` válido; `/api/v1/reviews/summary` nunca inventa reseñas mock.
@@ -492,7 +492,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 - **Checklist manual:**
   1. Crear un egreso, una comanda y un producto en API, reiniciar `satori_api` y confirmar que permanecen.
   2. Abrir **Reseñas Google** con y sin `GOOGLE_PLACES_API_KEY` y verificar estado real + descarga de `.xlsx` en **Reportes**.
-- **Casilla:** `[ ]` Completado y verificado.
+- **Casilla:** `[x]` Completado y verificado.
 - **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
 
 ---

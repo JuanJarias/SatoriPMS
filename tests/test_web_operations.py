@@ -4,9 +4,21 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 from sqlalchemy import delete, select
 
+from apps.api.core.config import settings
 from apps.api.core.database import AsyncSessionLocal
 from apps.api.main import app
-from apps.api.models import AuditLog, Booking, BookingStatus, Room
+from apps.api.models import (
+    AuditLog,
+    Booking,
+    BookingStatus,
+    CafeOrder,
+    Expense,
+    FolioCharge,
+    Room,
+    SpecialEvent,
+    User,
+)
+from apps.api.services.reviews_service import clear_reviews_cache
 
 
 async def _login_headers(client: AsyncClient, username: str, password: str) -> dict[str, str]:
@@ -300,10 +312,151 @@ async def test_salgados_cafe_order_to_folio_tc03_events_tc04_and_reviews() -> No
         assert ev_res.status_code == 200
         assert ev_res.json()["discountedTotal"] == 216000.0
 
-        # 3. Resumen de reseñas para Resenas.tsx (requiere JWT)
-        rev_unauth = await client.get("/api/v1/reviews/summary")
-        assert rev_unauth.status_code == 401
-        rev_res = await client.get("/api/v1/reviews/summary", headers=recep_headers)
-        assert rev_res.status_code == 200
-        assert rev_res.json()["total"] >= 3
-        assert rev_res.json()["average"] == 5.0
+        # 3. Resumen de reseñas sin GOOGLE_PLACES_API_KEY: nunca inventa reseñas falsas
+        clear_reviews_cache()
+        old_key = settings.GOOGLE_PLACES_API_KEY
+        settings.GOOGLE_PLACES_API_KEY = ""
+        try:
+            rev_unauth = await client.get("/api/v1/reviews/summary")
+            assert rev_unauth.status_code == 401
+            rev_res = await client.get("/api/v1/reviews/summary", headers=recep_headers)
+            assert rev_res.status_code == 200
+            assert rev_res.json()["placesApiConfigured"] is False
+            assert rev_res.json()["reviews"] == []
+        finally:
+            settings.GOOGLE_PLACES_API_KEY = old_key
+
+
+@pytest.mark.asyncio
+async def test_store_expenses_users_google_places_and_excel_export_p5(monkeypatch) -> None:
+    """Verifica persistencia DB de Tienda, Egresos, Usuarios, Google Places HTTP real y Excel openpyxl (P5)."""
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(FolioCharge))
+        await session.execute(delete(CafeOrder))
+        await session.execute(delete(Expense))
+        await session.execute(delete(SpecialEvent))
+        await session.execute(delete(User).where(User.username == "recep_temp_p5"))
+        await session.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        recep_headers = await _login_headers(client, "recepcion", "recepcion123")
+        admin_headers = await _login_headers(client, "admin", "admin123")
+
+        # 1. Tienda: listar catálogo sembrado y registrar venta descontando stock
+        prods = (await client.get("/api/v1/store/products", headers=recep_headers)).json()
+        assert len(prods) >= 9
+        p1 = prods[0]
+        sale_res = await client.post(
+            "/api/v1/store/sales",
+            headers=recep_headers,
+            json={"items": [{"productId": p1["code"], "qty": 1}], "chargeToRoom": False},
+        )
+        assert sale_res.status_code == 200
+        assert sale_res.json()["total"] == p1["price"]
+
+        # Restaurar stock de p1 como Admin
+        await client.put(
+            f"/api/v1/store/products/{p1['code']}",
+            headers=admin_headers,
+            json={"stock": p1["stock"]},
+        )
+
+        # 2. Egresos y Reporte Excel (.xlsx) solo para Administrador
+        assert (
+            await client.post(
+                "/api/v1/expenses",
+                headers=recep_headers,
+                json={"desc": "Intento recepción", "amount": 10000},
+            )
+        ).status_code == 403
+
+        exp_res = await client.post(
+            "/api/v1/expenses",
+            headers=admin_headers,
+            json={"date": "2026-11-19", "amount": 55000, "category": "Insumos", "desc": "Detergente P5"},
+        )
+        assert exp_res.status_code == 201
+        exp_id = exp_res.json()["numericId"]
+
+        void_res = await client.post(f"/api/v1/expenses/{exp_id}/void", headers=admin_headers)
+        assert void_res.status_code == 200
+        assert void_res.json()["voided"] is True
+
+        fin_res = await client.get("/api/v1/finance/summary", headers=admin_headers)
+        assert fin_res.status_code == 200
+        assert "totalIncome" in fin_res.json()
+
+        xlsx_res = await client.get("/api/v1/reports/export.xlsx", headers=admin_headers)
+        assert xlsx_res.status_code == 200
+        assert xlsx_res.content[:2] == b"PK"
+
+        # 3. Usuarios CRUD (solo Admin)
+        usr_res = await client.post(
+            "/api/v1/auth/users",
+            headers=admin_headers,
+            json={
+                "username": "recep_temp_p5",
+                "name": "Recep Temporal P5",
+                "password": "clave_segura_123",
+                "role": "Recepcionista",
+            },
+        )
+        assert usr_res.status_code == 201
+        new_uid = usr_res.json()["id"]
+        patch_usr = await client.patch(
+            f"/api/v1/auth/users/{new_uid}",
+            headers=admin_headers,
+            json={"active": False},
+        )
+        assert patch_usr.status_code == 200
+        assert patch_usr.json()["active"] is False
+
+        # 4. Google Places API mock HTTP (verifica parseo real sin datos inventados)
+        class _FakePlacesResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {
+                    "displayName": {"text": "Hotel Torre Satori"},
+                    "rating": 4.9,
+                    "userRatingCount": 42,
+                    "reviews": [
+                        {
+                            "rating": 5,
+                            "text": {"text": "Excelente café y atención en Sevilla."},
+                            "relativePublishTimeDescription": "Hace 2 días",
+                            "publishTime": "2026-11-17T12:00:00Z",
+                            "authorAttribution": {"displayName": "Huésped Verificado"},
+                        }
+                    ],
+                }
+
+        orig_get = AsyncClient.get
+
+        async def _fake_places_get(self, url, **kwargs):
+            if "places.googleapis.com" in str(url):
+                return _FakePlacesResponse()
+            return await orig_get(self, url, **kwargs)
+
+        monkeypatch.setattr("httpx.AsyncClient.get", _fake_places_get)
+        clear_reviews_cache()
+        old_key = settings.GOOGLE_PLACES_API_KEY
+        settings.GOOGLE_PLACES_API_KEY = "fake_google_key_test"
+        try:
+            g_res = await client.get("/api/v1/reviews/summary?refresh=true", headers=recep_headers)
+            assert g_res.status_code == 200
+            g_data = g_res.json()
+            assert g_data["placesApiConfigured"] is True
+            assert g_data["average"] == 4.9
+            assert g_data["total"] == 42
+            assert g_data["reviews"][0]["authorName"] == "Huésped Verificado"
+        finally:
+            settings.GOOGLE_PLACES_API_KEY = old_key
+            clear_reviews_cache()
+
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(User).where(User.username == "recep_temp_p5"))
+        await session.execute(delete(Expense))
+        await session.commit()
