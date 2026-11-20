@@ -257,6 +257,17 @@ async def create_web_manual_booking(
         events=events,
     )
 
+    payment_option = str(body.get("paymentOption") or body.get("payment_option") or "full").strip().lower()
+    if payment_option in ("half", "deposit"):
+        paid_amount = (total_price / Decimal("2")).quantize(Decimal("0.01"))
+        payment_status = "partial"
+    elif payment_option == "none":
+        paid_amount = Decimal("0.00")
+        payment_status = "pending"
+    else:
+        paid_amount = total_price
+        payment_status = "paid"
+
     try:
         await db.execute(
             update(Booking)
@@ -273,12 +284,12 @@ async def create_web_manual_booking(
             check_in=check_in,
             check_out=check_out,
             status=BookingStatus.CONFIRMADA.value,
-            payment_status="paid",
+            payment_status=payment_status,
             adults=int(body.get("adults", 2)),
             children=int(body.get("children", 0)),
             with_pet=bool(body.get("hasPet", False)),
             total_price=total_price,
-            paid_amount=total_price,
+            paid_amount=paid_amount,
             source="web",
             group_code=code,
             reservation_group_id=group_uuid,

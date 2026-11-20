@@ -227,7 +227,7 @@ export function Chatbot({ go }: { go?: (view: string, param?: string) => void })
                   </Button>
                 </div>
                 <div className="flex-1 p-6 space-y-3 overflow-y-auto text-sm text-ink-soft">
-                  <Alert tone="info" title="Sesión persistida en PostgreSQL 16 (sin Redis)">
+                  <Alert tone="info" title="Estado de la conversación">
                     Número WhatsApp: <strong>{selectedConv.waId}</strong> · Modo actual:{' '}
                     <strong>{selectedConv.agentActive ? 'Bot en silencio (Atención humana)' : 'Bot n8n V10 activo'}</strong>.
                     {selectedConv.updatedAt && ` Última actividad: ${new Date(selectedConv.updatedAt).toLocaleString('es-CO')}.`}

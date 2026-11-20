@@ -660,6 +660,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           phone: payload.phone,
           documentNumber: payload.doc || '',
         },
+        paymentOption: payload.paymentOption || 'full',
         source: payload.source || 'web',
       });
       await refreshBackendData();

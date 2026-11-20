@@ -86,7 +86,7 @@
 > "Financieramente, el ahorro frente a un software comercial supera los 13 millones al año: la inversión se recupera en menos de 14 meses y con apenas 3 reservas directas al mes se cubren todos los costos técnicos."
 
 ### Slide 20 — Oportunidades de mejora *(30 s · Esteban)*
-> "Como hoja de ruta v1.2.0 queda pasar la pasarela a producción con facturación electrónica DIAN, automatizar reseñas en Google, activar alertas de errores en producción y escalar a múltiples servidores cuando el hotel crezca."
+> "Para el crecimiento del proyecto dejamos dos frentes claros. En **producto**, incorporar recordatorios automáticos de llegada y salida por WhatsApp, cupones de fidelización para huéspedes frecuentes, sincronización de calendarios externos y escalar a múltiples servidores. Y en **proceso operativo**, realizar simulacros mensuales de restauración de respaldos, automatizar el monitoreo de webhooks y renovación de tokens, medir los tiempos reales de soporte con recepción y mantener un plan de reinducción ante rotación de personal."
 
 ### Slide 21 — Cierre *(25 s · Esteban)*
 > "En resumen, Torre Satori pasa de atender en libreta a vender 24/7 con cero sobreventas, sobre una plataforma que ya está lista para el piloto. Gracias por su confianza y por acompañarnos en este proceso. Muchas gracias."
