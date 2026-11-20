@@ -56,7 +56,6 @@ const NAV_ADMIN = [
   { k: 'a-usr', label: 'Recepcionistas', icon: Users },
   { k: 'a-log', label: 'Logs Auditoría', icon: ShieldCheck },
   { k: 'eventos', label: 'Eventos & Descuentos', icon: Tag },
-  { k: 'resenas', label: 'Reseñas Google', icon: Star },
 ];
 
 function AppLayout() {
