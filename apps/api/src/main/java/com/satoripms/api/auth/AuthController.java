@@ -1,85 +1,101 @@
 package com.satoripms.api.auth;
 
+import com.satoripms.api.security.JwtService;
+import com.satoripms.api.security.Roles;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
- * Controlador de autenticación para SatoriPMS.
- * Permite iniciar sesión como Administrador o Recepcionista.
+ * Autenticación del personal del hotel (Administrador y Recepcionista).
+ *
+ * Valida las credenciales contra la tabla system_users (contraseñas BCrypt) y emite un JWT
+ * que la aplicación web debe enviar en el encabezado {@code Authorization: Bearer <token>}.
  */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final JdbcTemplate jdbcTemplate;
+    private static final String INVALID_CREDENTIALS = "Usuario o contraseña no válidos";
 
-    public AuthController(JdbcTemplate jdbcTemplate) {
+    private final JdbcTemplate jdbcTemplate;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    /** Hash de referencia para igualar el tiempo de respuesta cuando el usuario no existe. */
+    private final String dummyHash;
+
+    public AuthController(JdbcTemplate jdbcTemplate, PasswordEncoder passwordEncoder, JwtService jwtService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.dummyHash = passwordEncoder.encode("satori-usuario-inexistente");
     }
 
     public record LoginRequest(String username, String password) {}
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest req) {
-        if (req == null || req.username() == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Usuario requerido"));
+    public ResponseEntity<?> login(@RequestBody(required = false) LoginRequest req) {
+        if (req == null || req.username() == null || req.username().isBlank()
+                || req.password() == null || req.password().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Usuario y contraseña son obligatorios"));
         }
 
-        String user = req.username().trim().toLowerCase();
-        String pass = req.password() != null ? req.password() : "";
-
-        // Verificación para perfil Administrador
-        if (user.equals("admin@gmail.com") || user.contains("admin") || user.equals("gerencia@torresatori.co")) {
-            if (!pass.isEmpty() && !pass.equals("admin123") && pass.length() < 4) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Contraseña incorrecta para Administrador"));
-            }
-            return ResponseEntity.ok(Map.of(
-                    "token", "satori-jwt-" + UUID.randomUUID(),
-                    "username", "admin",
-                    "name", "Frank Arias Salgado",
-                    "role", "admin",
-                    "email", user.equals("admin@gmail.com") ? "admin@gmail.com" : "gerencia@torresatori.co"
-            ));
+        List<Map<String, Object>> users = jdbcTemplate.queryForList(
+                "SELECT username, password_hash, role, name FROM system_users WHERE LOWER(username) = ? AND active = TRUE",
+                req.username().trim().toLowerCase());
+        if (users.isEmpty()) {
+            // Se compara contra un hash ficticio para no revelar por tiempo de respuesta si el usuario existe.
+            passwordEncoder.matches(req.password(), dummyHash);
+            return unauthorized();
         }
 
-        // Verificación para perfil Recepcionista
-        if (user.contains("recep") || user.contains("sofia") || user.equals("recepcion@satoripms.com")) {
-            return ResponseEntity.ok(Map.of(
-                    "token", "satori-jwt-" + UUID.randomUUID(),
-                    "username", "recepcion",
-                    "name", "Sofía Valencia",
-                    "role", "receptionist",
-                    "email", "sofia.valencia@torresatori.co"
-            ));
+        Map<String, Object> user = users.get(0);
+        String hash = String.valueOf(user.get("password_hash"));
+        String role = Roles.fromDatabaseRole(String.valueOf(user.get("role")));
+        if (role == null || !passwordEncoder.matches(req.password(), hash)) {
+            return unauthorized();
         }
 
-        // Consulta en base de datos si existe en system_users
-        try {
-            var users = jdbcTemplate.queryForList(
-                    "SELECT username, role, name FROM system_users WHERE LOWER(username) = ? AND active = true",
-                    user
-            );
-            if (!users.isEmpty()) {
-                Map<String, Object> u = users.get(0);
-                return ResponseEntity.ok(Map.of(
-                        "token", "satori-jwt-" + UUID.randomUUID(),
-                        "username", u.get("username"),
-                        "name", u.get("name"),
-                        "role", u.get("role"),
-                        "email", user + "@torresatori.co"
-                ));
-            }
-        } catch (Exception ignored) {
-            // Continuar con respuesta estándar
-        }
+        String username = String.valueOf(user.get("username"));
+        String name = String.valueOf(user.get("name"));
+        JwtService.IssuedToken token = jwtService.issue(username, name, role);
+        return ResponseEntity.ok(Map.of(
+                "token", token.value(),
+                "tokenType", "Bearer",
+                "expiresAt", token.expiresAt().toString(),
+                "username", username,
+                "name", name,
+                "role", role.toLowerCase()
+        ));
+    }
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "Usuario o contraseña no válidos"));
+    /** Datos de la sesión actual a partir del token. */
+    @GetMapping("/me")
+    public ResponseEntity<?> me(@AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Sesión no válida"));
+        }
+        List<String> roles = jwt.getClaimAsStringList("roles");
+        return ResponseEntity.ok(Map.of(
+                "username", jwt.getSubject(),
+                "name", String.valueOf(jwt.getClaimAsString("name")),
+                "role", roles == null || roles.isEmpty() ? "" : roles.get(0).toLowerCase(),
+                "expiresAt", String.valueOf(jwt.getExpiresAt())
+        ));
+    }
+
+    private ResponseEntity<?> unauthorized() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", INVALID_CREDENTIALS));
     }
 }
