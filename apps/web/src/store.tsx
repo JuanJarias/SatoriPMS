@@ -122,6 +122,14 @@ export interface UserItem {
   last: string;
 }
 
+export interface ConversationMessage {
+  from: string;
+  author: string;
+  text: string;
+  sentAt: string;
+  dispatched?: boolean;
+}
+
 export interface ConversationItem {
   id: number;
   waId: string;
@@ -131,6 +139,7 @@ export interface ConversationItem {
   step: string;
   state: string;
   agentActive: boolean;
+  messages?: ConversationMessage[];
   updatedAt?: string;
 }
 
@@ -252,6 +261,8 @@ interface StoreContextType {
   createUser: (payload: { username: string; name: string; password: string; role: string }) => Promise<ActionResult>;
   toggleUserActive: (id: string | number, currentActive: boolean) => Promise<ActionResult>;
   escalateConversation: (id: number) => Promise<ActionResult>;
+  toggleConversationBot: (id: number, botActive?: boolean) => Promise<ActionResult>;
+  sendConversationMessage: (id: number, text: string) => Promise<ActionResult>;
   exportExcelReport: () => Promise<ActionResult>;
   refreshBackendData: () => Promise<void>;
 }
@@ -784,6 +795,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const toggleConversationBot = async (id: number, botActive?: boolean): Promise<ActionResult> => {
+    try {
+      await apiClient.post(
+        `/api/v1/conversations/${id}/toggle-bot`,
+        botActive === undefined ? {} : { bot_active: botActive }
+      );
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error cambiando modo del bot' };
+    }
+  };
+
+  const sendConversationMessage = async (id: number, text: string): Promise<ActionResult> => {
+    try {
+      const res = await apiClient.post(`/api/v1/conversations/${id}/messages`, { text });
+      await refreshBackendData();
+      return { success: true, data: res.data };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error enviando mensaje manual' };
+    }
+  };
+
   const exportExcelReport = async (): Promise<ActionResult> => {
     try {
       await downloadAuthorizedFile('/api/v1/reports/export.xlsx', 'Reporte_TorreSatori.xlsx');
@@ -832,6 +866,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         createUser,
         toggleUserActive,
         escalateConversation,
+        toggleConversationBot,
+        sendConversationMessage,
         exportExcelReport,
         refreshBackendData,
       }}

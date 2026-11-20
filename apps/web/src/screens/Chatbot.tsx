@@ -26,16 +26,24 @@ import {
   Button,
   BadgeStatus,
   Alert,
+  Input,
   useToast,
   formatCurrency,
   cn
 } from '../ui';
 
 export function Chatbot({ go }: { go?: (view: string, param?: string) => void }) {
-  const { rooms, conversations, addBooking, escalateConversation } = useStore();
+  const {
+    rooms,
+    conversations,
+    addBooking,
+    toggleConversationBot,
+    sendConversationMessage,
+  } = useStore();
   const [activeTab, setActiveTab] = useState<'inbox' | 'simulator'>('inbox');
 
   const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
+  const [manualText, setManualText] = useState('');
   const selectedConv =
     conversations.find((c) => c.id === selectedConvId) || conversations[0] || null;
 
@@ -76,12 +84,34 @@ export function Chatbot({ go }: { go?: (view: string, param?: string) => void })
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const handleEscalateConv = async (id: number) => {
-    const res = await escalateConversation(id);
+  const handleToggleBot = async (id: number, currentlyAgentActive: boolean) => {
+    const res = await toggleConversationBot(id, currentlyAgentActive);
     if (res.success) {
-      show('Conversación escalada', 'El bot queda en pausa para atención humana en PostgreSQL');
+      show(
+        currentlyAgentActive ? 'Bot reactivado' : 'Atención humana activa',
+        currentlyAgentActive
+          ? 'El flujo n8n V10 vuelve a responder automáticamente'
+          : 'El bot queda en silencio para atención humana en PostgreSQL'
+      );
     } else {
-      show('Error al escalar', res.message, 'bad');
+      show('Error al cambiar modo', res.message, 'bad');
+    }
+  };
+
+  const handleSendManualReply = async () => {
+    if (!selectedConv || !manualText.trim()) return;
+    const res = await sendConversationMessage(selectedConv.id, manualText.trim());
+    if (res.success) {
+      setManualText('');
+      const dispatched = (res.data as { dispatched?: boolean } | undefined)?.dispatched;
+      show(
+        dispatched ? 'Enviado a WhatsApp' : 'Respuesta registrada',
+        dispatched
+          ? 'Mensaje entregado vía WhatsApp Cloud API y auditado'
+          : 'Guardado en PostgreSQL (sin WHATSAPP_TOKEN activo para envío externo)'
+      );
+    } else {
+      show('Error al enviar', res.message, 'bad');
     }
   };
 
@@ -189,19 +219,55 @@ export function Chatbot({ go }: { go?: (view: string, param?: string) => void })
                     </div>
                   </div>
                   <Button
-                    variant={selectedConv.agentActive ? 'danger' : 'secondary'}
+                    variant={selectedConv.agentActive ? 'secondary' : 'danger'}
                     className="h-8 text-xs px-3"
-                    onClick={() => handleEscalateConv(selectedConv.id)}
+                    onClick={() => handleToggleBot(selectedConv.id, selectedConv.agentActive)}
                   >
-                    {selectedConv.agentActive ? 'Escalamiento Humano Activo' : 'Activar Atención Humana'}
+                    {selectedConv.agentActive ? 'Reactivar Bot IA' : 'Pausar Bot (Atención Humana)'}
                   </Button>
                 </div>
-                <div className="flex-1 p-6 space-y-3 text-sm text-ink-soft">
+                <div className="flex-1 p-6 space-y-3 overflow-y-auto text-sm text-ink-soft">
                   <Alert tone="info" title="Sesión persistida en PostgreSQL 16 (sin Redis)">
                     Número WhatsApp: <strong>{selectedConv.waId}</strong> · Modo actual:{' '}
                     <strong>{selectedConv.agentActive ? 'Bot en silencio (Atención humana)' : 'Bot n8n V10 activo'}</strong>.
                     {selectedConv.updatedAt && ` Última actividad: ${new Date(selectedConv.updatedAt).toLocaleString('es-CO')}.`}
                   </Alert>
+
+                  {(selectedConv.messages ?? []).length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      {(selectedConv.messages ?? []).map((m, idx) => (
+                        <div key={idx} className="rounded-lg bg-forest-50 border border-forest-200 p-3 text-ink">
+                          <div className="flex justify-between text-[11px] text-ink-soft mb-1">
+                            <span className="font-semibold text-forest-900">{m.author}</span>
+                            <span>
+                              {new Date(m.sentAt).toLocaleString('es-CO')} · {m.dispatched ? 'WhatsApp OK' : 'Registro local'}
+                            </span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap">{m.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 border-t border-sand-200 bg-sand-50/40 flex gap-2">
+                  <Input
+                    value={manualText}
+                    onChange={(e) => setManualText(e.target.value)}
+                    placeholder="Escribir respuesta manual para el huésped..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSendManualReply();
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="primary"
+                    icon={<Send size={15} />}
+                    onClick={handleSendManualReply}
+                  >
+                    Enviar
+                  </Button>
                 </div>
               </>
             ) : (

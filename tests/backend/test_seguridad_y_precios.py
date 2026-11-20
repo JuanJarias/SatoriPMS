@@ -242,3 +242,44 @@ async def test_debug_listing_uses_the_n8n_status_contract() -> None:
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as anon:
         assert (await anon.get("/api/bookings/debug")).status_code == 401
+        login_rec = await anon.post(
+            "/api/v1/auth/login",
+            json={"username": "recepcion", "password": "recepcion123"},
+        )
+        rec_hdrs = {"Authorization": f"Bearer {login_rec.json()['access_token']}"}
+        assert (await anon.get("/api/bookings/debug", headers=rec_hdrs)).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_pending_payment_has_24h_expiration_and_frees_room_when_stale() -> None:
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import update
+    from apps.api.models import Booking
+    from apps.api.services.expiration_service import expire_stale_booking_locks
+
+    room_id = await _prepare_room_three()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers=_SVC) as client:
+        data = await _create_pending(client, room_id, "1094555666", "2027-07-10", "2027-07-12")
+        code = data["code"]
+        debug_rows = (await client.get("/api/bookings/debug")).json()
+        row = next(r for r in debug_rows if r["bookingCode"] == code)
+        assert row["expiresAt"] is not None
+
+        # Simular vencimiento de las 24 h del link Wompi
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                update(Booking)
+                .where(Booking.group_code == code)
+                .values(expires_at=datetime.now(timezone.utc) - timedelta(minutes=1))
+            )
+            await session.commit()
+
+        # Al correr el job, la reserva PENDIENTE_PAGO pasa a EXPIRADA y libera la habitación
+        expired = await expire_stale_booking_locks()
+        assert any(item["bookingCode"] == code and item["previousStatus"] == "PENDIENTE_PAGO" for item in expired)
+
+        avail = await client.get(
+            "/api/rooms/availability",
+            params={"checkIn": "2027-07-10", "checkOut": "2027-07-12", "adults": 2},
+        )
+        assert any(r["id"] == room_id for r in avail.json())

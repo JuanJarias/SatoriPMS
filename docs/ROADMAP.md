@@ -3,7 +3,7 @@
 **Período:** 11 al 20 de Noviembre de 2026  
 **Capacidad Total:** 48 horas (32 h laborables + 16 h fin de semana)  
 **Meta:** MVP P1 con WhatsApp Real, FastAPI, PostgreSQL en Supabase y Despliegue en la Nube.  
-**Referencia del Plan Maestro:** [docs/audit/05-plan-migracion.md](file:///home/jjarias/Documents/UNIVERSIDAD/8vo%20semestre/Integrador-ii/SatoriPMS/docs/audit/05-plan-migracion.md)
+**Referencia de Arquitectura:** [docs/README.md](README.md) · [docs/GUIA_TELEMATICA.md](GUIA_TELEMATICA.md)
 
 ---
 

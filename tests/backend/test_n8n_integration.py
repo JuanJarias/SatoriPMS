@@ -36,6 +36,17 @@ def test_n8n_v10_workflow_has_zero_redis_nodes() -> None:
     ]
     assert len(session_http_nodes) == 7
 
+    # Verificar paridad Wompi y cabeceras X-Service-Key en V10
+    node_names = {n["name"] for n in data.get("nodes", [])}
+    assert "API Confirmar Pago Externo" in node_names
+    assert "API Cancelar por Fallo Wompi" in node_names
+    for n in data.get("nodes", []):
+        url = str(n.get("parameters", {}).get("url", ""))
+        if "/api/" in url:
+            assert "$env.API_BASE_URL" in url
+            hdrs = n.get("parameters", {}).get("headerParameters", {}).get("parameters", [])
+            assert any(h.get("name") == "X-Service-Key" for h in hdrs), f"Falta X-Service-Key en {n['name']}"
+
 
 @pytest.mark.asyncio
 async def test_postgresql_conversation_session_crud_and_agent_escalation() -> None:
@@ -99,13 +110,44 @@ async def test_postgresql_conversation_session_crud_and_agent_escalation() -> No
         assert esc_res.status_code == 200
         assert esc_res.json()["agent_available"] is True
 
-        # 5. Listar bandeja de conversaciones -> GET /api/conversations (requiere JWT web)
+        # 5. Guardar también un link Wompi: NO debe aparecer en la bandeja ni romper session-keys
+        await client.put(
+            "/api/v1/conversations/session/wompi:link:test123",
+            json={"value": json.dumps({"wa_id": "573110001122", "link_id": "test123"}), "ttl": 3600},
+        )
+        keys_res = await client.get("/api/v1/conversations/session-keys", params={"prefix": "wompi:link:"})
+        assert keys_res.status_code == 200
+        assert any(item["key"] == "wompi:link:test123" for item in keys_res.json())
+
+        # 6. Listar bandeja de conversaciones -> GET /api/conversations (requiere JWT web, solo session:*)
         list_res = await client.get("/api/conversations", headers=jwt_headers)
         assert list_res.status_code == 200
         assert len(list_res.json()) == 1
+        conv_id = list_res.json()[0]["id"]
         assert list_res.json()[0]["status"] == "escalated"
 
-        # 6. Borrar sesión inactiva -> DELETE
+        # 7. Alternar modo bot <-> humano (toggle-bot) y enviar mensaje manual desde recepción
+        toggle_res = await client.post(
+            f"/api/v1/conversations/{conv_id}/toggle-bot",
+            json={"bot_active": True},
+            headers=jwt_headers,
+        )
+        assert toggle_res.status_code == 200
+        assert toggle_res.json()["agentActive"] is False
+        assert toggle_res.json()["botActive"] is True
+
+        msg_res = await client.post(
+            f"/api/v1/conversations/{conv_id}/messages",
+            json={"text": "Hola, ya confirmamos tu check-in anticipado."},
+            headers=jwt_headers,
+        )
+        assert msg_res.status_code == 200
+        assert msg_res.json()["message"]["text"] == "Hola, ya confirmamos tu check-in anticipado."
+
+        list_after = await client.get("/api/v1/conversations", headers=jwt_headers)
+        assert len(list_after.json()[0]["messages"]) == 1
+
+        # 8. Borrar sesión inactiva -> DELETE
         del_res = await client.delete("/api/v1/conversations/session/session:573110001122")
         assert del_res.status_code == 200
         assert del_res.json()["deleted"] is True

@@ -2,7 +2,7 @@ import json
 import os
 import sys
 
-DEFAULT_FLOW = 'flows/n8n/V9_ChatbotReservas.json'
+DEFAULT_FLOW = 'flows/n8n/V10_ChatbotReservas.json'
 
 def verify_flow(path=DEFAULT_FLOW):
     print(f"Flow: {path}")

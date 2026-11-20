@@ -47,7 +47,7 @@ async def _notify_n8n_expired(expired_items: list[dict[str, Any]]) -> None:
 async def expire_stale_booking_locks(
     db: AsyncSession | None = None,
 ) -> list[dict[str, Any]]:
-    """Marca como EXPIRADA los bloqueos BLOQUEADA_TEMPORAL con expires_at <= NOW() y avisa a n8n/SSE."""
+    """Marca como EXPIRADA los bloqueos BLOQUEADA_TEMPORAL y PENDIENTE_PAGO con expires_at <= NOW() y avisa a n8n/SSE."""
     own_session = db is None
     session = AsyncSessionLocal() if own_session else db
     expired_items: list[dict[str, Any]] = []
@@ -55,7 +55,12 @@ async def expire_stale_booking_locks(
     try:
         res = await session.execute(
             select(Booking).where(
-                Booking.status == BookingStatus.BLOQUEADA_TEMPORAL.value,
+                Booking.status.in_(
+                    [
+                        BookingStatus.BLOQUEADA_TEMPORAL.value,
+                        BookingStatus.PENDIENTE_PAGO.value,
+                    ]
+                ),
                 Booking.expires_at.is_not(None),
                 Booking.expires_at <= func.now(),
             )
@@ -65,12 +70,15 @@ async def expire_stale_booking_locks(
             return []
 
         for b in stale_bookings:
+            prev_status = b.status
             b.status = BookingStatus.EXPIRADA.value
             room = await session.get(Room, b.room_id)
             guest = await session.get(Guest, b.guest_id)
             expired_items.append(
                 {
                     "bookingId": b.id,
+                    "bookingCode": b.group_code or f"TS-{b.id}",
+                    "previousStatus": prev_status,
                     "roomId": b.room_id,
                     "roomNumber": room.number if room else None,
                     "waId": guest.whatsapp_phone if guest else None,

@@ -94,14 +94,18 @@ async def get_available_rooms(
             or_(
                 Booking.status.in_(
                     [
-                        BookingStatus.PENDIENTE_PAGO.value,
                         BookingStatus.CONFIRMADA.value,
                         BookingStatus.EN_CURSO.value,
                     ]
                 ),
                 and_(
-                    Booking.status == BookingStatus.BLOQUEADA_TEMPORAL.value,
-                    Booking.expires_at > func.now(),
+                    Booking.status.in_(
+                        [
+                            BookingStatus.BLOQUEADA_TEMPORAL.value,
+                            BookingStatus.PENDIENTE_PAGO.value,
+                        ]
+                    ),
+                    or_(Booking.expires_at.is_(None), Booking.expires_at > func.now()),
                 ),
             ),
         )

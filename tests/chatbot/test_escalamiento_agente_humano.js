@@ -8,18 +8,15 @@
  * Requiere el stack levantado (n8n, Redis y la API).
  */
 const http = require('http');
-const { execSync } = require('child_process');
+const { loadEnv, getPgSession, deletePgSession } = require('./lib/env');
 
+const env = loadEnv();
 const WA_ID = '573117778888';
 
-const N8N_HOST = process.env.N8N_HOST || 'localhost';
-const N8N_PORT = process.env.N8N_PORT || 5678;
-const REDIS_CONTAINER = process.env.REDIS_CONTAINER || 'satori_redis';
+const N8N_HOST = env.N8N_HOST || 'localhost';
+const N8N_PORT = env.N8N_PORT || 5678;
 
-const getSession = () => {
-  const raw = execSync(`docker exec ${REDIS_CONTAINER} redis-cli GET session:${WA_ID}`, { encoding: 'utf8' }).trim();
-  return raw ? JSON.parse(raw) : null;
-};
+const getSession = () => getPgSession(`session:${WA_ID}`, env);
 
 function sendMsg(text) {
   return new Promise((resolve, reject) => {
@@ -76,12 +73,12 @@ async function run() {
   console.log('======================================================================');
 
   try {
-    execSync(`docker exec ${REDIS_CONTAINER} redis-cli DEL session:${WA_ID}`);
+    await deletePgSession(`session:${WA_ID}`, env);
     console.log('[1/2] Enviando "menu"...');
     await sendMsg('menu');
     await sleep(2000);
 
-    console.log('[2/2] Seleccionando Opción 5 (Hablar con un agente — V9)...');
+    console.log('[2/2] Seleccionando Opción 5 (Hablar con un agente — V10)...');
     const res = await sendMsg('5');
     await sleep(3000);
 
@@ -93,8 +90,8 @@ async function run() {
 
     console.log('  • Código de estado webhook: HTTP 200 (OK)');
 
-    const session = getSession();
-    if (!session) throw new Error('No existe la sesión en Redis tras solicitar un agente');
+    const session = await getSession();
+    if (!session) throw new Error('No existe la sesión en PostgreSQL tras solicitar un agente');
     if (session.agent_active !== true) {
       throw new Error(`La sesión no quedó en atención humana (agent_active=${session.agent_active}, estado=${session.state})`);
     }

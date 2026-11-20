@@ -386,7 +386,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 | `P4` | Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) | `AGY` | [x] |
 | `P5` | Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel | `AGY` | [x] |
 | `P6` | Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) | `AGY` | [x] |
-| `P7` | Reconciliación flujo n8n `V10` (Wompi `ec8eace` sin Redis) y prueba Meta live | `AGY` | [ ] |
+| `P7` | Reconciliación flujo n8n `V10` (Wompi `ec8eace` sin Redis) y prueba Meta live | `AGY` | [x] |
 | `P8` | Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 | `AGY` | [ ] |
 | `P9` | Docker prod (Nginx HTTPS, R2 `pg_dump`, Sentry) y limpieza del repositorio | `AGY` | [ ] |
 | `P10` | Respaldo `origin/main`, merge `--no-ff` de `migracion-fastapi` a `main` y tag `v1.0.0` | `AGY` | [ ] |
@@ -526,9 +526,9 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
   cd apps/web && npm run build
   ```
 - **Checklist manual:**
-  1. Reimportar `V10_ChatbotReservas.json` en n8n (`:5678`) y pulsar **Publish**.
+  1. Reimportar `V10_ChatbotReservas.json` en n8n (`./scripts/sync-n8n-flow.sh`) y verificar en `:5678` que esté publicado sin Redis.
   2. Probar flujo en Meta (`Probar` en `messages` o app publicada) y verificar nueva sesión + reserva en el panel web.
-- **Casilla:** `[ ]` Completado y verificado.
+- **Casilla:** `[x]` Completado y verificado.
 - **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
 
 ---

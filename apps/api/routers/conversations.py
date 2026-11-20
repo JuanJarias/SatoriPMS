@@ -5,24 +5,29 @@ import json
 import sys
 from typing import Any
 
-from fastapi import APIRouter, Depends, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+import httpx
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
+    from core.config import settings
     from core.database import get_db
     from dependencies.auth import require_role, require_service_key, require_service_or_role, resolve_actor_name
     from models.conversation import Conversation
     from models.user import User, UserRole
     from services.audit_service import record_audit
+    from services.event_bus import publish_pms_event
 except ImportError:
+    from apps.api.core.config import settings
     from apps.api.core.database import get_db
     from apps.api.dependencies.auth import require_role, require_service_key, require_service_or_role, resolve_actor_name
     from apps.api.models.conversation import Conversation
     from apps.api.models.user import User, UserRole
     from apps.api.services.audit_service import record_audit
+    from apps.api.services.event_bus import publish_pms_event
 
 router = APIRouter(tags=["Conversations & Sessions"])
 
@@ -41,6 +46,18 @@ class AgentEscalationRequest(BaseModel):
     wa_id: str
     name: str | None = "Huésped WhatsApp"
     context: str | None = "Solicitud de agente desde WhatsApp"
+
+
+class ToggleBotRequest(BaseModel):
+    """Permite activar o pausar explícitamente el bot automático n8n en una sesión."""
+
+    bot_active: bool | None = None
+
+
+class ManualMessageRequest(BaseModel):
+    """Mensaje manual enviado por recepción o gerencia al huésped en WhatsApp."""
+
+    text: str = Field(..., min_length=1, max_length=2000)
 
 
 def _normalize_session_key(raw_key: str) -> tuple[str, str | None]:
@@ -259,6 +276,54 @@ async def request_human_agent(
     }
 
 
+def _parse_session_json(raw: str | None) -> dict[str, Any]:
+    """Deserializa session_data de forma segura."""
+    if not raw:
+        return {}
+    try:
+        loaded = json.loads(raw)
+        return loaded if isinstance(loaded, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+@router.get(
+    "/api/v1/conversations/session-keys",
+    status_code=status.HTTP_200_OK,
+)
+async def list_session_keys(
+    prefix: str = Query(default="session:"),
+    _principal: User | str = Depends(
+        require_service_or_role(
+            [UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value]
+        )
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Lista llaves almacenadas en PostgreSQL por prefijo (ej. wompi:link: o session:)."""
+    now = datetime.now(timezone.utc)
+    res = await db.execute(
+        select(Conversation)
+        .where(Conversation.session_key.like(f"{prefix}%"))
+        .order_by(Conversation.updated_at.desc())
+    )
+    rows = res.scalars().all()
+    items: list[dict[str, Any]] = []
+    for r in rows:
+        if r.expires_at is not None and r.expires_at <= now:
+            continue
+        items.append(
+            {
+                "key": r.session_key,
+                "waId": r.wa_id,
+                "value": r.session_data,
+                "session": _parse_session_json(r.session_data),
+                "updatedAt": r.updated_at.isoformat() if r.updated_at else None,
+            }
+        )
+    return items
+
+
 @router.get("/api/conversations", status_code=status.HTTP_200_OK)
 @router.get("/api/v1/conversations", status_code=status.HTTP_200_OK)
 async def list_conversations(
@@ -270,24 +335,31 @@ async def list_conversations(
     """Lista las conversaciones de WhatsApp para la bandeja de entrada de recepción."""
     res = await db.execute(
         select(Conversation)
-        .where(Conversation.wa_id.is_not(None))
+        .where(
+            Conversation.wa_id.is_not(None),
+            Conversation.session_key.like("session:%"),
+        )
         .order_by(Conversation.updated_at.desc())
     )
     rows = res.scalars().all()
-    return [
-        {
-            "id": r.id,
-            "waId": r.wa_id,
-            "guestName": r.sender_name or "Huésped WhatsApp",
-            "guestPhone": r.wa_id,
-            "status": "escalated" if r.agent_active else "active",
-            "step": r.step,
-            "state": r.state,
-            "agentActive": r.agent_active,
-            "updatedAt": r.updated_at.isoformat() if r.updated_at else None,
-        }
-        for r in rows
-    ]
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        parsed = _parse_session_json(r.session_data)
+        out.append(
+            {
+                "id": r.id,
+                "waId": r.wa_id,
+                "guestName": r.sender_name or "Huésped WhatsApp",
+                "guestPhone": r.wa_id,
+                "status": "escalated" if r.agent_active else "active",
+                "step": r.step,
+                "state": r.state,
+                "agentActive": r.agent_active,
+                "messages": parsed.get("manual_messages", []),
+                "updatedAt": r.updated_at.isoformat() if r.updated_at else None,
+            }
+        )
+    return out
 
 
 @router.post(
@@ -305,21 +377,165 @@ async def escalate_conversation_by_id(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Activa o confirma escalamiento a humano por ID de conversación."""
+    """Activa escalamiento a humano por ID de conversación."""
     conv = await db.get(Conversation, conversation_id)
-    if conv is not None:
-        conv.agent_active = True
-        conv.state = "escalamiento"
-        await record_audit(
-            db=db,
-            actor=resolve_actor_name(current_user),
-            action="CONVERSATION_ESCALATED",
-            entity="conversation",
-            entity_id=conversation_id,
-            details={"wa_id": conv.wa_id},
+    if conv is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversación no encontrada",
         )
-        await db.commit()
-    return {"status": "escalated", "id": conversation_id}
+    conv.agent_active = True
+    conv.state = "escalamiento"
+    session_obj = _parse_session_json(conv.session_data)
+    session_obj["agent_active"] = True
+    session_obj["state"] = "escalamiento"
+    conv.session_data = json.dumps(session_obj, ensure_ascii=False)
+    await record_audit(
+        db=db,
+        actor=resolve_actor_name(current_user),
+        action="CONVERSATION_ESCALATED",
+        entity="conversation",
+        entity_id=conversation_id,
+        details={"wa_id": conv.wa_id},
+    )
+    await db.commit()
+    publish_pms_event("conversation.updated", {"id": conversation_id, "agentActive": True})
+    return {"status": "escalated", "id": conversation_id, "agentActive": True}
+
+
+@router.post(
+    "/api/v1/conversations/{conversation_id}/toggle-bot",
+    status_code=status.HTTP_200_OK,
+)
+async def toggle_conversation_bot(
+    conversation_id: int,
+    payload: ToggleBotRequest | None = None,
+    current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Alterna entre atención humana (bot en silencio) y bot automático n8n."""
+    conv = await db.get(Conversation, conversation_id)
+    if conv is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversación no encontrada",
+        )
+    if payload is not None and payload.bot_active is not None:
+        new_agent_active = not payload.bot_active
+    else:
+        new_agent_active = not bool(conv.agent_active)
+
+    conv.agent_active = new_agent_active
+    conv.state = "escalamiento" if new_agent_active else "menu"
+    if not new_agent_active:
+        conv.step = "esperando_opcion"
+
+    session_obj = _parse_session_json(conv.session_data)
+    session_obj["agent_active"] = new_agent_active
+    session_obj["state"] = conv.state
+    if not new_agent_active:
+        session_obj["step"] = "esperando_opcion"
+    conv.session_data = json.dumps(session_obj, ensure_ascii=False)
+
+    await record_audit(
+        db=db,
+        actor=resolve_actor_name(current_user),
+        action="CONVERSATION_BOT_TOGGLED",
+        entity="conversation",
+        entity_id=conversation_id,
+        details={"wa_id": conv.wa_id, "bot_active": not new_agent_active},
+    )
+    await db.commit()
+    publish_pms_event(
+        "conversation.updated",
+        {"id": conversation_id, "agentActive": new_agent_active},
+    )
+    return {
+        "id": conversation_id,
+        "agentActive": new_agent_active,
+        "botActive": not new_agent_active,
+        "status": "escalated" if new_agent_active else "active",
+    }
+
+
+@router.post(
+    "/api/v1/conversations/{conversation_id}/messages",
+    status_code=status.HTTP_200_OK,
+)
+async def send_manual_whatsapp_message(
+    conversation_id: int,
+    payload: ManualMessageRequest,
+    current_user: User = Depends(
+        require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Envía/registra un mensaje manual desde recepción en la sesión del huésped."""
+    conv = await db.get(Conversation, conversation_id)
+    if conv is None or not conv.wa_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversación no encontrada",
+        )
+
+    text_clean = payload.text.strip()
+    if not text_clean:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El mensaje no puede estar vacío",
+        )
+
+    dispatched_whatsapp = False
+    if settings.WHATSAPP_TOKEN.strip() and settings.WHATSAPP_PHONE_ID.strip():
+        graph_ver = settings.WHATSAPP_GRAPH_VERSION.strip() or "v20.0"
+        url = f"https://graph.facebook.com/{graph_ver}/{settings.WHATSAPP_PHONE_ID.strip()}/messages"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    url,
+                    headers={"Authorization": f"Bearer {settings.WHATSAPP_TOKEN.strip()}"},
+                    json={
+                        "messaging_product": "whatsapp",
+                        "to": conv.wa_id,
+                        "type": "text",
+                        "text": {"body": text_clean},
+                    },
+                )
+                dispatched_whatsapp = 200 <= resp.status_code < 300
+        except Exception:
+            dispatched_whatsapp = False
+
+    session_obj = _parse_session_json(conv.session_data)
+    history = list(session_obj.get("manual_messages") or [])
+    entry = {
+        "from": "staff",
+        "author": resolve_actor_name(current_user),
+        "text": text_clean,
+        "sentAt": datetime.now(timezone.utc).isoformat(),
+        "dispatched": dispatched_whatsapp,
+    }
+    history.append(entry)
+    session_obj["manual_messages"] = history[-50:]
+    conv.session_data = json.dumps(session_obj, ensure_ascii=False)
+
+    await record_audit(
+        db=db,
+        actor=resolve_actor_name(current_user),
+        action="CONVERSATION_MANUAL_MESSAGE",
+        entity="conversation",
+        entity_id=conversation_id,
+        details={"wa_id": conv.wa_id, "dispatched_whatsapp": dispatched_whatsapp},
+    )
+    await db.commit()
+    publish_pms_event("conversation.message", {"id": conversation_id, "message": entry})
+    return {
+        "id": conversation_id,
+        "waId": conv.wa_id,
+        "dispatched": dispatched_whatsapp,
+        "message": entry,
+    }
 
 
 sys.modules.setdefault("routers.conversations", sys.modules[__name__])

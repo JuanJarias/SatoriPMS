@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = "Torre Satori PMS API"
     VERSION: str = "0.1.0"
+    ENVIRONMENT: str = "development"
     API_V1_PREFIX: str = "/api/v1"
     PORT: int = 8080
 
@@ -42,6 +43,10 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("SATORI_SERVICE_KEY", "N8N_INTERNAL_API_KEY"),
     )
     N8N_EXPIRED_WEBHOOK_URL: str = ""
+
+    WHATSAPP_TOKEN: str = ""
+    WHATSAPP_PHONE_ID: str = ""
+    WHATSAPP_GRAPH_VERSION: str = "v20.0"
 
     GOOGLE_PLACES_API_KEY: str = ""
     GOOGLE_PLACE_ID: str = "ChIJQRr4FV2zOY4RvqM_8_EfzsY"

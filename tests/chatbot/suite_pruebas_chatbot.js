@@ -884,7 +884,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const node = V9.nodes.find(n => n.name === 'H Menú Evaluador Opción');
       const evalOption = (text) => {
         const j = { wa_id: '573001112233', message_text: text };
@@ -1182,7 +1182,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const node = V9.nodes.find(n => n.name === 'H F1 Inicio Reserva');
       const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
       const out = new Function('$input', '$', '$env', node.parameters.jsCode)(
@@ -1201,7 +1201,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const node = V9.nodes.find(n => n.name === 'H F1 CheckOut');
       const run = (msg) => {
         const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
@@ -1228,7 +1228,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const node = V9.nodes.find(n => n.name === 'H Normalizar Respuesta');
       const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
       const out = new Function('$input', '$', '$env', node.parameters.jsCode)(
@@ -1252,7 +1252,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const node = V9.nodes.find(n => n.name === 'H Procesar Reserva Paso');
       const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
       const out = new Function('$input', '$', '$env', node.parameters.jsCode)(
@@ -1291,7 +1291,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const node = V9.nodes.find(n => n.name === 'H Reenviar Habitaciones Mascota');
       const wrap = (j) => ({ first: () => ({ json: j }), all: () => (Array.isArray(j) ? j.map(x => ({ json: x })) : [{ json: j }]) });
       const sourceRef = {
@@ -1319,7 +1319,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       let total = 0;
       const bad = [];
       for (const n of V9.nodes) {
@@ -1342,7 +1342,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const node = V9.nodes.find(n => n.name === 'H Procesar Reserva Paso');
       const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
       const out = new Function('$input', '$', '$env', node.parameters.jsCode)(
@@ -1373,7 +1373,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const node = V9.nodes.find(n => n.name === 'H Procesar Reserva Paso');
       const run = (step, msg) => {
         const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
@@ -1415,7 +1415,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const apiNodes = V9.nodes.filter(n => n.type.endsWith('httpRequest') && String(n.parameters.url || '').includes('API_BASE_URL'));
       const missing = apiNodes.filter(n => {
         const headers = (n.parameters.headerParameters && n.parameters.headerParameters.parameters) || [];
@@ -1434,7 +1434,7 @@ const TEST_CASES = [
     run: async () => {
       const fs = require('fs');
       const path = require('path');
-      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V9_ChatbotReservas.json'), 'utf8'));
+      const V9 = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../flows/n8n/V10_ChatbotReservas.json'), 'utf8'));
       const byName = (name) => V9.nodes.find(n => n.name === name);
       const wrap = (j) => ({ first: () => ({ json: j }), all: () => [{ json: j }] });
       const normalize = byName('H Normalizar Revisar Reserva');

@@ -2,9 +2,8 @@
 # ==============================================================================
 # SatoriPMS - Reiniciar el entorno de desarrollo desde cero
 #
-# Detiene todo y BORRA los volúmenes de datos: base de datos (reservas,
-# huéspedes, habitaciones...), Redis (sesiones y bloqueos) y, salvo que se use
-# --keep-n8n, también n8n (cuenta, credenciales, flujos e historial).
+# Detiene todo y BORRA los volúmenes de datos: base de datos PostgreSQL (reservas,
+# huéspedes, habitaciones, sesiones chatbot...) y, salvo --keep-n8n, también n8n.
 # ==============================================================================
 set -Eeuo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -22,10 +21,10 @@ Uso: ./scripts/reset-dev.sh [opciones]
 Borra contenedores y datos del entorno local. Pide confirmación.
 
 Opciones:
-  --keep-n8n     Conserva los datos de n8n (cuenta, credenciales y flujos); solo borra PostgreSQL y Redis.
+  --keep-n8n     Conserva los datos de n8n (cuenta, credenciales y flujos); solo borra PostgreSQL.
   --images       Borra también la imagen construida de la API (fuerza recompilación completa).
   --start        Vuelve a levantar todo al terminar (start-dev.sh).
-  --seed         Con --start: además publica el flujo V9 en n8n (las habitaciones y los usuarios de
+  --seed         Con --start: además publica el flujo V10 en n8n (las habitaciones y los usuarios de
                  desarrollo los crea Alembic al arrancar la API).
   -y, --yes      No pide confirmación.
   -h, --help     Muestra esta ayuda.
@@ -51,8 +50,7 @@ project="$(compose_project_name)"
 
 log_step "REINICIO COMPLETO DEL ENTORNO"
 log_warn "Se borrarán de forma permanente:"
-log_warn "  • Base de datos PostgreSQL (${project}_postgres_data): reservas, huéspedes, habitaciones, usuarios."
-log_warn "  • Redis (${project}_redis_data): sesiones del chatbot, bloqueos y links de Wompi."
+log_warn "  • Base de datos PostgreSQL (${project}_postgres_data): reservas, huéspedes, sesiones chatbot, habitaciones, usuarios."
 if $KEEP_N8N; then
     log_info "  • n8n se conserva (--keep-n8n)."
 else
@@ -74,7 +72,7 @@ down_args=(down --remove-orphans)
 $REMOVE_IMAGES && down_args+=(--rmi local)
 if $KEEP_N8N; then
     compose "${down_args[@]}"
-    for vol in "${project}_postgres_data" "${project}_redis_data"; do
+    for vol in "${project}_postgres_data"; do
         if docker volume inspect "$vol" >/dev/null 2>&1; then
             docker volume rm "$vol" >/dev/null
             log_success "Volumen $vol eliminado."
