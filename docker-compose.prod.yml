@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: satori_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-satori}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD robusta en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-satoripms}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-satori} -d ${POSTGRES_DB:-satoripms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./apps/api
+    container_name: satori_api_prod
+    restart: always
+    env_file: .env
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-satori}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-satoripms}
+      PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET de al menos 32 caracteres en .env}
+      SATORI_SERVICE_KEY: ${SATORI_SERVICE_KEY:?Defina SATORI_SERVICE_KEY en .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost","https://localhost"]}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-wompi}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/v1/health')"]
+      interval: 20s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        VITE_API_URL: ""
+    container_name: satori_web_prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+  n8n:
+    profiles: ["n8n"]
+    image: n8nio/n8n:2.47.3
+    container_name: satori_n8n_prod
+    restart: always
+    env_file: .env
+    environment:
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:?Defina N8N_BASIC_AUTH_USER en .env}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:?Defina N8N_BASIC_AUTH_PASSWORD en .env}
+      - N8N_PORT=5678
+      - N8N_WEBHOOK_URL=${N8N_PUBLIC_URL}
+      - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL}
+      - N8N_PROXY_HOPS=1
+      - GENERIC_TIMEZONE=America/Bogota
+    volumes:
+      - n8n_prod_data:/home/node/.n8n
+      - ./flows/n8n:/home/node/.n8n/workflows:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_prod_data:
+  n8n_prod_data:

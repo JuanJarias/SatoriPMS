@@ -388,7 +388,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 | `P6` | Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) | `AGY` | [x] |
 | `P7` | Reconciliación flujo n8n `V10` (Wompi `ec8eace` sin Redis) y prueba Meta live | `AGY` | [x] |
 | `P8` | Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 | `AGY` | [x] |
-| `P9` | Docker prod (Nginx HTTPS, R2 `pg_dump`, Sentry) y limpieza del repositorio | `AGY` | [ ] |
+| `P9` | Docker prod (Nginx HTTPS, R2 `pg_dump`, Sentry) y limpieza del repositorio | `AGY` | [x] |
 | `P10` | Respaldo `origin/main`, merge `--no-ff` de `migracion-fastapi` a `main` y tag `v1.0.0` | `AGY` | [ ] |
 
 ---
@@ -561,9 +561,9 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
   cd apps/web && npm run build
   ```
 - **Checklist manual:**
-  1. Abrir la app servida vía contenedor `web` / proxy y confirmar que `/api/v1/health` y las 12 pantallas responden en el mismo origen.
-  2. Verificar raíz del repo limpia antes del release.
-- **Casilla:** `[ ]` Completado y verificado.
+  1. Verificar `docker compose -f docker-compose.prod.yml config --quiet` y `./scripts/backup_pg_r2.sh --dry-run`.
+  2. Abrir la app servida vía contenedor `web` / proxy y confirmar que `/api/v1/health` y las 12 pantallas responden en el mismo origen.
+- **Casilla:** `[x]` Completado y verificado.
 - **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
 
 ---

@@ -92,7 +92,7 @@ Cierra con un resumen en tres partes: **qué funciona**, **qué falla y por qué
 - **3. Vencimiento de `PENDIENTE_PAGO`:** **RESUELTO.** Fijado `expires_at = NOW() + 24 h` en `n8n_compat.py` y expiración automática en `expiration_service.py`, `booking_service.py` y `room_service.py`.
 - **4. Regla de eventos especiales por noche:** **PENDIENTE DE CONFIRMACIÓN CON EL CLIENTE** (por ahora mantiene multiplicador noche por noche en `apps/api/services/pricing.py`).
 - **5. Endpoints WhatsApp web y `/api/bookings/debug`:** **RESUELTO.** Añadidos `POST /api/v1/conversations/{id}/toggle-bot`, `POST /api/v1/conversations/{id}/messages` y `GET /api/v1/conversations/session-keys` conectados a `Chatbot.tsx`; `GET /api/bookings/debug` limitado a `X-Service-Key` / `Administrador` y deshabilitado (`404`) si `ENVIRONMENT=production`.
-- **Siguiente paso:** Revisar **Punto 5 pendiente del roadmap** (Playwright E2E, actualización `.github/workflows/ci.yml` y Docker prod / Nginx / R2 / Sentry — `P8` y `P9`).
+- **Siguiente paso:** **P8** (Playwright E2E + CI Postgres 16) y **P9** (Docker prod Nginx, `sentry-sdk`, `backup_pg_r2.sh`, `Guia_Configuracion_Entorno.md` sin Redis) ya implementados en `integracion-fastapi`; solo resta revisar y aprobar **P10** (merge final a `main` + tag `v1.0.0`).
 
 ---
 

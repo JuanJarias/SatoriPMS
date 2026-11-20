@@ -1,6 +1,7 @@
 """Punto de entrada ASGI de FastAPI con APScheduler RN-02 y canal SSE (Lotes M0 y P4)."""
 
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 import sys
 
@@ -16,6 +17,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.database import get_db
+
+logger = logging.getLogger(__name__)
+if settings.SENTRY_DSN.strip():
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN.strip(),
+            environment=settings.ENVIRONMENT,
+            release=f"satoripms@{settings.VERSION}",
+            send_default_pii=False,
+            traces_sample_rate=0.1,
+        )
+    except ImportError:
+        logger.warning("SENTRY_DSN definido pero sentry-sdk no está instalado.")
 from routers.auth import router as auth_router
 from routers.bookings import router as bookings_router
 from routers.conversations import router as conversations_router

@@ -14,8 +14,9 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
   - [POSTGRES_USER](#postgres_user)
   - [POSTGRES_PASSWORD](#postgres_password)
   - [POSTGRES_DB](#postgres_db)
-- [2. Sesiones del Chatbot (Redis)](#2-sesiones-del-chatbot-redis)
-  - [REDIS_URL](#redis_url)
+- [2. Sesiones del Chatbot (PostgreSQL 16) y Entorno](#2-sesiones-del-chatbot-postgresql-16-y-entorno)
+  - [ENVIRONMENT y SENTRY_DSN](#environment-y-sentry_dsn)
+  - [Respaldos cifrados hacia Cloudflare R2 (`BACKUP_ENCRYPTION_KEY` / `R2_*`)](#respaldos-cifrados-hacia-cloudflare-r2)
 - [3. Servidor Central (Backend API)](#3-servidor-central-backend-api)
   - [PORT](#port)
   - [JWT_SECRET](#jwt_secret)
@@ -124,18 +125,16 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
 
 ---
 
-## 2. Sesiones del Chatbot (Redis)
+## 2. Sesiones del Chatbot (PostgreSQL 16) y Entorno
 
-### REDIS_URL
-- **Para qué sirve:** Cadena de conexión al servidor Redis, que **solo usa el orquestador n8n (flujo V9)** para guardar la sesión de cada conversación de WhatsApp y los enlaces de pago. El servidor central no usa Redis: sus bloqueos temporales de 15 minutos viven en PostgreSQL. Cuando el flujo V10 reemplace al V9 (guarda la sesión en PostgreSQL), este servicio y esta variable se podrán retirar.
-- **De dónde se saca:** Es la dirección de red donde corre el servicio de Redis.
-- **Cómo obtenerlo y configurarlo:**
-  - Para pruebas ejecutadas localmente desde la máquina anfitriona:
-    ```env
-    REDIS_URL=redis://localhost:6379
-    ```
-  - Si el servicio corre dentro de la red de Docker: n8n resuelve el host automáticamente como `redis:6379`.
-- **En dónde ponerlo:** En la variable `REDIS_URL` del archivo `.env`.
+SatoriPMS **no utiliza Redis**. Tanto los bloqueos temporales de 15 minutos (`BLOQUEADA_TEMPORAL`), el estado `PENDIENTE_PAGO` (24 h) como las sesiones conversacionales del flujo `V10` y enlaces `wompi:link:*` se almacenan de forma unificada en PostgreSQL 16.
+
+### ENVIRONMENT y SENTRY_DSN
+- **ENVIRONMENT:** `development` (local/E2E) o `production` (desactiva endpoints internos de depuración como `/api/bookings/debug` con `404`).
+- **SENTRY_DSN:** DSN opcional de Sentry (`send_default_pii=False` por cumplimiento Ley 1581). Déjelo vacío en desarrollo.
+
+### Respaldos cifrados hacia Cloudflare R2
+- Defina `BACKUP_ENCRYPTION_KEY`, `R2_BUCKET`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY` para ejecutar `./scripts/backup_pg_r2.sh` diariamente a las 03:00 a. m. vía `cron`.
 
 ---
 
@@ -436,7 +435,7 @@ El flujo conversacional V9 (`V9_ChatbotReservas.json`) incorpora la pasarela de 
 ## 9. Automatización del Chatbot (n8n)
 
 ### COMPOSE_PROFILES
-- **Para qué sirve:** Controla qué servicios secundarios levanta Docker Compose al ejecutar el comando de inicio. Si contiene `n8n`, levanta el orquestador del chatbot; si está vacío, levanta únicamente la base de datos, Redis y el backend.
+- **Para qué sirve:** Controla qué servicios secundarios levanta Docker Compose al ejecutar el comando de inicio. Si contiene `n8n`, levanta el orquestador del chatbot; si está vacío, levanta únicamente PostgreSQL y el backend FastAPI.
 - **Cómo configurarlo:**
   - Valor estándar para operar el hotel con chatbot:
     ```env
@@ -514,16 +513,14 @@ El flujo conversacional V9 (`V9_ChatbotReservas.json`) incorpora la pasarela de 
 Una vez completadas todas las variables, el archivo `.env` en la raíz del proyecto debe tener una estructura completa como la siguiente:
 
 ```env
-# Base de datos
+# Base de datos (PostgreSQL 16 — sin Redis)
 DATABASE_URL=postgresql+psycopg://satori:satori_dev@localhost:5432/satoripms
 POSTGRES_USER=satori
 POSTGRES_PASSWORD=satori_dev
 POSTGRES_DB=satoripms
 
-# Redis (solo n8n V9)
-REDIS_URL=redis://localhost:6379
-
 # Servidor Central
+ENVIRONMENT=development
 PORT=8080
 JWT_SECRET=4f8b9d2e1c3a7f6e5d4c3b2a109876543210abcdef0123456789abcdef012345
 JWT_EXPIRES_MINUTES=480
@@ -566,8 +563,8 @@ N8N_BASIC_AUTH_USER=SatoriPMS
 N8N_BASIC_AUTH_PASSWORD=cambia_esta_password
 N8N_PUBLIC_URL=https://n8n-chatbot.shares.zrok.io/
 
-# Frontend
-VITE_API_URL=http://localhost:8080
+# Frontend (vacío usa proxy /api mismo origen en Vite y Nginx prod)
+VITE_API_URL=
 ```
 
 ### Verificación de Arranque
@@ -579,4 +576,4 @@ docker compose up -d
 # Verificar el estado de salud de los contenedores
 docker compose ps
 ```
-Todos los contenedores (`satori_postgres`, `satori_redis`, `satori_api` y `satori_n8n`) deben figurar en estado `running` o `healthy`. Compruebe también la API en `http://localhost:8080/api/v1/health` (debe responder `{"status":"ok","db":"connected"}`).
+Todos los contenedores (`satori_postgres`, `satori_api` y `satori_n8n` si `n8n` está en `COMPOSE_PROFILES`) deben figurar en estado `running` o `healthy`. En producción (`docker compose -f docker-compose.prod.yml up -d --build`) se añade `satori_web_prod` (Nginx sirviendo `/` y proxying `/api`). Compruebe también la API en `http://localhost:8080/api/v1/health` (debe responder `{"status":"ok","db":"connected"}`).
