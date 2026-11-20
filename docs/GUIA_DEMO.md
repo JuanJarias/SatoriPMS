@@ -140,4 +140,4 @@ Si en el salón bloquean el túnel o vence el token de Meta, el **cliente sí pu
 |---|---|---|
 | **WhatsApp desde celular real** | El huésped escribe desde su teléfono y recibe respuestas reales en WhatsApp. | **No llega al teléfono físico** porque `graph.facebook.com` requiere internet, `WHATSAPP_TOKEN` vigente y túnel público. |
 | **Pasarela Wompi real** | Abre el enlace real `checkout.wompi.co/l/...` y el webhook `transaction.updated` confirma la reserva. | **No abre el checkout externo** ni recibe webhooks desde Wompi; se muestra la reserva en `PENDIENTE_PAGO` / Simulador y se confirma desde recepción. |
-| **Google Places Reseñas** | Consulta reseñas reales desde Google Places API. | **Sí funciona en Plan B** (no usa `zrok2` ni Meta): requiere solo internet normal + `GOOGLE_PLACES_API_KEY` en `.env` (queda en caché en `api` si se abre antes). |
+| **Google Places Reseñas** | Consulta reseñas individuales con llave Google Cloud. | **Sí funciona sin tarjeta ni API Key:** extrae en vivo calificación real, total y distribución por estrellas desde Google Travel + botón directo para leer los comentarios en Google Reviews. |

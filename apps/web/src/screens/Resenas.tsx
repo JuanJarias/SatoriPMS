@@ -35,6 +35,7 @@ export interface ReviewItem {
 export interface ReviewSummaryResponse {
   placeName: string;
   placeId: string;
+  googleReviewsUrl?: string;
   average: number | null;
   total: number;
   distribution: Record<number, number>;
@@ -151,9 +152,8 @@ export function Resenas() {
 
       {/* Nota de integridad y fuente real */}
       <Alert tone="info" title="Fuente Directa de Google Reviews (Solo Lectura)">
-        Las métricas y opiniones provienen directamente del perfil oficial del hotel en Google
-        Reviews sin datos simulados ni modificaciones locales. En la aplicación web no se redactan
-        reseñas ni se realizan redirecciones externas.
+        Las métricas provienen en tiempo real del perfil oficial del hotel en Google Travel / Places
+        sin datos simulados ni modificaciones locales.
         {summary?.fetchedAt ? ` Última sincronización: ${formatFetchedAt(summary.fetchedAt)}.` : ''}
       </Alert>
 
@@ -405,13 +405,33 @@ export function Resenas() {
             <Card className="p-8">
               <EmptyState
                 icon={<AlertCircle size={32} className="text-terra-600" />}
-                title="Comentarios individuales pendientes de llave de Google Places API"
+                title={
+                  summary?.total
+                    ? 'Resumen real cargado sin llave de Google Places API'
+                    : 'Pendiente de conexión o llave de Google Places API'
+                }
               >
-                {summary?.placesApiConfigured
-                  ? 'No se recibieron comentarios individuales desde Google Places API en este momento.'
-                  : `Configura GOOGLE_PLACES_API_KEY en el archivo .env y recrea el contenedor API para consultar en vivo la calificación oficial y comentarios reales de Google Reviews (Place ID: ${
-                      summary?.placeId || 'ChIJQRr4FV2zOY4RvqM_8_EfzsY'
-                    }).`}
+                <div className="space-y-3">
+                  <p>
+                    {summary?.placesApiConfigured
+                      ? 'No se recibieron comentarios individuales desde Google Places API en este momento.'
+                      : summary?.total
+                        ? `El resumen oficial (${averageRating ?? '—'} ★ y ${totalCount} opiniones con distribución exacta por estrellas) se extrajo en vivo desde el perfil público de Google Travel sin necesitar tarjeta ni API Key. Los textos individuales dentro del panel requieren GOOGLE_PLACES_API_KEY (Places API New).`
+                        : `Sin GOOGLE_PLACES_API_KEY configurada y sin respuesta de Google Travel en este momento (Place ID: ${
+                            summary?.placeId || 'ChIJQRr4FV2zOY4RvqM_8_EfzsY'
+                          }).`}
+                  </p>
+                  {summary?.googleReviewsUrl && (
+                    <a
+                      href={summary.googleReviewsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg bg-forest-800 px-4 py-2 text-xs font-semibold text-white hover:bg-forest-900 transition-colors"
+                    >
+                      Abrir opiniones escritas en Google Reviews
+                    </a>
+                  )}
+                </div>
               </EmptyState>
             </Card>
           )}
