@@ -88,17 +88,26 @@ WOMPI_LINK_EXPIRATION_HOURS=24
 
 ---
 
-## 4. Plan B local (si falla el WiFi del salón, `zrok2` o Meta)
+## 4. Plan B interactivo para el cliente (si falla internet, `zrok2` o Meta)
 
-Si en el salón bloquean puertos o cae Meta/Wompi, **todo el PMS + chatbot n8n + PostgreSQL funcionan 100% local sin internet**:
+Si en el salón bloquean el túnel o vence el token de Meta, el **cliente sí puede probar todas las pantallas y reservas directamente en el navegador (`http://localhost:5173`)**:
 
-1. **Panel web completo en vivo (`http://localhost:5173`):**
-   - Muestra **Habitaciones `1–9`**, **Calendario**, creación de reserva manual, **error real 409** al solapar fechas (`EXCLUDE USING gist`), carga de **Tienda / Salgados Café**, exportación real **`.xlsx`** y **Logs de Auditoría**.
-   - Usa la pestaña **WhatsApp & Bot → Simulador Sandbox** para demostrar la experiencia móvil paso a paso creando una reserva real en PostgreSQL.
-2. **Prueba E2E real del flujo n8n `V10` directo contra `localhost:5678` (sin Meta ni túnel):**
-   ```bash
-   node tests/chatbot/test_e2e_v9_completo.js
-   node tests/chatbot/test_escalamiento_agente_humano.js
-   ```
-3. **Simular confirmación de pago Wompi firmada (si hay acceso al botón/terminal sin pasarela real):**
-   - Desde **WhatsApp & Bot** o terminal con `X-Service-Key` puedes confirmar pago externo sobre el código `TS-XXXX` generado y ver reflejada la transición `PENDIENTE_PAGO → CONFIRMADA` al instante por SSE en la web.
+### Qué SÍ funciona al 100% para que el cliente pruebe en Plan B
+1. **Operación hotelera completa en PostgreSQL:** Habitaciones `1–9` (crear, editar, eliminar), Calendario semanal, Reservas manuales (con **bloqueo automático 409** ante solapes y cancelación con reembolso RN-03), Llegadas (Check-in), Salidas (Check-out consolidando consumos).
+2. **Tienda Torre Satori & Salgados Café:** crear/editar/eliminar productos como Admin (**+ Nuevo producto** / **Editar** / **Eliminar** en `Tienda Hotel`), vender en efectivo o cargar a la habitación, y pedidos de cafetería a cocina/folio.
+3. **Gerencia:** Resumen financiero real, registro y anulación de egresos, eventos y descuentos especiales por noche, descarga real de **Excel (`.xlsx`)**, gestión de usuarios y **Logs de Auditoría inmutables**.
+4. **Chatbot (experiencia visual + flujo real en backend):**
+   - **Para el cliente (visual e interactivo):** pestaña **WhatsApp & Bot → Simulador Sandbox**, donde recorre paso a paso fechas, huéspedes, mascota, elige entre las 9 habitaciones reales y **crea una reserva real en PostgreSQL** que aparece al instante en **Reservas** y **Calendario**.
+   - **Para demostrar n8n `V10` + IA + PostgreSQL sin Meta:**
+     ```bash
+     node tests/chatbot/test_e2e_v9_completo.js
+     node tests/chatbot/test_escalamiento_agente_humano.js
+     ```
+     y mostrar en la pestaña **WhatsApp & Bot → Sesiones WhatsApp** cómo aparece la sesión en PostgreSQL, alternar **Pausar Bot / Reactivar Bot IA** y responder manualmente desde recepción.
+
+### Limitaciones exactas del Plan B (sin Meta / sin Wompi / sin internet)
+| Capacidad | En modo Vivo (`zrok2` + Meta + Wompi) | En Plan B local / sin internet |
+|---|---|---|
+| **WhatsApp desde celular real** | El huésped escribe desde su teléfono y recibe respuestas reales en WhatsApp. | **No llega al teléfono físico** porque `graph.facebook.com` requiere internet, `WHATSAPP_TOKEN` vigente y túnel público. |
+| **Pasarela Wompi real** | Abre el enlace real `checkout.wompi.co/l/...` y el webhook `transaction.updated` confirma la reserva. | **No abre el checkout externo** ni recibe webhooks desde Wompi; se muestra la reserva en `PENDIENTE_PAGO` / Simulador y se confirma desde recepción. |
+| **Google Places Reseñas** | Consulta reseñas actualizadas desde Google Places API. | Muestra caché si ya consultó antes, o el aviso honesto de configuración/conexión sin datos falsos. |

@@ -9,7 +9,8 @@ import {
   BedDouble,
   Tag,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Edit2
 } from 'lucide-react';
 import { useStore, ProductItem } from '../store';
 import {
@@ -22,15 +23,29 @@ import {
   FilterChip,
   Alert,
   EmptyState,
+  Modal,
+  ConfirmModal,
+  Field,
+  Input,
   useToast,
   formatCurrency,
   cn
 } from '../ui';
 
 export function Tienda({ go }: { go: (view: string, param?: string) => void }) {
-  const { products, rooms, sell } = useStore();
+  const { role, products, rooms, sell, addProduct, updateProduct, deleteProduct } = useStore();
+  const isAdmin = role === 'admin';
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('todas');
+
+  // Modales CRUD inventario (solo Admin)
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProductItem | null>(null);
+  const [prodName, setProdName] = useState('');
+  const [prodCategory, setProdCategory] = useState('Bebidas');
+  const [prodPrice, setProdPrice] = useState('');
+  const [prodStock, setProdStock] = useState('');
 
   // Carrito de compras
   const [cart, setCart] = useState<{ id: string; qty: number }[]>([]);
@@ -127,12 +142,77 @@ export function Tienda({ go }: { go: (view: string, param?: string) => void }) {
     setCart([]);
   };
 
+  const openNewProductModal = () => {
+    setEditingProduct(null);
+    setProdName('');
+    setProdCategory('Bebidas');
+    setProdPrice('');
+    setProdStock('10');
+    setProductModalOpen(true);
+  };
+
+  const openEditProductModal = (p: ProductItem) => {
+    setEditingProduct(p);
+    setProdName(p.name);
+    setProdCategory(p.category);
+    setProdPrice(String(p.price));
+    setProdStock(String(p.stock));
+    setProductModalOpen(true);
+  };
+
+  const handleSaveProduct = async () => {
+    const priceNum = Number(prodPrice);
+    const stockNum = Number(prodStock);
+    if (!prodName.trim() || isNaN(priceNum) || priceNum < 0 || isNaN(stockNum) || stockNum < 0) {
+      show('Datos inválidos', 'Ingresa nombre, precio y stock válidos (≥ 0)', 'bad');
+      return;
+    }
+    const payload = {
+      name: prodName.trim(),
+      category: prodCategory,
+      price: priceNum,
+      stock: Math.floor(stockNum),
+    };
+    const res = editingProduct
+      ? await updateProduct(editingProduct.id, payload)
+      : await addProduct(payload);
+    if (!res.success) {
+      show('No se pudo guardar', res.message, 'bad');
+      return;
+    }
+    show(
+      editingProduct ? 'Producto actualizado' : 'Producto agregado',
+      `${payload.name} · ${formatCurrency(payload.price)}`
+    );
+    setProductModalOpen(false);
+    setEditingProduct(null);
+  };
+
+  const handleConfirmDeleteProduct = async () => {
+    if (!deleteTarget) return;
+    const res = await deleteProduct(deleteTarget.id);
+    if (!res.success) {
+      show('No se pudo eliminar', res.message, 'bad');
+      return;
+    }
+    setCart((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+    show('Producto eliminado', `${deleteTarget.name} retirado del catálogo activo`);
+    setDeleteTarget(null);
+  };
+
   return (
     <div>
       <PageHeader
         eyebrow="Inventario & Tienda de Hotel"
         title="Tienda Torre Satori"
         desc="Venta de bebidas, snacks, insumos y café especial de origen de la casa: Salgados Café."
+        actions={
+          isAdmin ? (
+            <Button variant="terra" icon={<Plus size={16} />} onClick={openNewProductModal}>
+              Nuevo producto (Admin)
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className="grid gap-6 min-[1100px]:grid-cols-[1.5fr_1fr]">
@@ -220,6 +300,29 @@ export function Tienda({ go }: { go: (view: string, param?: string) => void }) {
                         <Plus size={14} />
                         Agregar
                       </Button>
+                    )}
+
+                    {isAdmin && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditProductModal(p)}
+                          className="flex items-center gap-1 text-xs font-semibold text-forest-700 hover:text-forest-900 cursor-pointer p-1"
+                          title="Editar precio o stock"
+                        >
+                          <Edit2 size={13} />
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(p)}
+                          className="flex items-center gap-1 text-xs font-semibold text-bad hover:text-[#9c352e] cursor-pointer p-1"
+                          title="Eliminar producto del catálogo"
+                        >
+                          <Trash2 size={13} />
+                          Eliminar
+                        </button>
+                      </div>
                     )}
                   </div>
                 </Card>
@@ -340,6 +443,77 @@ export function Tienda({ go }: { go: (view: string, param?: string) => void }) {
           </Card>
         </div>
       </div>
+
+      {/* Modal: Crear / Editar Producto (solo Admin) */}
+      {productModalOpen && (
+        <Modal
+          title={editingProduct ? `Editar ${editingProduct.name}` : 'Nuevo Producto de Tienda'}
+          onClose={() => setProductModalOpen(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setProductModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="primary" onClick={handleSaveProduct}>
+                {editingProduct ? 'Guardar cambios' : 'Crear producto'}
+              </Button>
+            </>
+          }
+        >
+          <Field label="Nombre del producto *">
+            <Input
+              value={prodName}
+              onChange={(e) => setProdName(e.target.value)}
+              placeholder="Ej. Jugo Hit Mora 500 ml"
+            />
+          </Field>
+          <Field label="Categoría">
+            <Select
+              value={prodCategory}
+              onChange={setProdCategory}
+              options={[
+                { value: 'Café de Origen', label: 'Café de Origen' },
+                { value: 'Bebidas', label: 'Bebidas' },
+                { value: 'Snacks', label: 'Snacks' },
+                { value: 'Cuidado personal', label: 'Cuidado personal' },
+              ]}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Precio COP *">
+              <Input
+                type="number"
+                min={0}
+                value={prodPrice}
+                onChange={(e) => setProdPrice(e.target.value)}
+                placeholder="Ej. 5000"
+              />
+            </Field>
+            <Field label="Stock en inventario *">
+              <Input
+                type="number"
+                min={0}
+                value={prodStock}
+                onChange={(e) => setProdStock(e.target.value)}
+                placeholder="Ej. 15"
+              />
+            </Field>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal: Confirmar eliminación */}
+      {deleteTarget && (
+        <ConfirmModal
+          title={`¿Eliminar "${deleteTarget.name}"?`}
+          confirm="Sí, eliminar producto"
+          danger
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDeleteProduct}
+        >
+          El producto dejará de aparecer en el catálogo activo de la Tienda. La acción quedará registrada en auditoría.
+        </ConfirmModal>
+      )}
 
       {node}
     </div>

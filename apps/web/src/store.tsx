@@ -243,6 +243,9 @@ interface StoreContextType {
   payRemainingBooking: (code: string) => Promise<ActionResult>;
   // Store & Folio Actions
   sell: (cart: { id: string; qty: number }[], chargeToRoom: boolean, roomNumber?: string) => Promise<ActionResult>;
+  addProduct: (payload: { name: string; category: string; price: number; stock: number }) => Promise<ActionResult>;
+  updateProduct: (id: string, payload: { name: string; category: string; price: number; stock: number }) => Promise<ActionResult>;
+  deleteProduct: (id: string) => Promise<ActionResult>;
   // Restaurant Actions
   addRestaurantOrder: (order: {
     roomNumber?: string;
@@ -694,6 +697,44 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const addProduct = async (payload: {
+    name: string;
+    category: string;
+    price: number;
+    stock: number;
+  }): Promise<ActionResult> => {
+    try {
+      await apiClient.post('/api/v1/store/products', payload);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error creando producto' };
+    }
+  };
+
+  const updateProduct = async (
+    id: string,
+    payload: { name: string; category: string; price: number; stock: number }
+  ): Promise<ActionResult> => {
+    try {
+      await apiClient.put(`/api/v1/store/products/${encodeURIComponent(id)}`, payload);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error actualizando producto' };
+    }
+  };
+
+  const deleteProduct = async (id: string): Promise<ActionResult> => {
+    try {
+      await apiClient.delete(`/api/v1/store/products/${encodeURIComponent(id)}`);
+      await refreshBackendData();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Error eliminando producto' };
+    }
+  };
+
   const addRestaurantOrder = async (orderData: {
     roomNumber?: string;
     tableNumber?: string;
@@ -857,6 +898,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         addBooking,
         payRemainingBooking,
         sell,
+        addProduct,
+        updateProduct,
+        deleteProduct,
         addRestaurantOrder,
         updateOrderStatus,
         addEvent,
