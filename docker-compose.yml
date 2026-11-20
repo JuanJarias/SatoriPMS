@@ -36,7 +36,7 @@ services:
   # ── Orquestación del chatbot ───────────────────────────
   n8n:
     profiles: ["n8n"]
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.47.3
     container_name: satori_n8n
     restart: unless-stopped
     ports:
@@ -76,6 +76,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-satori_dev}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Seguridad: firma de tokens del personal y llave de servicio del chatbot (n8n)
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET (mínimo 32 caracteres) en .env}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-28800000}
+      SATORI_SERVICE_KEY: ${SATORI_SERVICE_KEY:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      # Administrador inicial (opcional): solo se crea si el usuario no existe
+      SATORI_ADMIN_USERNAME: ${SATORI_ADMIN_USERNAME:-}
+      SATORI_ADMIN_PASSWORD: ${SATORI_ADMIN_PASSWORD:-}
+      SATORI_ADMIN_NAME: ${SATORI_ADMIN_NAME:-Administrador}
       GOOGLE_REVIEWS_URL: ${GOOGLE_REVIEWS_URL:-https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews?hl=es-CO&gl=co}
       GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
       GOOGLE_PLACE_ID: ${GOOGLE_PLACE_ID:-ChIJQRr4FV2zOY4RvqM_8_EfzsY}
