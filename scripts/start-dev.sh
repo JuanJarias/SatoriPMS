@@ -120,6 +120,14 @@ if $START_INFRA; then
     fi
     log_success "Contenedores en ejecución."
 
+    # Una base creada por el backend Java anterior (Flyway) no admite las migraciones de Alembic.
+    legacy_schema="$(compose exec -T postgres sh -c 'psql -tA -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT to_regclass('"'"'public.flyway_schema_history'"'"') IS NOT NULL AND to_regclass('"'"'public.alembic_version'"'"') IS NULL"' 2>/dev/null | tr -d '[:space:]' || true)"
+    if [ "$legacy_schema" = "t" ]; then
+        log_error "La base de datos tiene el esquema del servidor Java anterior (Flyway) y la API nueva no puede migrarlo."
+        log_info "Los datos locales no son compatibles. Para empezar de cero (BORRA la información local) ejecuta:"
+        log_info "  ./scripts/reset-dev.sh --start"
+        exit 1
+    fi
     wait_for_http "$API_URL/api/v1/health" 120 "Backend (API)" || {
         log_info "Últimas líneas de la API:"; compose logs --tail 20 api || true; exit 1; }
     if n8n_enabled; then
