@@ -252,16 +252,8 @@ async def create_web_manual_booking(
     check_in = date.fromisoformat(str(first_room_req.get("checkIn") or body.get("checkIn") or "2026-12-01"))
     check_out = date.fromisoformat(str(first_room_req.get("checkOut") or body.get("checkOut") or "2026-12-03"))
 
-    # Resolver habitación por número ('101') o por ID primario (1)
-    room_res = await db.execute(
-        select(Room).where(
-            or_(
-                Room.number == str(raw_room_id),
-                Room.id == (int(raw_room_id) if str(raw_room_id).isdigit() else -1),
-            )
-        )
-    )
-    room = room_res.scalars().first()
+    # Resolver habitación estrictamente por ID primario para evitar colisiones con números 1-9
+    room = await db.get(Room, int(raw_room_id)) if str(raw_room_id).isdigit() else None
     if room is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habitación no encontrada")
 
@@ -343,6 +335,25 @@ async def create_web_manual_booking(
 
 
 # ── 2. CRUD Dinámico de Habitaciones con Candado de Borrado (TC-02) ──────────
+def _serialize_room(r: Room) -> dict[str, Any]:
+    """Serializa una entidad Room al contrato JSON compartido web/API."""
+    return {
+        "id": r.id,
+        "number": r.number,
+        "name": r.name,
+        "description": r.description,
+        "type": r.type,
+        "baseAdultsCapacity": r.base_adults_capacity,
+        "maxAdultsCapacity": r.max_adults_capacity,
+        "childrenCapacity": r.children_capacity,
+        "extraGuestPrice": float(r.extra_guest_price),
+        "allowsPets": r.allows_pets,
+        "pricePerNight": float(r.price_per_night),
+        "status": r.status,
+        "active": r.active,
+    }
+
+
 @router.get("/api/rooms", status_code=status.HTTP_200_OK)
 @router.get("/api/v1/rooms", status_code=status.HTTP_200_OK)
 async def list_all_rooms(
@@ -351,49 +362,113 @@ async def list_all_rooms(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    """Lista todas las habitaciones del hotel con su tarifa, capacidad y estado físico."""
-    res = await db.execute(select(Room).where(Room.active.is_(True)).order_by(Room.number.asc()))
-    rooms = res.scalars().all()
-    return [
-        {
-            "id": r.id,
-            "number": r.number,
-            "name": r.name,
-            "description": r.description,
-            "type": r.type,
-            "baseAdultsCapacity": r.base_adults_capacity,
-            "maxAdultsCapacity": r.max_adults_capacity,
-            "childrenCapacity": r.children_capacity,
-            "extraGuestPrice": float(r.extra_guest_price),
-            "allowsPets": r.allows_pets,
-            "pricePerNight": float(r.price_per_night),
-            "status": r.status,
-            "active": r.active,
-        }
-        for r in rooms
-    ]
+    """Lista todas las habitaciones activas ordenadas numéricamente con tarifa, capacidad y estado físico."""
+    res = await db.execute(
+        select(Room)
+        .where(Room.active.is_(True))
+        .order_by(func.length(Room.number), Room.number.asc())
+    )
+    return [_serialize_room(r) for r in res.scalars().all()]
 
 
-@router.put("/api/rooms/{room_ref}", status_code=status.HTTP_200_OK)
-@router.put("/api/v1/rooms/{room_ref}", status_code=status.HTTP_200_OK)
-async def update_room(
-    room_ref: str,
+@router.post("/api/rooms", status_code=status.HTTP_201_CREATED)
+@router.post("/api/v1/rooms", status_code=status.HTTP_201_CREATED)
+async def create_room(
     body: dict[str, Any] = Body(...),
     current_user: User = Depends(require_role([UserRole.ADMINISTRADOR.value])),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Actualiza precio base, capacidades o estado físico de una habitación y registra en audit_log (TC-02)."""
-    res = await db.execute(
-        select(Room).where(
-            or_(
-                Room.number == room_ref,
-                Room.id == (int(room_ref) if room_ref.isdigit() else -1),
-            )
+    """Crea una nueva habitación (solo Administrador) validando unicidad de número."""
+    number = str(body.get("number") or "").strip()
+    name = str(body.get("name") or "").strip()
+    if not number or not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Los campos number y name son obligatorios",
         )
+
+    dup = await db.execute(select(Room).where(Room.number == number))
+    if dup.scalars().first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Ya existe una habitación con el número {number}",
+        )
+
+    base_cap = int(body.get("baseAdultsCapacity", body.get("base_adults_capacity", 2)))
+    max_cap = int(body.get("maxAdultsCapacity", body.get("max_adults_capacity", base_cap)))
+    if max_cap < base_cap:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="maxAdultsCapacity debe ser mayor o igual a baseAdultsCapacity",
+        )
+
+    room = Room(
+        number=number,
+        name=name,
+        description=body.get("description"),
+        type=str(body.get("type") or "Doble"),
+        base_adults_capacity=base_cap,
+        max_adults_capacity=max_cap,
+        children_capacity=int(body.get("childrenCapacity", body.get("children_capacity", 0))),
+        extra_guest_price=Decimal(
+            str(body.get("extraGuestPrice", body.get("extra_guest_price", 40000)))
+        ).quantize(Decimal("0.01")),
+        allows_pets=bool(body.get("allowsPets", body.get("allows_pets", False))),
+        price_per_night=Decimal(
+            str(body.get("pricePerNight", body.get("price_per_night", 200000)))
+        ).quantize(Decimal("0.01")),
+        status=str(body.get("status") or "available"),
+        active=True,
     )
-    room = res.scalars().first()
+    db.add(room)
+    try:
+        await db.flush()
+        await record_audit(
+            db=db,
+            actor=current_user.username,
+            action="ROOM_CREATED",
+            entity="room",
+            entity_id=str(room.id),
+            details={"number": room.number, "name": room.name},
+        )
+        await db.commit()
+        await db.refresh(room)
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Conflicto al crear la habitación {number}",
+        ) from exc
+    return _serialize_room(room)
+
+
+@router.put("/api/rooms/{room_id}", status_code=status.HTTP_200_OK)
+@router.put("/api/v1/rooms/{room_id}", status_code=status.HTTP_200_OK)
+async def update_room(
+    room_id: int,
+    body: dict[str, Any] = Body(...),
+    current_user: User = Depends(require_role([UserRole.ADMINISTRADOR.value])),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Actualiza número, precio base, capacidades o estado de una habitación por Room.id y registra en audit_log (TC-02)."""
+    room = await db.get(Room, room_id)
     if room is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habitación no encontrada")
+
+    if "number" in body and body["number"] is not None:
+        new_num = str(body["number"]).strip()
+        if not new_num:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El número de habitación no puede estar vacío")
+        if new_num != room.number:
+            dup = await db.execute(
+                select(Room).where(Room.number == new_num, Room.id != room.id)
+            )
+            if dup.scalars().first() is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Ya existe otra habitación con el número {new_num}",
+                )
+            room.number = new_num
 
     if "pricePerNight" in body or "price_per_night" in body:
         raw_p = body.get("pricePerNight", body.get("price_per_night"))
@@ -401,8 +476,21 @@ async def update_room(
     if "extraGuestPrice" in body or "extra_guest_price" in body:
         raw_e = body.get("extraGuestPrice", body.get("extra_guest_price"))
         room.extra_guest_price = Decimal(str(raw_e)).quantize(Decimal("0.01"))
+    if "baseAdultsCapacity" in body or "base_adults_capacity" in body:
+        room.base_adults_capacity = int(body.get("baseAdultsCapacity", body.get("base_adults_capacity")))
+    if "maxAdultsCapacity" in body or "max_adults_capacity" in body:
+        room.max_adults_capacity = int(body.get("maxAdultsCapacity", body.get("max_adults_capacity")))
+    if room.max_adults_capacity < room.base_adults_capacity:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="maxAdultsCapacity debe ser mayor o igual a baseAdultsCapacity",
+        )
+    if "childrenCapacity" in body or "children_capacity" in body:
+        room.children_capacity = int(body.get("childrenCapacity", body.get("children_capacity")))
     if "name" in body:
-        room.name = str(body["name"])
+        room.name = str(body["name"]).strip()
+    if "description" in body:
+        room.description = body["description"]
     if "type" in body:
         room.type = str(body["type"])
     if "status" in body:
@@ -410,32 +498,34 @@ async def update_room(
     if "allowsPets" in body or "allows_pets" in body:
         room.allows_pets = bool(body.get("allowsPets", body.get("allows_pets")))
 
-    await record_audit(
-        db=db,
-        actor=current_user.username,
-        action="ROOM_UPDATED",
-        entity="room",
-        entity_id=room.number,
-        details={"price_per_night": str(room.price_per_night), "status": room.status},
-    )
-    await db.commit()
-    await db.refresh(room)
-    return {
-        "id": room.id,
-        "number": room.number,
-        "name": room.name,
-        "type": room.type,
-        "pricePerNight": float(room.price_per_night),
-        "extraGuestPrice": float(room.extra_guest_price),
-        "status": room.status,
-        "allowsPets": room.allows_pets,
-    }
+    try:
+        await record_audit(
+            db=db,
+            actor=current_user.username,
+            action="ROOM_UPDATED",
+            entity="room",
+            entity_id=str(room.id),
+            details={
+                "number": room.number,
+                "price_per_night": str(room.price_per_night),
+                "status": room.status,
+            },
+        )
+        await db.commit()
+        await db.refresh(room)
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conflicto de unicidad o restricción al actualizar la habitación",
+        ) from exc
+    return _serialize_room(room)
 
 
-@router.patch("/api/rooms/{room_ref}/status", status_code=status.HTTP_200_OK)
-@router.patch("/api/v1/rooms/{room_ref}/status", status_code=status.HTTP_200_OK)
+@router.patch("/api/rooms/{room_id}/status", status_code=status.HTTP_200_OK)
+@router.patch("/api/v1/rooms/{room_id}/status", status_code=status.HTTP_200_OK)
 async def update_room_operational_status(
-    room_ref: str,
+    room_id: int,
     body: dict[str, Any] = Body(...),
     current_user: User = Depends(
         require_role([UserRole.ADMINISTRADOR.value, UserRole.RECEPCIONISTA.value])
@@ -449,10 +539,7 @@ async def update_room_operational_status(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Estado operativo inválido",
         )
-    room = await db.get(Room, int(room_ref)) if room_ref.isdigit() else None
-    if room is None:
-        res = await db.execute(select(Room).where(Room.number == room_ref))
-        room = res.scalars().first()
+    room = await db.get(Room, room_id)
     if room is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habitación no encontrada")
 
@@ -467,26 +554,18 @@ async def update_room_operational_status(
     )
     await db.commit()
     await db.refresh(room)
-    return {"id": room.id, "number": room.number, "status": room.status}
+    return _serialize_room(room)
 
 
-@router.delete("/api/rooms/{room_ref}", status_code=status.HTTP_200_OK)
-@router.delete("/api/v1/rooms/{room_ref}", status_code=status.HTTP_200_OK)
+@router.delete("/api/rooms/{room_id}", status_code=status.HTTP_200_OK)
+@router.delete("/api/v1/rooms/{room_id}", status_code=status.HTTP_200_OK)
 async def delete_room_if_no_active_bookings(
-    room_ref: str,
+    room_id: int,
     current_user: User = Depends(require_role([UserRole.ADMINISTRADOR.value])),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Impide con HTTP 409 eliminar o desactivar una habitación si tiene reservas activas (TC-02)."""
-    res = await db.execute(
-        select(Room).where(
-            or_(
-                Room.number == room_ref,
-                Room.id == (int(room_ref) if room_ref.isdigit() else -1),
-            )
-        )
-    )
-    room = res.scalars().first()
+    room = await db.get(Room, room_id)
     if room is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Habitación no encontrada")
 
@@ -509,11 +588,11 @@ async def delete_room_if_no_active_bookings(
         actor=current_user.username,
         action="ROOM_DEACTIVATED",
         entity="room",
-        entity_id=room.number,
-        details={"room_id": room.id},
+        entity_id=str(room.id),
+        details={"room_id": room.id, "number": room.number},
     )
     await db.commit()
-    return {"deleted": True, "roomNumber": room.number}
+    return {"deleted": True, "roomId": room.id, "roomNumber": room.number}
 
 
 # ── 3. Salgados Café & Cargos al Folio de Habitación (TC-03) ─────────────────

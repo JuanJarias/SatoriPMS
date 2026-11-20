@@ -159,6 +159,88 @@ async def test_room_crud_and_delete_protection_when_booking_active_tc02() -> Non
 
 
 @pytest.mark.asyncio
+async def test_room_number_editable_without_id_collision_and_post_create() -> None:
+    """Verifica creación POST /api/v1/rooms, edición segura de room.number por Room.id y rechazo 409 si duplica (P3)."""
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(Room).where(Room.number == "10"))
+        await session.commit()
+        r1 = (await session.execute(select(Room).where(Room.number == "1"))).scalar_one()
+        r2 = (await session.execute(select(Room).where(Room.number == "2"))).scalar_one()
+        r1_id, r2_id = r1.id, r2.id
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        recep_headers = await _login_headers(client, "recepcion", "recepcion123")
+        admin_headers = await _login_headers(client, "admin", "admin123")
+
+        # 1. Recepción no puede crear habitaciones (403); Admin sí (201) y duplicado -> 409
+        forb_post = await client.post(
+            "/api/v1/rooms",
+            headers=recep_headers,
+            json={"number": "10", "name": "Mirador Norte", "pricePerNight": 230000},
+        )
+        assert forb_post.status_code == 403
+
+        ok_post = await client.post(
+            "/api/v1/rooms",
+            headers=admin_headers,
+            json={"number": "10", "name": "Mirador Norte", "pricePerNight": 230000},
+        )
+        assert ok_post.status_code == 201
+        created_id = ok_post.json()["id"]
+
+        dup_post = await client.post(
+            "/api/v1/rooms",
+            headers=admin_headers,
+            json={"number": "10", "name": "Duplicada", "pricePerNight": 230000},
+        )
+        assert dup_post.status_code == 409
+
+        # 2. Ordenamiento numérico (1..9, 10 -> "10" va al final, no después de "1")
+        list_res = await client.get("/api/v1/rooms", headers=admin_headers)
+        assert list_res.status_code == 200
+        nums = [r["number"] for r in list_res.json()]
+        assert nums[-1] == "10"
+
+        # 3. Intentar cambiar número de r1 a "2" (ocupado por r2) -> 409 Conflict
+        dup_upd = await client.put(
+            f"/api/v1/rooms/{r1_id}",
+            headers=admin_headers,
+            json={"number": "2"},
+        )
+        assert dup_upd.status_code == 409
+
+        # 4. Cambiar número de r1 ("1" -> "99") y verificar que PUT /rooms/{r2_id} solo toca r2 sin colisión
+        ok_upd = await client.put(
+            f"/api/v1/rooms/{r1_id}",
+            headers=admin_headers,
+            json={"number": "99"},
+        )
+        assert ok_upd.status_code == 200
+        assert ok_upd.json()["number"] == "99"
+
+        r2_check = await client.put(
+            f"/api/v1/rooms/{r2_id}",
+            headers=admin_headers,
+            json={"name": "Familiar"},
+        )
+        assert r2_check.status_code == 200
+        assert r2_check.json()["id"] == r2_id
+        assert r2_check.json()["number"] == "2"
+
+        # Restaurar número "1" de r1 y limpiar habitación temporal "10"
+        await client.put(
+            f"/api/v1/rooms/{r1_id}",
+            headers=admin_headers,
+            json={"number": "1"},
+        )
+
+    async with AsyncSessionLocal() as session:
+        await session.execute(delete(Room).where(Room.id == created_id))
+        await session.commit()
+
+
+@pytest.mark.asyncio
 async def test_salgados_cafe_order_to_folio_tc03_events_tc04_and_reviews() -> None:
     """Verifica TC-03 (Salgados Café al folio), TC-04 (eventos solo Admin con 10% descuento) y resumen de reseñas."""
     async with AsyncSessionLocal() as session:

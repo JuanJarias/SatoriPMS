@@ -428,7 +428,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const setRoomStatus = (id: string | number, status: RoomStatusKey, extra: Partial<RoomItem> = {}) => {
     setRooms((prev) =>
-      prev.map((r) => (r.id === id || r.number === String(id) ? { ...r, status, ...extra } : r))
+      prev.map((r) => (String(r.id) === String(id) ? { ...r, status, ...extra } : r))
     );
   };
 
@@ -455,10 +455,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (role !== 'admin') {
       return { success: false, message: 'Operación denegada: Solo el Administrador puede editar habitaciones.' };
     }
+    if (data.number) {
+      const duplicate = rooms.some(
+        (r) => String(r.id) !== String(id) && r.number === data.number
+      );
+      if (duplicate) {
+        return {
+          success: false,
+          message: `Ya existe otra habitación con el número ${data.number}.`,
+        };
+      }
+    }
     setRooms((prev) =>
-      prev.map((r) => (r.id === id || r.number === String(id) ? { ...r, ...data } : r))
+      prev.map((r) => (String(r.id) === String(id) ? { ...r, ...data } : r))
     );
-    log(`Modificó parámetros de Hab. ${id}`, 'Habitaciones');
+    log(`Modificó parámetros de Hab. ${data.number || id}`, 'Habitaciones');
     return { success: true };
   };
 
@@ -466,14 +477,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (role !== 'admin') {
       return { success: false, message: 'Operación denegada: Solo el Administrador puede eliminar habitaciones.' };
     }
-    const targetRoom = rooms.find((r) => r.id === id || r.number === String(id));
+    const targetRoom = rooms.find((r) => String(r.id) === String(id));
     if (!targetRoom) {
       return { success: false, message: 'La habitación no existe.' };
     }
     // REGLA CLAVE: No se puede eliminar si tiene reservas activas o pendientes
     const activeBookings = bookings.filter(
       (b) =>
-        (b.room === targetRoom.number || b.roomId === Number(targetRoom.id)) &&
+        (b.roomId !== undefined ? String(b.roomId) === String(targetRoom.id) : b.room === targetRoom.number) &&
         ['confirmada', 'pendiente', 'bloqueada', 'enCurso'].includes(b.status)
     );
     if (activeBookings.length > 0) {
@@ -482,7 +493,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         message: `No se puede eliminar la habitación ${targetRoom.number}. Tiene ${activeBookings.length} reserva(s) activa(s) o en curso (ej. código ${activeBookings[0].code}).`,
       };
     }
-    setRooms((prev) => prev.filter((r) => r.id !== id && r.number !== String(id)));
+    setRooms((prev) => prev.filter((r) => String(r.id) !== String(id)));
     log(`Eliminó la habitación ${targetRoom.number} (${targetRoom.name})`, 'Habitaciones');
     return { success: true };
   };

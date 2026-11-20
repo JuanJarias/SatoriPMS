@@ -111,7 +111,9 @@ export function Rooms() {
     }
 
     if (editRoom) {
+      const nextNum = formNumber.trim();
       const res = updateRoom(editRoom.id, {
+        number: nextNum,
         name: formName.trim(),
         type: formType,
         capacity: Number(formCapacity),
@@ -123,7 +125,7 @@ export function Rooms() {
         allowsPets: formAllowsPets,
       });
       if (res.success) {
-        show('Habitación actualizada', `Hab. ${editRoom.number} modificada por Administrador`);
+        show('Habitación actualizada', `Hab. ${nextNum} modificada por Administrador`);
         setEditRoom(null);
       } else {
         show('Error al actualizar', res.message, 'bad');
@@ -453,8 +455,7 @@ export function Rooms() {
               <Input
                 value={formNumber}
                 onChange={(e) => setFormNumber(e.target.value)}
-                placeholder="Ej. 104, 204"
-                disabled={!!editRoom}
+                placeholder="Ej. 1, 2, 10"
               />
             </Field>
             <Field label="Nombre comercial *">

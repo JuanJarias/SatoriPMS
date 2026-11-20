@@ -86,7 +86,7 @@ async def get_available_rooms(
             Room.children_capacity >= children,
             Room.id.not_in(overlapping_active_bookings),
         )
-        .order_by(Room.number.asc())
+        .order_by(func.length(Room.number), Room.number.asc())
     )
 
     if with_pet:

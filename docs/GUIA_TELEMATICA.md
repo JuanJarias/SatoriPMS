@@ -382,7 +382,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 | `P0` | Aislamiento DB de pruebas (`satoripms_test`) y variables `.env` Wompi/Google | `AGY` | [x] |
 | `P1` | Migración Alembic `004`: cuartos `1–9`, tarifas reales y tablas operativas | `AGY` | [x] |
 | `P2` | RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers | `AGY` | [x] |
-| `P3` | Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` | `AGY` | [ ] |
+| `P3` | Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` | `AGY` | [x] |
 | `P4` | Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) | `AGY` | [ ] |
 | `P5` | Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel | `AGY` | [ ] |
 | `P6` | Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) | `AGY` | [ ] |
@@ -446,7 +446,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 
 ---
 
-### `P3` — Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` (`GUIADO`)
+### `P3` — Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` (`AGY`)
 - **Objetivo:** eliminar la búsqueda ambigua `or_(Room.number == ref, Room.id == int(ref))`, resolver siempre por `Room.id`, habilitar `POST /api/v1/rooms` y edición de `number` en `PUT /api/v1/rooms/{room_id}` (con `409 Conflict` si el número ya existe), ordenar numéricamente `1..9` y desbloquear el campo número en `Rooms.tsx`.
 - **Archivos afectados:** `apps/api/routers/web_operations.py`, `apps/api/services/room_service.py`, `apps/api/schemas/room.py`, `apps/web/src/screens/Rooms.tsx`, `apps/web/src/store.tsx`, `tests/test_rooms_availability.py`, `tests/test_web_operations.py`, `docs/aprendizaje/P3.md`.
 - **Criterio de aceptación:** un Administrador puede cambiar el número de la habitación `id=1` sin alterar `id=2` ni romper sus reservas vinculadas por `room_id`, y recibe `409` al intentar duplicar un número existente.
@@ -458,7 +458,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 - **Checklist manual:**
   1. En **Habitaciones** (Admin), editar el número de un cuarto disponible, guardar y recargar la página (`F5`) validando persistencia.
   2. Intentar asignar un número ya ocupado por otra habitación y confirmar mensaje de error `409`.
-- **Casilla:** `[ ]` Completado y verificado.
+- **Casilla:** `[x]` Completado y verificado.
 - **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
 
 ---
