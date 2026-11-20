@@ -67,7 +67,7 @@ Este flujo acompaña al viajero pregunta por pregunta, validando la información
     - **Opción 1 — Pagar el 100% ahora:** Confirma la reserva como totalmente pagada.
     - **Opción 2 — Pagar el 50% de anticipo:** Confirma la reserva abonando la mitad y dejando el 50% restante pendiente para pagarlo antes o durante el ingreso al hotel.
     - **Opción 3 — Cancelar reserva:** Cancela el proceso y **libera de inmediato el bloqueo temporal de la habitación** para que vuelva a estar disponible.
-11. **Confirmación y entrega del código único:** Al completarse el pago del 100% o del 50%, el sistema registra la reserva definitiva, libera el candado temporal y entrega al huésped su **código único de reserva** de 8 caracteres alfanuméricos junto con el desglose del monto abonado y el saldo pendiente.
+11. **Confirmación y entrega del código único:** Al completarse el pago del 100% o del 50%, el sistema registra la reserva definitiva, libera el candado temporal y entrega al huésped su **código único de reserva** con el formato `TS-XXXX` (por ejemplo, `TS-7K4Q`) junto con el desglose del monto abonado y el saldo pendiente.
 
 ---
 
@@ -79,7 +79,7 @@ Pensado para viajeros que prefieren escribir todos sus requerimientos en un solo
 2. **Interpretación con Inteligencia Artificial:** El texto del huésped es analizado por el modelo de inteligencia artificial, que extrae de forma estructurada las fechas, huéspedes, mascota, nombre, documento y acompañantes. Si el usuario no indicó fechas válidas de entrada y salida, el asistente resume lo que entendió y le pide únicamente las fechas faltantes.
 3. **Búsqueda y selección de habitación:** Con las fechas y la ocupación identificadas, el asistente consulta la disponibilidad real filtrando por capacidad y admisión de mascotas, y muestra las opciones disponibles para que el viajero elija con un número.
 4. **Bloqueo temporal y resumen con desglose de recargos:** Al elegir la habitación, el sistema la bloquea por 15 minutos y muestra el resumen completo con el desglose de **tarifa base**, **recargo por persona adicional** y **total de la estadía**, ofreciendo las opciones de pagar el 100%, abonar el 50% o cancelar (liberando el bloqueo de inmediato).
-5. **Confirmación:** Genera la reserva y entrega el código único de 8 caracteres con las mismas garantías que el flujo guiado.
+5. **Confirmación:** Genera la reserva y entrega el código único `TS-XXXX` con las mismas garantías que el flujo guiado.
 
 ---
 
@@ -98,8 +98,8 @@ Para garantizar la máxima transparencia, autenticidad e imparcialidad, el chatb
 Permite al huésped autogestionar su reserva activa en cualquier momento garantizando la privacidad y protección de los datos de su estadía mediante una **verificación de identidad en dos pasos**:
 
 1. **Solicitud del código de reserva:** El asistente solicita el código oficial de la reserva (por ejemplo: `TS-4156`), con prefijo estándar `TS-` de Torre Satori.
-2. **Validación de identidad con documento del titular:** Para evitar que un tercero pueda consultar o manipular reservas ajenas al conocer un código, el asistente solicita obligatoriamente el número de documento de identidad o cédula del titular registrado. Si el documento no coincide exactamente con el titular de la reserva, el sistema rechaza la consulta por motivos de seguridad y privacidad.
-3. **Presentación del estado de la reserva:** Una vez validada la identidad, muestra el nombre del titular, estado de la reserva, fechas de entrada y salida, noches, habitaciones asignadas, desglose de huéspedes, tarifa total, monto abonado a la fecha y saldo pendiente:
+2. **Validación de identidad con documento del titular:** Para evitar que un tercero pueda consultar o manipular reservas ajenas al conocer un código, el asistente solicita obligatoriamente el número de documento de identidad o cédula del titular registrado. La verificación la realiza el servidor central: si el código y el documento no corresponden a la misma reserva, el asistente informa que no se encontró una reserva con esos datos (sin revelar si el código existe) y vuelve a solicitar el código. El documento solicitado se usa también para confirmar el pago del saldo y la cancelación.
+3. **Presentación del estado de la reserva:** Una vez validada la identidad, muestra el nombre del titular, su documento enmascarado (solo los últimos 4 dígitos), estado de la reserva, fechas de entrada y salida, noches, habitaciones asignadas, desglose de huéspedes, tarifa total, monto abonado a la fecha y saldo pendiente:
    - Si la reserva tiene **saldo pendiente** (porque se confirmó con anticipo del 50%), habilita tres opciones: **1. Pagar saldo restante**, **2. Cancelar reserva** y **3. Volver al menú**.
    - Si la reserva ya está **pagada al 100%**, habilita: **1. Cancelar reserva** y **2. Volver al menú**.
 4. **Liquidación del saldo restante:** Si el huésped elige pagar el saldo pendiente, el sistema registra el pago del 50% restante, actualiza el estado de pago a completado (100%), deja el saldo pendiente en cero y envía el comprobante de actualización por WhatsApp.

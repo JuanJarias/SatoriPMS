@@ -2,7 +2,7 @@
 
 Este documento proporciona una guía exhaustiva, paso a paso y sin requerir conocimientos técnicos previos, para configurar correctamente el archivo de variables de entorno `.env` en la raíz de **SatoriPMS**. 
 
-Las variables de entorno son parámetros de configuración y secretos (claves de acceso, credenciales de base de datos, tokens de comunicación) que el sistema necesita para conectar el servidor central (API), el motor de base de datos, la memoria de concurrencia, el asistente de WhatsApp en n8n, la inteligencia artificial de Gemini y la pasarela de pagos de Mercado Pago.
+Las variables de entorno son parámetros de configuración y secretos (claves de acceso, credenciales de base de datos, tokens de comunicación) que el sistema necesita para conectar el servidor central (API), el motor de base de datos, la memoria de concurrencia, el asistente de WhatsApp en n8n, la inteligencia artificial de Gemini y la pasarela de pagos Wompi.
 
 ---
 
@@ -19,7 +19,10 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
 - [3. Servidor Central (Backend API)](#3-servidor-central-backend-api)
   - [PORT](#port)
   - [JWT_SECRET](#jwt_secret)
-  - [JWT_EXPIRES_IN](#jwt_expires_in)
+  - [JWT_EXPIRATION_MS](#jwt_expiration_ms)
+  - [SATORI_SERVICE_KEY](#satori_service_key)
+  - [CORS_ALLOWED_ORIGINS](#cors_allowed_origins)
+  - [SATORI_ADMIN_USERNAME y SATORI_ADMIN_PASSWORD](#satori_admin_username-y-satori_admin_password)
 - [4. Integración con Meta for Developers y WhatsApp Cloud API](#4-integración-con-meta-for-developers-y-whatsapp-cloud-api)
   - [META_APP_ID](#meta_app_id)
   - [META_APP_SECRET](#meta_app_secret)
@@ -31,9 +34,7 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
   - [WHATSAPP_GRAPH_VERSION](#whatsapp_graph_version)
 - [5. Inteligencia Artificial (Google Gemini)](#5-inteligencia-artificial-google-gemini)
   - [GEMINI_API_KEY](#gemini_api_key)
-- [6. Pasarela de Pagos (Mercado Pago)](#6-pasarela-de-pagos-mercado-pago)
-  - [MERCADOPAGO_ACCESS_TOKEN](#mercadopago_access_token)
-  - [MERCADOPAGO_WEBHOOK_SECRET](#mercadopago_webhook_secret)
+- [6. Pagos de Prueba](#6-pagos-de-prueba)
   - [BOOKING_TEST_PAYMENT_ENABLED](#booking_test_payment_enabled)
 - [7. Pasarela de Pagos Wompi (Colombia)](#7-pasarela-de-pagos-wompi-colombia)
   - [WOMPI_ENABLED](#wompi_enabled)
@@ -50,7 +51,6 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
   - [N8N_PUBLIC_URL](#n8n_public_url)
 - [10. Panel Web de Recepción (Frontend)](#10-panel-web-de-recepción-frontend)
   - [VITE_API_URL](#vite_api_url)
-  - [VITE_WS_URL](#vite_ws_url)
 - [Resumen de Ubicación y Verificación](#resumen-de-ubicación-y-verificación)
 
 ---
@@ -161,7 +161,7 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
     ```bash
     openssl rand -hex 32
     ```
-  - Copie el resultado (una secuencia de 64 caracteres hexadecimales).
+  - Copie el resultado (una secuencia de 64 caracteres hexadecimales). El servidor central exige **mínimo 32 caracteres** y no arranca si la clave es más corta.
   - *Ejemplo de formato:*
     ```env
     JWT_SECRET=4f8b9d2e1c3a7f6e5d4c3b2a109876543210abcdef0123456789abcdef012345
@@ -170,16 +170,62 @@ Las variables de entorno son parámetros de configuración y secretos (claves de
 
 ---
 
-### JWT_EXPIRES_IN
+### JWT_EXPIRATION_MS
 - **Para qué sirve:** Determina el tiempo de vigencia de la sesión de un usuario en el panel web antes de requerir que inicie sesión nuevamente.
 - **De dónde se saca:** Lo define la política de seguridad del hotel.
 - **Cómo configurarlo:**
-  - Formato: número seguido de la unidad de tiempo (`h` para horas, `d` para días).
-  - Valor recomendado (un turno de recepción completo):
+  - Se expresa en milisegundos.
+  - Valor recomendado (un turno de recepción completo de 8 horas):
     ```env
-    JWT_EXPIRES_IN=8h
+    JWT_EXPIRATION_MS=28800000
     ```
-- **En dónde ponerlo:** En la variable `JWT_EXPIRES_IN` del archivo `.env`.
+- **En dónde ponerlo:** En la variable `JWT_EXPIRATION_MS` del archivo `.env`.
+
+---
+
+### SATORI_SERVICE_KEY
+- **Para qué sirve:** Llave secreta con la que el orquestador del chatbot (n8n) se identifica ante el servidor central. Sin esta llave nadie puede consultar disponibilidad, bloquear habitaciones, crear, consultar, pagar o cancelar reservas en nombre del chatbot.
+- **De dónde se saca:** Es una cadena aleatoria y secreta que debe generar el administrador del sistema.
+- **Cómo obtenerlo paso a paso:**
+  - *Comando en terminal (Linux / macOS):*
+    ```bash
+    openssl rand -hex 32
+    ```
+  - Copie el resultado.
+  - *Ejemplo de formato:*
+    ```env
+    SATORI_SERVICE_KEY=9c1e7b3a5d2f4e6a8b0c1d3e5f7a9b2c4d6e8f0a1b3c5d7e9f2a4b6c8d0e1f3a
+    ```
+- **En dónde ponerlo:** En la variable `SATORI_SERVICE_KEY` del archivo `.env`. El mismo archivo lo leen el servidor central y n8n, por lo que ambos quedan con la misma llave. Después de cambiarla, recree los contenedores `api` y `n8n`.
+
+---
+
+### CORS_ALLOWED_ORIGINS
+- **Para qué sirve:** Lista de direcciones web desde las que el navegador puede consumir el servidor central (por ejemplo, la aplicación web de recepción).
+- **De dónde se saca:** Corresponde a la dirección en la que se publica la aplicación web.
+- **Cómo configurarlo:**
+  - Separe varias direcciones con comas, sin espacios innecesarios.
+  - Valor para desarrollo local:
+    ```env
+    CORS_ALLOWED_ORIGINS=http://localhost:5173
+    ```
+- **En dónde ponerlo:** En la variable `CORS_ALLOWED_ORIGINS` del archivo `.env`.
+
+---
+
+### SATORI_ADMIN_USERNAME y SATORI_ADMIN_PASSWORD
+- **Para qué sirven:** Crean automáticamente el primer usuario Administrador al arrancar el servidor central, para poder ingresar al panel web en una instalación nueva.
+- **De dónde se sacan:** Los define el responsable de la instalación.
+- **Cómo configurarlos:**
+  - La contraseña debe tener **mínimo 8 caracteres**.
+  - El usuario solo se crea si todavía no existe; nunca se modifica un usuario existente.
+  - Opcionalmente, `SATORI_ADMIN_NAME` define el nombre visible del administrador.
+    ```env
+    SATORI_ADMIN_USERNAME=gerencia
+    SATORI_ADMIN_PASSWORD=una_contraseña_segura
+    SATORI_ADMIN_NAME=Gerencia Torre Satori
+    ```
+- **En dónde ponerlos:** En el archivo `.env`. Después del primer arranque se recomienda dejar `SATORI_ADMIN_PASSWORD` vacía.
 
 ---
 
@@ -334,52 +380,17 @@ Para que el hotel pueda enviar y recibir mensajes automáticos por WhatsApp, se 
 
 ---
 
-## 6. Pasarela de Pagos (Mercado Pago)
-
-### MERCADOPAGO_ACCESS_TOKEN
-- **Para qué sirve:** Clave privada que permite al servidor central generar órdenes de pago, enlaces de cobro para anticipos (50%) o pagos completos (100%) y consultar el estado de las transacciones de los huéspedes.
-- **De dónde se saca:** En el panel para desarrolladores de Mercado Pago.
-- **Cómo obtenerlo paso a paso:**
-  1. *Requisitos previos:* Disponer de una cuenta registrada en Mercado Pago (de Colombia para Torre Satori).
-  2. Ingrese en el navegador a: [https://www.mercadopago.com.co/developers](https://www.mercadopago.com.co/developers)
-  3. Inicie sesión con su cuenta de Mercado Pago.
-  4. En la barra superior derecha, haga clic en la opción **Tus integraciones** (o acceda a [https://www.mercadopago.com.co/developers/panel/app](https://www.mercadopago.com.co/developers/panel/app)).
-  5. Seleccione su aplicación (o haga clic en **Crear aplicación**, asigne el nombre "SatoriPMS Pagos" y elija el modelo de integración Checkout Pro o Pagos Online).
-  6. En el menú lateral izquierdo de su aplicación, haga clic en **Credenciales de prueba** (para pruebas sin dinero real) o en **Credenciales de producción** (para cobros reales).
-  7. Localice el campo titulado **Access Token** (suele comenzar por `TEST-` en pruebas o `APP_USR-` en producción).
-  8. Haga clic en el icono de copiar situado junto a la clave.
-- **En dónde ponerlo:**
-  ```env
-  MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-abcdef0123456789-123456789
-  ```
-
----
-
-### MERCADOPAGO_WEBHOOK_SECRET
-- **Para qué sirve:** Clave criptográfica que utiliza Mercado Pago para firmar las notificaciones de confirmación de pago (Webhooks). Permite que el servidor central verifique que el aviso de pago proviene legítimamente de Mercado Pago y no de un atacante simulando un pago falso.
-- **De dónde se saca:** En la sección de configuración de Notificaciones Webhooks de su aplicación en Mercado Pago Developers.
-- **Cómo obtenerlo paso a paso:**
-  1. Dentro de su aplicación en [https://www.mercadopago.com.co/developers/panel/app](https://www.mercadopago.com.co/developers/panel/app).
-  2. En el menú lateral izquierdo, haga clic en **Webhooks** (o **Notificaciones Webhooks**).
-  3. Configure su URL de notificación apuntando al endpoint de su servidor (ej. `https://su-dominio.com/api/payments/webhook`).
-  4. En la parte superior de esa misma sección observará un apartado titulado **Clave secreta de firma** (o **Secret signature**).
-  5. Haga clic en el botón de copiar.
-- **En dónde ponerlo:**
-  ```env
-  MERCADOPAGO_WEBHOOK_SECRET=f9a8b7c6d5e4f3a2b1...
-  ```
-
----
+## 6. Pagos de Prueba
 
 ### BOOKING_TEST_PAYMENT_ENABLED
-- **Para qué sirve:** Bandera de control operativa que habilita o desactiva la simulación de pagos instantáneos en entornos de prueba locales sin necesidad de interactuar con la pasarela bancaria.
+- **Para qué sirve:** Bandera de control operativa que habilita o desactiva la simulación de pagos instantáneos en entornos de prueba locales sin necesidad de interactuar con la pasarela bancaria. Aun habilitada, solo un usuario Administrador puede usarla.
 - **De dónde se saca:** Es una directiva interna de control del servidor central.
 - **Cómo configurarlo:**
   - Para pruebas automatizadas y desarrollo local: `true`.
   - Para el entorno operativo real del hotel: `false`.
   - Valor recomendado inicial:
     ```env
-    BOOKING_TEST_PAYMENT_ENABLED=true
+    BOOKING_TEST_PAYMENT_ENABLED=false
     ```
 - **En dónde ponerlo:** En la variable `BOOKING_TEST_PAYMENT_ENABLED` del archivo `.env`.
 
@@ -471,7 +482,7 @@ El flujo conversacional V9 (`V9_ChatbotReservas.json`) incorpora la pasarela de 
   - *Si utiliza zrok (herramienta integrada en el proyecto):*
     1. Ejecute en su terminal:
        ```bash
-       zrok share public http://localhost:5678
+       zrok2 share public http://localhost:5678
        ```
     2. La terminal mostrará un mensaje indicando la URL pública generada (ej. `https://n8n-chatbot.shares.zrok.io/`).
     3. Copie esa URL completa terminada en barra diagonal (`/`).
@@ -484,7 +495,7 @@ El flujo conversacional V9 (`V9_ChatbotReservas.json`) incorpora la pasarela de 
 
 ---
 
-## 8. Panel Web de Recepción (Frontend)
+## 10. Panel Web de Recepción (Frontend)
 
 ### VITE_API_URL
 - **Para qué sirve:** Dirección base que el navegador web del recepcionista o administrador utiliza para realizar peticiones HTTP (consultar calendario de habitaciones, registrar huéspedes, ver reservas, liquidar cuentas).
@@ -499,22 +510,6 @@ El flujo conversacional V9 (`V9_ChatbotReservas.json`) incorpora la pasarela de 
     VITE_API_URL=http://192.168.1.50:8080
     ```
 - **En dónde ponerlo:** En la variable `VITE_API_URL` del archivo `.env`.
-
----
-
-### VITE_WS_URL
-- **Para qué sirve:** Dirección del protocolo WebSocket (`ws://` o `wss://`) que utiliza el panel web para recibir actualizaciones y alertas en tiempo real (por ejemplo, notificación instantánea cuando un huésped en WhatsApp solicita atención de una recepcionista humana o cuando entra una nueva reserva).
-- **De dónde se saca:** Es el mismo host y puerto del servidor central, pero empleando el protocolo `ws://`.
-- **Cómo configurarlo:**
-  - Para desarrollo local:
-    ```env
-    VITE_WS_URL=ws://localhost:8080
-    ```
-  - Para servidores con certificado SSL en producción:
-    ```env
-    VITE_WS_URL=wss://api.torresatori.com
-    ```
-- **En dónde ponerlo:** En la variable `VITE_WS_URL` del archivo `.env`.
 
 ---
 
@@ -535,7 +530,11 @@ REDIS_URL=redis://localhost:6379
 # Servidor Central
 PORT=8080
 JWT_SECRET=4f8b9d2e1c3a7f6e5d4c3b2a109876543210abcdef0123456789abcdef012345
-JWT_EXPIRES_IN=8h
+JWT_EXPIRATION_MS=28800000
+SATORI_SERVICE_KEY=9c1e7b3a5d2f4e6a8b0c1d3e5f7a9b2c4d6e8f0a1b3c5d7e9f2a4b6c8d0e1f3a
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+SATORI_ADMIN_USERNAME=gerencia
+SATORI_ADMIN_PASSWORD=una_contraseña_segura
 
 # WhatsApp / Meta
 META_APP_ID=1234567890123456
@@ -550,10 +549,16 @@ WHATSAPP_GRAPH_VERSION=v25.0
 # Inteligencia Artificial
 GEMINI_API_KEY=AIzaSy...
 
-# Pasarela de Pago
-MERCADOPAGO_ACCESS_TOKEN=TEST-...
-MERCADOPAGO_WEBHOOK_SECRET=f9a8b7...
-BOOKING_TEST_PAYMENT_ENABLED=true
+# Pagos de prueba
+BOOKING_TEST_PAYMENT_ENABLED=false
+
+# Wompi
+WOMPI_ENABLED=true
+WOMPI_PUBLIC_KEY=pub_test_...
+WOMPI_PRIVATE_KEY=prv_test_...
+WOMPI_EVENTS_SECRET=test_events_...
+WOMPI_API_URL=https://sandbox.wompi.co/v1
+WOMPI_CHECKOUT_URL=https://checkout.wompi.co/l/
 
 # n8n
 COMPOSE_PROFILES=n8n
@@ -563,7 +568,6 @@ N8N_PUBLIC_URL=https://n8n-chatbot.shares.zrok.io/
 
 # Frontend
 VITE_API_URL=http://localhost:8080
-VITE_WS_URL=ws://localhost:8080
 ```
 
 ### Verificación de Arranque

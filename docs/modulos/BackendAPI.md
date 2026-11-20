@@ -6,6 +6,12 @@ El **Servidor Central** es el núcleo lógico de **SatoriPMS**. Actúa como úni
 
 Su función es garantizar que todas las reglas del negocio —como el cálculo de precios con personas adicionales o eventos especiales, el bloqueo de 15 minutos contra sobreventa, la validación de abonos del 50% y 100%, el cálculo de reembolsos sobre lo efectivamente pagado y los permisos exclusivos del administrador— se apliquen de manera uniforme y segura sin importar desde qué canal se realice la operación.
 
+### Control de Acceso
+Ninguna operación del servidor central está abierta al público:
+- **Personal del hotel:** inicia sesión con usuario y contraseña (`Iniciar sesión : "POST /api/auth/login"`) y recibe una credencial digital firmada con vigencia limitada (por defecto, un turno de 8 horas), que acompaña cada operación posterior. La credencial indica si la persona es **Administrador** o **Recepcionista**, y el servidor rechaza las operaciones reservadas al Administrador cuando las intenta otro perfil.
+- **Asistente de WhatsApp:** se identifica con una llave de servicio privada que solo conocen el servidor central y el orquestador del chatbot. Con ella únicamente puede realizar las operaciones propias de la atención al huésped (disponibilidad, bloqueos, reservas, consulta, pago de saldo, cancelación y confirmación de pagos de la pasarela).
+- **Protección de los datos del huésped:** cuando la solicitud proviene del asistente de WhatsApp, consultar, pagar el saldo o cancelar una reserva exige el código de reserva **y** el documento del titular. Si el documento no coincide, el servidor responde exactamente igual que si la reserva no existiera, y nunca devuelve el documento completo (solo sus últimos 4 dígitos).
+
 ---
 
 ## 2. Operaciones de Disponibilidad, Habitaciones y Eventos Especiales
@@ -31,7 +37,8 @@ Su función es garantizar que todas las reglas del negocio —como el cálculo d
   - `Eliminar habitación sin reservas pendientes : "DELETE /api/rooms/{id}"`
 
 ### C. Gestión de Eventos Especiales y Descuentos por Fechas (Solo Administrador)
-- **Concepto para el negocio:** Permite definir temporadas o eventos especiales en el calendario (con fecha de inicio, fecha de fin y porcentaje de descuento o ajuste tarifario) para incentivar la ocupación o gestionar fechas de alta demanda turística en Sevilla.
+- **Concepto para el negocio:** Permite definir temporadas o eventos especiales en el calendario (con fecha de inicio, fecha de fin y porcentaje de descuento o de recargo) para incentivar la ocupación o gestionar fechas de alta demanda turística en Sevilla.
+- **Aplicación sobre el precio:** El ajuste se aplica **noche por noche**: solo las noches de la estadía que caen dentro de las fechas del evento reciben el descuento o el recargo. Si varios eventos coinciden en una misma noche, sus porcentajes se suman.
 - **Identificadores técnicos de las operaciones:**
   - `Consultar eventos y promociones : "GET /api/events"`
   - `Crear evento especial o descuento : "POST /api/events"`
@@ -58,7 +65,7 @@ Su función es garantizar que todas las reglas del negocio —como el cálculo d
 ## 4. Operaciones de Confirmación, Consulta, Pago de Saldo y Cancelación de Reservas
 
 ### A. Confirmación de Reserva (Individual o Grupal)
-- **Concepto para el negocio:** Registra en firme la reserva de una o varias habitaciones bajo un mismo código grupal (`Identificador de grupo de reserva : "reservationGroupId"`), guarda o actualiza la ficha del huésped titular y sus acompañantes, calcula el precio total (sumando noches base y recargo por personas adicionales), procesa la modalidad de pago elegida y libera los bloqueos temporales de memoria.
+- **Concepto para el negocio:** Registra en firme la reserva de una o varias habitaciones bajo un mismo código grupal (`Identificador de grupo de reserva : "reservationGroupId"`), guarda o actualiza la ficha del huésped titular y sus acompañantes, calcula el precio total (sumando las noches con sus ajustes por eventos especiales y el recargo por personas adicionales), genera el código público `TS-XXXX`, procesa la modalidad de pago elegida y libera los bloqueos temporales de memoria.
 - **Modalidades de pago admitidas (`Opción de pago : "paymentOption"`):**
   - `Pago completo del 100% : "full"`: La reserva queda en estado `Confirmada : "confirmed"`, estado de pago `Pagada : "paid"`, monto abonado igual al 100% del total y saldo pendiente en cero.
   - `Anticipo del 50% : "deposit"`: La reserva queda en estado `Confirmada : "confirmed"`, estado de pago `Pago parcial : "partial"`, monto abonado igual al 50% del total y el 50% restante como saldo pendiente.
@@ -66,7 +73,7 @@ Su función es garantizar que todas las reglas del negocio —como el cálculo d
 - **Identificador técnico de la operación:** `Confirmar reserva : "POST /api/bookings/confirm"`
 
 ### B. Consulta de Reserva por Código Único
-- **Concepto para el negocio:** Permite tanto al huésped en WhatsApp como al recepcionista consultar todos los detalles de una reserva ingresando los 8 caracteres de su código único. Devuelve las habitaciones asignadas, fechas, noches, datos del titular, valor total, **monto efectivamente abonado**, **saldo pendiente** y el cálculo exacto de la política de reembolso aplicable en ese instante.
+- **Concepto para el negocio:** Permite tanto al huésped en WhatsApp como al recepcionista consultar todos los detalles de una reserva ingresando su código único con el formato `TS-XXXX` (por ejemplo, `TS-7K4Q`), que debe coincidir exactamente. Desde WhatsApp se exige además el documento del titular. Devuelve las habitaciones asignadas, fechas, noches, datos del titular, valor total, **monto efectivamente abonado**, **saldo pendiente** y el cálculo exacto de la política de reembolso aplicable en ese instante.
 - **Identificador técnico de la operación:** `Consultar reserva por código : "GET /api/bookings/group/{code}"`
 
 ### C. Pago del Saldo Restante (Segundo 50%)
@@ -105,7 +112,8 @@ Su función es garantizar que todas las reglas del negocio —como el cálculo d
 
 ### B. Bandeja de Conversaciones y Escalamiento a Recepción
 - `Listar conversaciones de WhatsApp : "GET /api/conversations"`: Permite al panel web consultar los chats de los huéspedes, priorizando aquellos que solicitaron atención de un recepcionista humano.
-- `Notificar escalamiento a agente humano : "POST /api/conversations/{id}/escalation"`: Registra la solicitud de transferencia a recepción humana y emite la alerta en tiempo real al panel web mediante conexión continua (`Canal de notificaciones en tiempo real : "/ws"`).
+- `Notificar escalamiento a agente humano : "POST /api/conversations/{id}/escalation"`: Marca la conversación como escalada para que el panel web la muestre como pendiente de atención humana. El panel web consulta la bandeja por sondeo periódico; no hay canal de notificaciones en tiempo real.
+- `Aviso del chatbot de que un huésped pidió un agente : "POST /api/notifications/agent-request"`: Lo invoca n8n con la llave de servicio (`{"wa_id", "name", "context"}`). Marca como escalada la conversación en curso de ese número y responde 202.
 
 ### C. Tienda Interna, Inventario y Finanzas
 - **Catálogo y consumos de tienda:** Operaciones para crear y editar productos (`Gestión de productos : "/api/products"`), registrar compras con descuento automático de existencias y asociar el cargo a una reserva activa o como venta directa de mostrador (`Registro de consumos : "/api/consumptions"`).

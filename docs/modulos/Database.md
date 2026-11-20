@@ -44,7 +44,8 @@ Conserva el perfil de cada cliente que se comunica por WhatsApp o se registra en
 ### D. Registro de Reservas (`Reservas : "booking"`)
 Contiene cada estadía reservada desde el chatbot de WhatsApp o desde la aplicación web:
 - `Identificador de reserva : "id"`.
-- `Identificador de grupo de reserva : "reservation_group_id"`: Código único universal (cuyo prefijo de 8 caracteres se entrega al cliente) que agrupa todas las habitaciones tomadas en una misma solicitud familiar o grupal.
+- `Identificador de grupo de reserva : "reservation_group_id"`: Código único universal e interno que agrupa todas las habitaciones tomadas en una misma solicitud familiar o grupal.
+- `Código de reserva : "booking_code"`: Código público que se entrega al huésped con el formato `TS-XXXX` (por ejemplo, `TS-7K4Q`). Es único por reserva, lo comparten todas las habitaciones del mismo grupo y se busca siempre por coincidencia exacta.
 - `Habitación asignada : "room_id"` y `Huésped titular : "guest_id"`.
 - `Fecha de entrada : "check_in"` y `Fecha de salida : "check_out"`.
 - `Estado de la reserva : "status"`: Admite exclusivamente cuatro estados en minúsculas:
@@ -92,12 +93,16 @@ Esta regla utiliza un índice de rangos de fechas (`Índice GiST : "EXCLUDE USIN
 
 La creación y evolución de las tablas se gestiona de forma automática al iniciar el servidor mediante archivos numerados en [apps/api/src/main/resources/db/migration/](../../apps/api/src/main/resources/db/migration):
 
-1. [V1__initial_schema.sql](../../apps/api/src/main/resources/db/migration/V1__initial_schema.sql): Crea las tablas principales del sistema (`room`, `guest`, `booking`, `product`, `consumption`, `financial_record`, `conversation`, `system_users`), la restricción contra cruces de fechas y los índices de búsqueda rápida.
-2. [V2__seed_rooms.sql.example](../../apps/api/src/main/resources/db/migration/V2__seed_rooms.sql.example): Plantilla de carga inicial con las **9 habitaciones de referencia** del hotel. Al copiarse como `V2__seed_rooms.sql`, inserta el catálogo inicial sin exponer tarifas reales en el repositorio público.
-3. [V3__align_id_types_with_jpa.sql](../../apps/api/src/main/resources/db/migration/V3__align_id_types_with_jpa.sql): Alinea los tipos de datos de los identificadores numéricos de todas las tablas para soportar volúmenes altos de registros.
-4. [V4__booking_groups_and_guest_document.sql](../../apps/api/src/main/resources/db/migration/V4__booking_groups_and_guest_document.sql): Incorpora el documento de identidad del huésped (`document_number`), el código de agrupación para reservas de múltiples habitaciones (`reservation_group_id`) y el listado de acompañantes (`companions`).
-5. [V5__add_paid_amount_and_review_entity.sql](../../apps/api/src/main/resources/db/migration/V5__add_paid_amount_and_review_entity.sql): Añade el control del monto efectivamente abonado (`paid_amount`), amplía los estados de pago parcial y crea la tabla de reseñas (`review`) con sus datos iniciales.
-6. [V6__create_special_events_table.sql](../../apps/api/src/main/resources/db/migration/V6__create_special_events_table.sql): Crea la tabla de eventos especiales y temporadas (`special_event`) para descuentos o ajustes tarifarios estacionales.
-7. [V7__create_restaurant_tables.sql](../../apps/api/src/main/resources/db/migration/V7__create_restaurant_tables.sql): Crea las tablas de la cafetería y restaurante Salgados Café (`menu_item`, `restaurant_order`, `restaurant_order_item`) para comandas y consumos.
-8. [V8__seed_products.sql.example](../../apps/api/src/main/resources/db/migration/V8__seed_products.sql.example): Plantilla de carga inicial para los productos de la tienda interna del hotel (se copia localmente como `V8__seed_products.sql`).
-9. [dev_seed.sql](../../db/seed/dev_seed.sql): Archivo auxiliar para entornos de desarrollo local que permite crear el usuario inicial de administración en la tabla `Usuarios del sistema : "system_users"`.
+1. [V1__initial_schema.sql](../../apps/api/src/main/resources/db/migration/V1__initial_schema.sql): Crea las tablas principales del sistema (`room`, `guest`, `booking`, `review`, `product`, `consumption`, `conversation`, `system_users`), la restricción contra cruces de fechas y los índices de búsqueda rápida.
+2. [V3__align_id_types_with_jpa.sql](../../apps/api/src/main/resources/db/migration/V3__align_id_types_with_jpa.sql): Alinea los tipos de datos de los identificadores numéricos de todas las tablas para soportar volúmenes altos de registros.
+3. [V4__booking_groups_and_guest_document.sql](../../apps/api/src/main/resources/db/migration/V4__booking_groups_and_guest_document.sql): Incorpora el documento de identidad del huésped (`document_number`), el código de agrupación para reservas de múltiples habitaciones (`reservation_group_id`) y el listado de acompañantes (`companions`).
+4. [V5__add_paid_amount_and_review_entity.sql](../../apps/api/src/main/resources/db/migration/V5__add_paid_amount_and_review_entity.sql): Añade el control del monto efectivamente abonado (`paid_amount`) y adapta la tabla de reseñas (`review`).
+5. [V6__create_special_events_table.sql](../../apps/api/src/main/resources/db/migration/V6__create_special_events_table.sql): Crea la tabla de eventos especiales y temporadas (`special_events`) para descuentos o recargos tarifarios estacionales.
+6. [V7__create_restaurant_tables.sql](../../apps/api/src/main/resources/db/migration/V7__create_restaurant_tables.sql): Crea las tablas de la cafetería y restaurante Salgados Café (`menu_items`, `restaurant_orders`, `restaurant_order_items`) para comandas y consumos.
+7. [V8__remove_placeholder_reviews.sql](../../apps/api/src/main/resources/db/migration/V8__remove_placeholder_reviews.sql): Elimina las reseñas de ejemplo; las reseñas reales se consultan directamente en el perfil oficial de Google Reviews.
+8. [V9__add_booking_code.sql](../../apps/api/src/main/resources/db/migration/V9__add_booking_code.sql): Crea el código público de reserva (`booking_code`) en su propia columna y devuelve la columna de acompañantes (`companions`) a su propósito original.
+
+**Datos iniciales del hotel (plantillas repetibles):** las habitaciones y los productos reales no se publican en el repositorio. Se cargan con plantillas que se copian localmente sin la extensión `.example`. Al ser migraciones repetibles (prefijo `R__`), no ocupan un número de versión y pueden crearse en cualquier momento sin interferir con las migraciones anteriores:
+- [R__seed_rooms.sql.example](../../apps/api/src/main/resources/db/migration/R__seed_rooms.sql.example): Plantilla con las **9 habitaciones de referencia** (se copia como `R__seed_rooms.sql`).
+- [R__seed_products.sql.example](../../apps/api/src/main/resources/db/migration/R__seed_products.sql.example): Plantilla de productos de la tienda interna (se copia como `R__seed_products.sql`).
+- [dev_seed.sql](../../db/seed/dev_seed.sql): Archivo auxiliar para entornos de desarrollo local con usuarios, habitaciones, productos, eventos y huéspedes de prueba.

@@ -8,7 +8,7 @@ El módulo de **Seguridad y Protección de Datos** define las medidas de resguar
 
 ## 2. Control de Acceso por Roles en la Aplicación Web
 
-El acceso a las funciones administrativas y operativas del panel web se protege mediante inicio de sesión con usuario y contraseña, emitiendo una credencial digital firmada con vigencia controlada (`Credencial de sesión : "JWT"` configurada con `Clave secreta de firma : "JWT_SECRET"` y `Tiempo de expiración : "JWT_EXPIRATION"`).
+El acceso a las funciones administrativas y operativas del panel web se protege mediante inicio de sesión con usuario y contraseña, validado contra las cuentas registradas del personal. Al ingresar, el servidor central emite una credencial digital firmada con vigencia controlada (`Credencial de sesión : "JWT"` configurada con `Clave secreta de firma : "JWT_SECRET"` y `Tiempo de expiración : "JWT_EXPIRATION_MS"`, por defecto 8 horas). Todas las operaciones del servidor central exigen esta credencial y verifican el perfil antes de ejecutarse: una operación exclusiva del Administrador se rechaza aunque se intente desde fuera de la aplicación web.
 
 El sistema distingue estrictamente dos perfiles de usuario:
 
@@ -26,7 +26,8 @@ El sistema distingue estrictamente dos perfiles de usuario:
 | **Crear, editar o desactivar cuentas de usuarios del personal** | **Exclusivo Administrador** | No permitido |
 
 ### Reglas de Cuentas del Personal
-- **Almacenamiento seguro de contraseñas:** Ninguna contraseña se guarda en texto visible; el sistema almacena únicamente su huella criptográfica irreversible (`Contraseña cifrada : "password_hash"`).
+- **Almacenamiento seguro de contraseñas:** Ninguna contraseña se guarda en texto visible; el sistema almacena únicamente su huella criptográfica irreversible (`Contraseña cifrada : "password_hash"`, algoritmo BCrypt).
+- **Primer administrador:** En una instalación nueva, el primer usuario Administrador se crea automáticamente a partir de los parámetros de instalación (`SATORI_ADMIN_USERNAME` y `SATORI_ADMIN_PASSWORD`), solo si ese usuario aún no existe.
 - **Retiro de personal sin pérdida de historial:** Cuando un empleado deja de laborar en el hotel, su cuenta no se elimina físicamente de la base de datos para conservar el registro histórico de qué operaciones realizó en su momento; en su lugar, el administrador desactiva la cuenta (`Usuario activo : "active = false"`), bloqueando de inmediato su ingreso al sistema.
 
 ---
@@ -36,7 +37,8 @@ El sistema distingue estrictamente dos perfiles de usuario:
 1. **Aislamiento de servicios internos:** La base de datos principal y el motor de memoria rápida se ejecutan dentro de una red interna privada de contenedores y no están expuestos a internet público. Únicamente el servidor de aplicaciones y el canal de recepción de mensajes de WhatsApp reciben tráfico externo autorizado.
 2. **Verificación de autenticidad de mensajes de WhatsApp:** Las notificaciones entrantes desde la plataforma oficial de Meta incluyen una firma criptográfica en su encabezado (`Firma de seguridad de Meta : "X-Hub-Signature-256"`), la cual permite validar que el mensaje proviene genuinamente de WhatsApp y no de un tercero no autorizado.
 3. **Control de mensajes duplicados:** En caso de que la red telefónica o Meta reenvíe un mismo mensaje por intermitencia de conexión, el sistema identifica el código único del mensaje (`Identificador de mensaje : "message_id"`) para evitar procesarlo dos veces.
-4. **Protección de claves y credenciales:** Todas las contraseñas de base de datos, llaves de inteligencia artificial (`Clave de Google Gemini : "GEMINI_API_KEY"`) y tokens de conexión a WhatsApp (`Token de WhatsApp : "WHATSAPP_API_TOKEN"`) se cargan desde variables de entorno locales ([.env.example](../../.env.example)) excluidas del repositorio de código.
+4. **Identificación del asistente de WhatsApp ante el servidor central:** El orquestador del chatbot se identifica con una llave de servicio privada (`Llave de servicio : "SATORI_SERVICE_KEY"`). Sin ella no es posible consultar, crear ni modificar reservas, y con ella solo se permiten las operaciones propias de la atención al huésped.
+5. **Protección de claves y credenciales:** Todas las contraseñas de base de datos, llaves de inteligencia artificial (`Clave de Google Gemini : "GEMINI_API_KEY"`) y tokens de conexión a WhatsApp (`Token de WhatsApp : "WHATSAPP_API_TOKEN"`) se cargan desde variables de entorno locales ([.env.example](../../.env.example)) excluidas del repositorio de código.
 
 ---
 
@@ -44,7 +46,7 @@ El sistema distingue estrictamente dos perfiles de usuario:
 
 En cumplimiento del régimen colombiano de Habeas Data y protección de datos personales:
 - **Aviso de privacidad e información previa:** Tanto en el flujo de reserva guiada paso a paso como en el asistente con inteligencia artificial en WhatsApp, antes de recopilar el nombre completo y el número de documento de identidad del huésped, el asistente presenta el aviso de privacidad informando que los datos suministrados serán tratados por Torre Satori con la única finalidad de gestionar su reserva, registro hotelero y facturación.
-- **Verificación de identidad en dos pasos para consultas y cancelaciones:** Para impedir que terceros no autorizados accedan a los datos de la estadía o alteren reservas ajenas al conocer un código de reserva, el sistema exige validar conjuntamente el código de reserva (`TS-XXXX`) y el número de documento de identidad (cédula) del titular registrado.
+- **Verificación de identidad en dos pasos para consultas y cancelaciones:** Para impedir que terceros no autorizados accedan a los datos de la estadía o alteren reservas ajenas al conocer un código de reserva, el sistema exige validar conjuntamente el código de reserva (`TS-XXXX`) y el número de documento de identidad (cédula) del titular registrado. Esta verificación la realiza el servidor central: si el documento no coincide responde igual que si la reserva no existiera, y el asistente de WhatsApp nunca recibe el documento completo del titular (solo sus últimos 4 dígitos).
 - **Finalidad exclusiva y confidencialidad:** Los números telefónicos, nombres, documentos de identidad y registros de acompañantes se utilizan únicamente para la prestación del servicio de hospedaje y no se comparten ni comercializan con terceros.
 
 ---

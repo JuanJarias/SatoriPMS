@@ -2,18 +2,15 @@
 
 Bienvenido al centro de documentación de **SatoriPMS**, el sistema de gestión hotelera y reservas automatizadas para **Torre Satori** (Sevilla, Valle del Cauca).
 
-Esta carpeta reúne la especificación completa del proyecto: cómo funciona el negocio, qué compone cada módulo del sistema, cómo interactúan sus servicios mediante diagramas visuales, cuál es su modelo financiero y cuál es el estado actual de construcción.
+Esta carpeta reúne la especificación completa del proyecto: cómo funciona el negocio, qué compone cada módulo del sistema, cómo interactúan sus servicios mediante diagramas visuales y cuál es su modelo financiero.
 
 ---
 
 ## Propósito y Cómo Utilizar esta Documentación
 
-La documentación está organizada para cumplir dos funciones claramente diferenciadas:
+Esta carpeta reúne la **especificación funcional y de diseño del proyecto** (`modulos/`, `Diagramas/`, `Presupuesto/`, `Reuniones/` y `Actividades/`). Explica con claridad qué debe hacer el sistema, cómo funcionan sus flujos operativos y cuáles son las reglas acordadas para el hotel. Cualquier persona, cliente o integrante del equipo que lea estos documentos comprenderá qué compone el proyecto y cómo debe operar en su totalidad.
 
-1. **Especificación Funcional y de Diseño del Proyecto (`modulos/`, `Diagramas/`, `Presupuesto/`, `Reuniones/`):**
-   Explica con claridad qué debe hacer el sistema, cómo funcionan sus flujos operativos y cuáles son las reglas acordadas para el hotel. Cualquier persona, cliente o integrante del equipo que lea estos documentos comprenderá qué compone el proyecto y cómo debe operar en su totalidad.
-2. **Seguimiento de Avance y Control de Cambios (`EstadoActual.md` y `CambiosPendientes.md`):**
-   Concentra exclusivamente el estado real de implementación, las decisiones técnicas adoptadas, el historial de modificaciones y los cambios pendientes de envío al repositorio remoto.
+El historial de cambios del código se consulta directamente en el registro de versiones del repositorio.
 
 ---
 
@@ -35,11 +32,7 @@ Cada documento describe el funcionamiento previsto, las reglas de negocio y el d
 - [Diseño Visual y Experiencia de Usuario (UX/UI)](modulos/DiseñoUXUI.md): Identidad visual inspirada en la cultura cafetera de Sevilla, paleta de colores, tipografía y principios de usabilidad del panel web.
 - [Gestión del Proyecto](modulos/GestionProyecto.md): Alcance general, desglose de etapas de trabajo, conformación del equipo, cronograma de entregas y matriz de gestión de riesgos.
 
-### 2. Seguimiento del Proyecto (`docs/modulos/EstadoActual.md` y `docs/CambiosPendientes.md`)
-- [Estado Actual del Proyecto](modulos/EstadoActual.md): Único documento oficial de seguimiento técnico y administrativo. Contiene el resumen ejecutivo, el estado verificado de cada componente y documento, las discrepancias identificadas, los trabajos pendientes, el historial de cambios y el registro de decisiones.
-- [Cambios Pendientes de Envío](CambiosPendientes.md): Registro organizado por commit de todas las modificaciones realizadas localmente desde la última sincronización con el repositorio remoto.
-
-### 3. Diagramas del Sistema (`docs/Diagramas/`)
+### 2. Diagramas del Sistema (`docs/Diagramas/`)
 - [Índice de Diagramas](Diagramas/README.md): Guía de las representaciones visuales del proyecto:
   1. [Infraestructura y Servicios](Diagramas/01_Infraestructura_Servicios.md)
   2. [Flujo de Reserva por WhatsApp](Diagramas/02_Flujo_Reserva_WhatsApp.md)
@@ -47,14 +40,16 @@ Cada documento describe el funcionamiento previsto, las reglas de negocio y el d
   4. [Gestión Operativa en Recepción](Diagramas/04_Gestion_Operativa_Recepcion.md)
   5. [Ciclo de Vida de una Reserva](Diagramas/05_Ciclo_Vida_Reserva.md)
 
-### 4. Presupuesto y Viabilidad Financiera (`docs/Presupuesto/`)
+### 3. Presupuesto y Viabilidad Financiera (`docs/Presupuesto/`)
 - [Presupuesto General del Proyecto](Presupuesto/Presupuesto.md): Análisis detallado de los costos de construcción, puesta en marcha en Sevilla, operación mensual en producción y retorno de inversión para las 9 habitaciones de referencia del hotel.
 - [Libro Financiero en Excel (`Presupuesto_SatoriPMS.xlsx`)](Presupuesto/Presupuesto_SatoriPMS.xlsx): Modelo financiero dinámico con cinco hojas vinculadas mediante fórmulas (Resumen Ejecutivo, Matriz de Costos, Catálogo de Requerimientos, Escenarios Financieros y Supuestos Validados).
 - [Análisis de Escenarios de Crisis Presupuestal](Presupuesto/Actividad4_Crisis_Presupuestal.md): Evaluación de planes de contingencia ante un recorte financiero, un cambio regulatorio de privacidad y la salida imprevista de un integrante técnico.
 
-### 5. Actas y Actividades de Referencia (`docs/Reuniones/` y `docs/Actividades/`)
+### 4. Actas y Actividades de Referencia (`docs/Reuniones/` y `docs/Actividades/`)
 - [Acta de Reunión con el Cliente](Reuniones/ReunionCliente.md): Minuta ejecutiva y transcripción íntegra de la sesión de levantamiento de requerimientos con el propietario del hotel, Frank Arias Salgado.
-- [Enunciado de Escenarios de Crisis Presupuestal (PDF)](Actividades/ACTIVIDAD%204%20(Escenarios%20de%20Crisis%20Presupuestal).pdf): Documento académico de referencia para la simulación financiera.
+- [Enunciado de Escenarios de Crisis Presupuestal (PDF)](<Actividades/ACTIVIDAD 4 (Escenarios de Crisis Presupuestal).pdf>): Documento académico de referencia para la simulación financiera.
+- [Plan de Transición y Alistamiento Operativo del Servicio](Actividades/Actividad5_Transicion_Servicio.md): Entregable de la transición del servicio a operación bajo el marco ITIL 4.
+- [Enunciado de la Transición del Servicio (PDF)](<Actividades/ACTIVIDAD 5. Entregable transición del servicio (Operaciones).pdf>): Documento académico de referencia para el plan de transición.
 
-### 6. Guías de Despliegue y Configuración
-- [Guía de Configuración de Variables de Entorno (.env)](Guia_Configuracion_Entorno.md): Manual detallado paso a paso para obtener y configurar cada una de las claves de acceso, identificadores de WhatsApp (Meta for Developers), Inteligencia Artificial (Google AI Studio), pasarela de pagos (Mercado Pago) y credenciales de infraestructura local.
+### 5. Guías de Despliegue y Configuración
+- [Guía de Configuración de Variables de Entorno (.env)](Guia_Configuracion_Entorno.md): Manual detallado paso a paso para obtener y configurar cada una de las claves de acceso, identificadores de WhatsApp (Meta for Developers), Inteligencia Artificial (Google AI Studio), pasarela de pagos (Wompi), seguridad del servidor central y credenciales de infraestructura local.

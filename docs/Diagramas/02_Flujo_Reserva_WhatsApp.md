@@ -12,7 +12,7 @@ Este diagrama detalla paso a paso cómo un huésped realiza una reserva a travé
 sequenceDiagram
     autonumber
     actor H as Huésped (WhatsApp)
-    participant N as Orquestador Chatbot (n8n V8)
+    participant N as Orquestador Chatbot (n8n V9)
     participant IA as Inteligencia Artificial (Gemini)
     participant A as Servidor Central (API)
     participant R as Memoria Rápida (Redis 7)
@@ -80,7 +80,7 @@ sequenceDiagram
         A->>R: Verifica que el lockToken siga vigente
         A->>DB: Guarda huésped y reserva agrupada (reservationGroupId)<br/>status = 'confirmed', payment_status = 'paid' o 'partial'
         A->>R: Elimina de inmediato el bloqueo temporal
-        A-->>N: Devuelve código de reserva (8 caracteres), total, abonado y saldo
+        A-->>N: Devuelve código de reserva (TS-XXXX), total, abonado y saldo
         N->>R: Reinicia sesión de usuario a estado de menú
         N-->>H: Envía confirmación exitosa con código único y desglose de pago
     else Elige Opción 3 (Cancelar) o Reinicia con "Menú"
