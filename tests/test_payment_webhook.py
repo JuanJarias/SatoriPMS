@@ -24,9 +24,9 @@ def _sign_payload(raw_bytes: bytes, secret: str | None = None) -> str:
 
 
 async def _create_locked_booking_for_webhook() -> int:
-    """Limpia reservas de la habitación 102 y crea un bloqueo temporal BLOQUEADA_TEMPORAL."""
+    """Limpia reservas de la habitación 2 (Familiar) y crea un bloqueo temporal BLOQUEADA_TEMPORAL."""
     async with AsyncSessionLocal() as session:
-        room_res = await session.execute(select(Room).where(Room.number == "102"))
+        room_res = await session.execute(select(Room).where(Room.number == "2"))
         room = room_res.scalar_one()
         await session.execute(delete(Booking).where(Booking.room_id == room.id))
 

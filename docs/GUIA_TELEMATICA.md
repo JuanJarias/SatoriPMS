@@ -380,7 +380,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 | ID | Paso | Modo | Estado |
 | :--- | :--- | :--- | :--- |
 | `P0` | Aislamiento DB de pruebas (`satoripms_test`) y variables `.env` Wompi/Google | `AGY` | [x] |
-| `P1` | Migración Alembic `004`: cuartos `1–9`, tarifas reales y tablas operativas | `AGY` | [ ] |
+| `P1` | Migración Alembic `004`: cuartos `1–9`, tarifas reales y tablas operativas | `AGY` | [x] |
 | `P2` | RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers | `AGY` | [ ] |
 | `P3` | Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` | `AGY` | [ ] |
 | `P4` | Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) | `AGY` | [ ] |
@@ -424,7 +424,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 - **Checklist manual:**
   1. Consultar `SELECT id, number, name, price_per_night FROM room ORDER BY id;` y validar `1..9`.
   2. Confirmar que `alembic downgrade -1` revierte limpio en `satoripms_test`.
-- **Casilla:** `[ ]` Completado y verificado.
+- **Casilla:** `[x]` Completado y verificado.
 - **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
 
 ---

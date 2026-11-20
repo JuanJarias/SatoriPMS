@@ -12,12 +12,12 @@ from apps.api.main import app
 from apps.api.models import Booking, BookingStatus, Guest, Room
 
 
-async def _clear_bookings_and_get_room_101() -> tuple[int, int]:
+async def _clear_bookings_and_get_room_1() -> tuple[int, int]:
     """Limpia reservas previas, restaura las 9 habitaciones a available y garantiza un huésped de prueba."""
     async with AsyncSessionLocal() as session:
         await session.execute(delete(Booking))
         await session.execute(update(Room).values(status="available", active=True))
-        room_res = await session.execute(select(Room).where(Room.number == "101"))
+        room_res = await session.execute(select(Room).where(Room.number == "1"))
         room = room_res.scalar_one()
 
         guest_res = await session.execute(
@@ -41,11 +41,11 @@ async def _clear_bookings_and_get_room_101() -> tuple[int, int]:
 @pytest.mark.asyncio
 async def test_availability_calculates_extra_guest_surcharge_and_filters_capacity_rn01() -> None:
     """Verifica que GET /api/v1/rooms/availability aplique recargo por adulto adicional (RN-01) y filtre por capacidad."""
-    await _clear_bookings_and_get_room_101()
+    await _clear_bookings_and_get_room_1()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # 1. Para 3 adultos (2 noches): Hab 101 tiene base=2, max=3, precio=120000, extra=20000 -> (120000+20000)*2 = 280000.00
+        # 1. Para 3 adultos (2 noches): Hab 4 (Balcón) tiene base=2, max=3, precio=210000, extra=40000 -> (210000+40000)*2 = 500000.00
         res = await client.get(
             "/api/v1/rooms/availability",
             params={
@@ -57,14 +57,14 @@ async def test_availability_calculates_extra_guest_surcharge_and_filters_capacit
         )
         assert res.status_code == 200
         rooms = res.json()
-        assert len(rooms) == 9
-        room_101 = next(r for r in rooms if r["number"] == "101")
-        assert room_101["nights"] == 2
-        assert room_101["extra_adults"] == 1
-        assert Decimal(room_101["total_price"]) == Decimal("280000.00")
+        assert len(rooms) == 6
+        room_4 = next(r for r in rooms if r["number"] == "4")
+        assert room_4["nights"] == 2
+        assert room_4["extra_adults"] == 1
+        assert Decimal(room_4["total_price"]) == Decimal("500000.00")
 
-        # 2. Para 5 adultos: solo las 3 suites (301, 302, 303 con max_adults_capacity=6) cumplen RN-01
-        res_suites = await client.get(
+        # 2. Para 5 adultos: Hab 2 (Familiar, max=5) y Hab 9 (Cordillera, max=6) cumplen RN-01
+        res_large = await client.get(
             "/api/v1/rooms/availability",
             params={
                 "check_in": "2026-12-10",
@@ -72,17 +72,17 @@ async def test_availability_calculates_extra_guest_surcharge_and_filters_capacit
                 "adults": 5,
             },
         )
-        assert res_suites.status_code == 200
-        suite_numbers = [r["number"] for r in res_suites.json()]
-        assert suite_numbers == ["301", "302", "303"]
+        assert res_large.status_code == 200
+        large_numbers = [r["number"] for r in res_large.json()]
+        assert large_numbers == ["2", "9"]
 
 
 @pytest.mark.asyncio
 async def test_availability_hides_active_lock_but_ignores_expired_lock_inline_rn02() -> None:
     """Verifica que un bloqueo vigente oculte la habitación, pero si expires_at <= NOW() se ignore dinámicamente en PostgreSQL."""
-    guest_id, room_id = await _clear_bookings_and_get_room_101()
+    guest_id, room_id = await _clear_bookings_and_get_room_1()
 
-    # 1. Insertar bloqueo temporal vigente (+15 min) en Habitación 101
+    # 1. Insertar bloqueo temporal vigente (+15 min) en Habitación 1
     async with AsyncSessionLocal() as session:
         lock = Booking(
             guest_id=guest_id,
@@ -92,7 +92,7 @@ async def test_availability_hides_active_lock_but_ignores_expired_lock_inline_rn
             status=BookingStatus.BLOQUEADA_TEMPORAL.value,
             expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
             adults=2,
-            total_price=Decimal("240000.00"),
+            total_price=Decimal("360000.00"),
         )
         session.add(lock)
         await session.commit()
@@ -106,7 +106,7 @@ async def test_availability_hides_active_lock_but_ignores_expired_lock_inline_rn
         )
         assert res_active.status_code == 200
         numbers_active = [r["number"] for r in res_active.json()]
-        assert "101" not in numbers_active
+        assert "1" not in numbers_active
         assert len(numbers_active) == 8
 
     # 2. Vencer expires_at en BD (-1 minuto) SIN cambiar el status (sigue en BLOQUEADA_TEMPORAL)
@@ -123,5 +123,5 @@ async def test_availability_hides_active_lock_but_ignores_expired_lock_inline_rn
         )
         assert res_expired.status_code == 200
         numbers_expired = [r["number"] for r in res_expired.json()]
-        assert "101" in numbers_expired
+        assert "1" in numbers_expired
         assert len(numbers_expired) == 9

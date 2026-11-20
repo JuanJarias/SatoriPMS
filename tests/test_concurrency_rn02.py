@@ -13,9 +13,9 @@ from apps.api.models import Booking, BookingStatus, Guest, Room
 
 
 async def _prepare_test_guest_and_room() -> tuple[int, int]:
-    """Crea o recupera un huésped de prueba y limpia reservas previas de la habitación 101."""
+    """Crea o recupera un huésped de prueba y limpia reservas previas de la habitación 1."""
     async with AsyncSessionLocal() as session:
-        room_res = await session.execute(select(Room).where(Room.number == "101"))
+        room_res = await session.execute(select(Room).where(Room.number == "1"))
         room = room_res.scalar_one()
 
         await session.execute(delete(Booking).where(Booking.room_id == room.id))

@@ -95,7 +95,7 @@ async def test_postgresql_conversation_session_crud_and_agent_escalation() -> No
 async def test_n8n_v10_end_to_end_booking_lifecycle_and_rn03_cancellation() -> None:
     """Simula el recorrido completo de n8n V10: disponibilidad -> lock -> confirm (TS-XXXX) -> group -> pay-remaining -> cancellation (RN-03)."""
     async with AsyncSessionLocal() as session:
-        room_res = await session.execute(select(Room).where(Room.number == "103"))
+        room_res = await session.execute(select(Room).where(Room.number == "3"))
         room = room_res.scalar_one()
         await session.execute(delete(Booking).where(Booking.room_id == room.id))
         await session.commit()
@@ -115,8 +115,8 @@ async def test_n8n_v10_end_to_end_booking_lifecycle_and_rn03_cancellation() -> N
             },
         )
         assert avail_res.status_code == 200
-        room_103 = next(r for r in avail_res.json() if r["number"] == "103")
-        assert room_103["pricePerNight"] == 120000.0
+        room_3 = next(r for r in avail_res.json() if r["number"] == "3")
+        assert room_3["pricePerNight"] == 170000.0
 
         # 2. Bloqueo temporal de 15 min desde n8n V10
         lock_res = await client.post(
@@ -154,8 +154,8 @@ async def test_n8n_v10_end_to_end_booking_lifecycle_and_rn03_cancellation() -> N
         assert code.startswith("TS-")
         assert c_data["status"] == "CONFIRMADA"
         assert c_data["paymentStatus"] == "partial"
-        assert c_data["paidAmount"] == 120000.0
-        assert c_data["remainingAmount"] == 120000.0
+        assert c_data["paidAmount"] == 170000.0
+        assert c_data["remainingAmount"] == 170000.0
 
         # 4. Consulta por código TS-XXXX
         group_res = await client.get(f"/api/bookings/group/{code}")
@@ -169,11 +169,11 @@ async def test_n8n_v10_end_to_end_booking_lifecycle_and_rn03_cancellation() -> N
         assert pay_rem_res.json()["paymentStatus"] == "paid"
         assert pay_rem_res.json()["remainingAmount"] == 0.0
 
-        # 6. Cancelación con cálculo de reembolso RN-03 (>72h antes de 2026-12-25 -> 100% de 240.000)
+        # 6. Cancelación con cálculo de reembolso RN-03 (>72h antes de 2026-12-25 -> 100% de 340.000)
         cancel_res = await client.post(f"/api/bookings/group/{code}/cancellation")
         assert cancel_res.status_code == 200
         cancel_data = cancel_res.json()
         assert cancel_data["status"] == "CANCELADA"
         assert cancel_data["refundPercentage"] == 100
-        assert cancel_data["refundAmount"] == 240000.0
-        assert "103" in cancel_data["freedRoomNumbers"]
+        assert cancel_data["refundAmount"] == 340000.0
+        assert "3" in cancel_data["freedRoomNumbers"]
