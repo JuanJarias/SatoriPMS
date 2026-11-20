@@ -366,3 +366,222 @@ En tu sustentación, ten preparadas estas tres respuestas contundentes:
 
 ### Pregunta 3: *"¿Por qué desacoplan Meta de FastAPI poniendo n8n en el medio en lugar de recibir los webhooks directamente en FastAPI?"*
 > **Tu respuesta:** *"Por el patrón arquitectural de Adaptador de Borde (Edge Adapter) y separación de responsabilidades. Meta Cloud API actualiza con frecuencia la estructura de sus payloads de WhatsApp y requiere mecánicas de plantillas y reintentos. n8n actúa como adaptador de transporte: recibe la trama HTTP de Meta, valida el handshake de verificación (`hub.challenge`), normaliza el mensaje a un JSON plano de negocio y lo entrega a FastAPI mediante una llamada HTTP autenticada con clave de servicio (`X-Service-Key`). De esta forma, si el proveedor de mensajería cambia mañana (por ejemplo, a Telegram o Twilio), nuestro backend transaccional de FastAPI no sufre ninguna modificación."*
+
+---
+
+## 7. Plan Maestro de Cierre para Entrega a Producción (`v1.0.0`)
+
+Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **Torre Satori PMS** al hotel cliente (9 habitaciones numeradas `1–9`, pasarela **Wompi** tras puerto sandbox, **WhatsApp Cloud API directo** vía n8n/PostgreSQL, 12 pantallas web persistentes y CI completo) antes de realizar el merge final a `main` como **`v1.0.0`**.
+
+> **Regla de ejecución en Fase 3:** después de cada paso (`P0`..`P10`) se ejecutan `.venv/bin/pytest -v` y `cd apps/web && npm run build`, se entrega el checklist manual (máx. 5 puntos) y se **pausa hasta recibir `"OK"`** para hacer 1 commit en español y push exclusivo a `migracion-fastapi`. Cada lote deja nota en `docs/aprendizaje/<ID>.md`.
+
+### Índice de Pasos
+
+| ID | Paso | Modo | Estado |
+| :--- | :--- | :--- | :--- |
+| `P0` | Aislamiento DB de pruebas (`satoripms_test`) y variables `.env` Wompi/Google | `AGY` | [x] |
+| `P1` | Migración Alembic `004`: cuartos `1–9`, tarifas reales y tablas operativas | `AGY` | [ ] |
+| `P2` | RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers | `AGY` | [ ] |
+| `P3` | Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` | `AGY` | [ ] |
+| `P4` | Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) | `AGY` | [ ] |
+| `P5` | Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel | `AGY` | [ ] |
+| `P6` | Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) | `AGY` | [ ] |
+| `P7` | Reconciliación flujo n8n `V10` (Wompi `ec8eace` sin Redis) y prueba Meta live | `AGY` | [ ] |
+| `P8` | Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 | `AGY` | [ ] |
+| `P9` | Docker prod (Nginx HTTPS, R2 `pg_dump`, Sentry) y limpieza del repositorio | `AGY` | [ ] |
+| `P10` | Respaldo `origin/main`, merge `--no-ff` de `migracion-fastapi` a `main` y tag `v1.0.0` | `AGY` | [ ] |
+
+---
+
+### `P0` — Aislamiento DB de pruebas (`satoripms_test`) y variables `.env` Wompi/Google (`AGY`)
+- **Objetivo:** evitar que `pytest` borre reservas reales de `satoripms` y declarar en `.env.example` / `config.py` las variables definitivas (`WOMPI_*`, `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACE_ID`, `GOOGLE_REVIEWS_URL`, `N8N_INTERNAL_API_KEY`), retirando `MERCADOPAGO_*`.
+- **Archivos afectados:** `tests/conftest.py`, `apps/api/core/config.py`, `.env.example`, `.env`, `docs/aprendizaje/P0.md`.
+- **Criterio de aceptación:** `pytest` corre completo contra `satoripms_test` sin tocar filas de `satoripms`, y `Settings` carga todas las nuevas llaves sin valores hardcodeados inseguros en prod.
+- **Comandos:**
+  ```bash
+  sudo docker exec satori_postgres psql -U satori -d postgres -c "CREATE DATABASE satoripms_test;"
+  .venv/bin/pytest -v
+  cd apps/web && npm run build
+  ```
+- **Checklist manual:**
+  1. Confirmar que tras correr `pytest`, `satoripms` conserva intactas sus reservas previas.
+  2. Verificar que `.env` tiene las claves `WOMPI_*` y `GOOGLE_*` listas (sin valores en git).
+- **Casilla:** `[x]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P1` — Migración Alembic `004`: cuartos `1–9`, tarifas reales y tablas operativas (`AGY`)
+- **Objetivo:** migrar las 9 habitaciones de `101..303` a `'1'..'9'` con los nombres y tarifas vigentes de `store.tsx`, crear las tablas relacionales de Tienda (`product`, `folio_charge`), Salgados Café (`cafe_menu`, `cafe_order`), Eventos (`special_event`) y Egresos (`expense`), y retirar el obsoleto `db/seed/dev_seed.sql`.
+- **Archivos afectados:** `apps/api/alembic/versions/004_rooms_1_to_9_and_operations.py`, `apps/api/models/` (nuevos modelos), `db/seed/dev_seed.sql`, `docs/aprendizaje/P1.md`.
+- **Criterio de aceptación:** `alembic upgrade head` ejecuta sin errores en `satoripms` y `satoripms_test`; `room` queda con `'1'..'9'`, tarifas `$170.000–$380.000` y 0 tablas faltantes.
+- **Comandos:**
+  ```bash
+  cd apps/api && ../../.venv/bin/alembic upgrade head
+  ../../.venv/bin/pytest -v
+  cd ../web && npm run build
+  ```
+- **Checklist manual:**
+  1. Consultar `SELECT id, number, name, price_per_night FROM room ORDER BY id;` y validar `1..9`.
+  2. Confirmar que `alembic downgrade -1` revierte limpio en `satoripms_test`.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P2` — RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers (`MÍO`)
+- **Objetivo:** proteger con `Depends(require_role(...))` todos los endpoints administrativos y operativos de `web_operations.py` y `rooms.py`, exigir `X-Service-Key` en rutas internas consumidas por n8n (`/api/bookings/confirm`, `/lock`, `/unlock`, `/conversations/*`) y eliminar `/api/bookings/test-paid` y endpoints demo abiertos.
+- **Archivos afectados:** `apps/api/dependencies/auth.py`, `apps/api/routers/web_operations.py`, `apps/api/routers/rooms.py`, `apps/api/routers/bookings.py`, `apps/api/routers/n8n_compat.py`, `apps/api/routers/conversations.py`, `tests/test_auth.py`, `docs/aprendizaje/P2.md`.
+- **Criterio de aceptación:** peticiones web sin JWT devuelven `401`; Recepcionista recibe `403` en rutas de Administrador (CRUD cuartos, eventos, egresos, usuarios, auditoría); n8n sin `X-Service-Key` recibe `401`.
+- **Comandos:**
+  ```bash
+  .venv/bin/pytest tests/test_auth.py tests/test_web_operations.py -v
+  cd apps/web && npm run build
+  ```
+- **Checklist manual:**
+  1. Probar en `/docs` (Swagger) que `GET /api/v1/auth/audit` y `POST /api/v1/rooms` rechazan sin Bearer token.
+  2. Iniciar sesión con rol `Recepcionista` y confirmar `403` al intentar editar tarifas o crear egresos.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P3` — Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` (`GUIADO`)
+- **Objetivo:** eliminar la búsqueda ambigua `or_(Room.number == ref, Room.id == int(ref))`, resolver siempre por `Room.id`, habilitar `POST /api/v1/rooms` y edición de `number` en `PUT /api/v1/rooms/{room_id}` (con `409 Conflict` si el número ya existe), ordenar numéricamente `1..9` y desbloquear el campo número en `Rooms.tsx`.
+- **Archivos afectados:** `apps/api/routers/web_operations.py`, `apps/api/services/room_service.py`, `apps/api/schemas/room.py`, `apps/web/src/screens/Rooms.tsx`, `apps/web/src/store.tsx`, `tests/test_rooms_availability.py`, `tests/test_web_operations.py`, `docs/aprendizaje/P3.md`.
+- **Criterio de aceptación:** un Administrador puede cambiar el número de la habitación `id=1` sin alterar `id=2` ni romper sus reservas vinculadas por `room_id`, y recibe `409` al intentar duplicar un número existente.
+- **Comandos:**
+  ```bash
+  .venv/bin/pytest tests/test_rooms_availability.py tests/test_web_operations.py -v
+  cd apps/web && npm run build
+  ```
+- **Checklist manual:**
+  1. En **Habitaciones** (Admin), editar el número de un cuarto disponible, guardar y recargar la página (`F5`) validando persistencia.
+  2. Intentar asignar un número ya ocupado por otra habitación y confirmar mensaje de error `409`.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P4` — Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) (`MÍO`)
+- **Objetivo:** incorporar `APScheduler` en `main.py` ejecutando cada 60 s la expiración de `BLOQUEADA_TEMPORAL` vencidas + notificación a n8n; consolidar adaptador **Wompi** tras puerto de pasarela con validación HMAC/checksum e idempotencia; exponer flujo SSE (`/api/v1/events/stream`) para actualización en tiempo real de calendario y reservas.
+- **Archivos afectados:** `apps/api/requirements.txt`, `apps/api/main.py`, `apps/api/services/payment_service.py`, `apps/api/routers/payments.py`, `apps/api/routers/events_stream.py` (nuevo), `tests/test_payment_webhook.py`, `tests/test_booking_lock.py`, `docs/aprendizaje/P4.md`.
+- **Criterio de aceptación:** tras vencer `expires_at`, el job marca `EXPIRADA` en <= 60 s y emite evento SSE; el webhook de Wompi rechaza firmas inválidas con `401` e ignora duplicados con `200`.
+- **Comandos:**
+  ```bash
+  .venv/bin/pytest -v
+  cd apps/web && npm run build
+  ```
+- **Checklist manual:**
+  1. Abrir dos pestañas en **Calendario / Reservas**, confirmar una reserva en una pestaña y observar actualización automática en la otra sin recargar.
+  2. Enviar webhook de prueba sin firma válida al endpoint de pagos y verificar rechazo `401`.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P5` — Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel (`GUIADO`)
+- **Objetivo:** retirar listas RAM en `web_operations.py`; implementar cliente `httpx` para Google Places API con caché TTL y `?refresh=true` (retornando `placesApiConfigured: false` real si falta `GOOGLE_PLACES_API_KEY`); implementar CRUD completo en PostgreSQL para Tienda (`product`), Cargos al folio (`folio_charge`), Salgados Café (`cafe_menu`/`cafe_order`), Eventos (`special_event` + cálculo descuento `HU-12`), Egresos (`expense`), Usuarios (`system_users`) y exportación `.xlsx` real con `openpyxl`.
+- **Archivos afectados:** `apps/api/requirements.txt`, `apps/api/services/reviews_service.py` (nuevo), `apps/api/routers/web_operations.py`, `apps/api/routers/finance_reports.py` (nuevo), `apps/api/routers/auth.py`, `tests/test_web_operations.py`, `docs/aprendizaje/P5.md`.
+- **Criterio de aceptación:** reiniciar `satori_api` no borra comandas, ventas, eventos, egresos ni usuarios; `GET /api/v1/reports/export.xlsx` descarga un `.xlsx` válido; `/api/v1/reviews/summary` nunca inventa reseñas mock.
+- **Comandos:**
+  ```bash
+  .venv/bin/pytest -v
+  cd apps/web && npm run build
+  ```
+- **Checklist manual:**
+  1. Crear un egreso, una comanda y un producto en API, reiniciar `satori_api` y confirmar que permanecen.
+  2. Abrir **Reseñas Google** con y sin `GOOGLE_PLACES_API_KEY` y verificar estado real + descarga de `.xlsx` en **Reportes**.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P6` — Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) (`GUIADO`)
+- **Objetivo:** eliminar `INITIAL_*`, credenciales prellenadas y `localStorage` auth fake de `Login.tsx` y `store.tsx`; conectar `api/client.ts` con token JWT (Bearer) e interceptores 401; migrar todas las referencias `'101'..'303'` en UI a `'1'..'9'`; conectar las 12 pantallas (`Login`, `Dashboard`, `Rooms`, `CalendarView`, `Reservas`, `Operacion`, `Tienda`, `Restaurante`, `Eventos`, `Resenas`, `Chatbot`→`/api/v1/conversations` con escalamiento real, `Admin`→`/audit`, usuarios, egresos, KPIs y `.xlsx` real) + cambio de contraseña real en `AccountSettingsModal`.
+- **Archivos afectados:** `apps/web/src/api/client.ts`, `apps/web/src/store.tsx`, `apps/web/src/App.tsx`, `apps/web/src/screens/*.tsx`, `apps/web/src/pages/Conversations.tsx`, `apps/web/src/pages/ReservasDebug.tsx`, `docs/aprendizaje/P6.md`.
+- **Criterio de aceptación:** 0 datos ficticios al iniciar con DB vacía (salvo las 9 habitaciones semilla); `F5` conserva exactamente lo guardado en PostgreSQL; Recepcionista nunca ve ni puede ejecutar acciones de Administrador.
+- **Comandos:**
+  ```bash
+  .venv/bin/pytest -v
+  cd apps/web && npm run build
+  ```
+- **Checklist manual:**
+  1. Iniciar sesión en `http://localhost:5173` como `admin` y como `recepcion` con JWT real.
+  2. Recargar (`F5`) tras crear una reserva manual, cargar una bebida de Tienda a la hab. `1`, hacer check-in y exportar `.xlsx`.
+  3. Verificar en **WhatsApp & Bot** las sesiones reales de PostgreSQL y el botón de escalamiento humano.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P7` — Reconciliación flujo n8n `V10` (Wompi `ec8eace` sin Redis) y prueba Meta live (`AGY`)
+- **Objetivo:** incorporar en `flows/n8n/V10_ChatbotReservas.json` las mejoras Wompi (`pending_payment`, confirmación externa y rollback ante fallo de `ec8eace` en `origin/main`) adaptadas 100% a FastAPI/PostgreSQL (0 nodos Redis) con cabecera `X-Service-Key` y habitaciones `1–9`; actualizar `tests/chatbot/` y validar flujo vivo con Meta Cloud API + Cloudflare Tunnel.
+- **Archivos afectados:** `flows/n8n/V10_ChatbotReservas.json`, `flows/n8n/V9_ChatbotReservas.json`, `apps/api/routers/n8n_compat.py`, `tests/test_n8n_integration.py`, `tests/chatbot/*.js`, `docs/aprendizaje/P7.md`.
+- **Criterio de aceptación:** `verify_n8n_flow_integrity.py` reporta 0 errores, `test_n8n_v10_workflow_has_zero_redis_nodes` pasa, y un mensaje real de WhatsApp o prueba de panel Meta completa consulta de disponibilidad `1–9` + bloqueo temporal visible en el calendario web.
+- **Comandos:**
+  ```bash
+  python3 tests/chatbot/verify_n8n_flow_integrity.py
+  .venv/bin/pytest tests/test_n8n_integration.py -v
+  cd apps/web && npm run build
+  ```
+- **Checklist manual:**
+  1. Reimportar `V10_ChatbotReservas.json` en n8n (`:5678`) y pulsar **Publish**.
+  2. Probar flujo en Meta (`Probar` en `messages` o app publicada) y verificar nueva sesión + reserva en el panel web.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P8` — Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 (`GUIADO`)
+- **Objetivo:** instalar `@playwright/test` en `apps/web`, escribir pruebas E2E contra API + PostgreSQL real (`satoripms_test`) cubriendo Login JWT, RBAC multi-rol, colisión `409`, edición número `1–9`, cargo a folio y descarga `.xlsx`; ampliar `pytest` con todos los endpoints nuevos; actualizar `.github/workflows/ci.yml` con servicio `postgres:16` efímero, `alembic upgrade head`, `pytest`, `npm run build` y Playwright.
+- **Archivos afectados:** `apps/web/package.json`, `apps/web/playwright.config.ts`, `apps/web/tests/e2e/*.spec.ts`, `tests/test_*.py`, `.github/workflows/ci.yml`, `docs/aprendizaje/P8.md`.
+- **Criterio de aceptación:** 100% de `pytest` y Playwright E2E pasan localmente con 0 saltos ni mocks ficticios en flujos críticos, y el workflow de CI contempla `migracion-fastapi` y `main`.
+- **Comandos:**
+  ```bash
+  .venv/bin/pytest -v
+  cd apps/web && npm run build && npx playwright test
+  ```
+- **Checklist manual:**
+  1. Ejecutar `npx playwright test` y revisar reporte sin errores de consola ni 500 de API.
+  2. Verificar que ningún test dejó basura en `satoripms`.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P9` — Docker prod (Nginx HTTPS, R2 `pg_dump`, Sentry) y limpieza del repositorio (`AGY`)
+- **Objetivo:** añadir configuración Docker de producción (`apps/web/Dockerfile` + Nginx reverse proxy HTTPS unificando `/` y `/api`), `env_file`, `healthcheck` y usuario no-root en `apps/api/Dockerfile`, `depends_on: api` en `n8n`, integración Sentry (`sentry-sdk`) y script/cron `pg_dump` cifrado diario 3:00 a. m. hacia Cloudflare R2; limpiar raíz moviendo/retirando entregables sueltos de Actividad 5 y actualizando `docs/Guia_Configuracion_Entorno.md`.
+- **Archivos afectados:** `docker-compose.yml`, `docker-compose.prod.yml` (o perfil `prod`), `apps/api/Dockerfile`, `apps/web/Dockerfile`, `infra/nginx/default.conf`, `scripts/backup_pg_r2.sh`, `docs/Guia_Configuracion_Entorno.md`, archivos raíz de Actividad 5, `docs/aprendizaje/P9.md`.
+- **Criterio de aceptación:** `docker compose up -d --build` levanta `postgres`, `api`, `web` y `n8n` saludables; script de backup valida exportación cifrada y `Guia_Configuracion_Entorno.md` ya no referencia Java/Redis/Flyway.
+- **Comandos:**
+  ```bash
+  sudo docker compose config --quiet
+  .venv/bin/pytest -v
+  cd apps/web && npm run build
+  ```
+- **Checklist manual:**
+  1. Abrir la app servida vía contenedor `web` / proxy y confirmar que `/api/v1/health` y las 12 pantallas responden en el mismo origen.
+  2. Verificar raíz del repo limpia antes del release.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
+
+---
+
+### `P10` — Respaldo `origin/main`, merge `--no-ff` de `migracion-fastapi` a `main` y tag `v1.0.0` (`MÍO`)
+- **Objetivo:** cerrar el proyecto con `migracion-fastapi` 100% verificada en CI, sincronizar `main` con `origin/main` creando tag anotado de respaldo adicional (`backup-main-v9-pre-v1`, manteniendo `legacy-java-backup` en `d0b17ad`), hacer `git merge --no-ff migracion-fastapi` en `main`, etiquetar **`v1.0.0`** y publicar release final.
+- **Archivos afectados:** Ramas `migracion-fastapi` y `main`, tags `backup-main-v9-pre-v1` y `v1.0.0`, `docs/aprendizaje/P10.md`.
+- **Criterio de aceptación:** CI verde en `main`, `legacy-java-backup` y `backup-main-v9-pre-v1` preservados en `origin`, y tag `v1.0.0` apuntando al commit de merge en `main`.
+- **Comandos:**
+  ```bash
+  git checkout main && git pull origin main
+  git tag -a backup-main-v9-pre-v1 -m "Respaldo de main (V9) previo a release FastAPI v1.0.0"
+  git merge --no-ff migracion-fastapi -m "release(v1.0.0): consolidar migracion FastAPI + PostgreSQL 16 + React para produccion"
+  git tag -a v1.0.0 -m "Torre Satori PMS v1.0.0 - Entrega a produccion"
+  git push origin main backup-main-v9-pre-v1 v1.0.0
+  ```
+- **Checklist manual:**
+  1. Verificar en GitHub que `CI — Lint, Tests & Build` pasa en verde sobre `main` y `v1.0.0`.
+  2. Probar despliegue limpio en servidor destino con tag `v1.0.0`.
+- **Casilla:** `[ ]` Completado y verificado.
+- **Pausa:** Confirmación explícita del dueño antes de ejecutar cualquier push a `main`.

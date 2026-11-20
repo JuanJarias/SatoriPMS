@@ -26,6 +26,23 @@ class Settings(BaseSettings):
     JWT_EXPIRES_MINUTES: int = 480
 
     PAYMENT_WEBHOOK_SECRET: str = "satori_dev_payment_webhook_secret_hmac_2026"
+    PAYMENT_PROVIDER: str = "sandbox"
+    WOMPI_PUBLIC_KEY: str = ""
+    WOMPI_PRIVATE_KEY: str = ""
+    WOMPI_EVENTS_SECRET: str = ""
+    WOMPI_INTEGRITY_SECRET: str = ""
+    WOMPI_ENVIRONMENT: str = "sandbox"
+
+    N8N_INTERNAL_API_KEY: str = "satori_dev_n8n_internal_key_2026"
+    N8N_EXPIRED_WEBHOOK_URL: str = ""
+
+    GOOGLE_PLACES_API_KEY: str = ""
+    GOOGLE_PLACE_ID: str = "ChIJQRr4FV2zOY4RvqM_8_EfzsY"
+    GOOGLE_REVIEWS_URL: str = (
+        "https://www.google.com/travel/hotels/entity/CgsIvsf-mZ_-h-fGARAB/reviews"
+    )
+
+    SENTRY_DSN: str = ""
 
     DATABASE_URL: str = (
         "postgresql+psycopg://satori:satori_dev@localhost:5432/satoripms"
