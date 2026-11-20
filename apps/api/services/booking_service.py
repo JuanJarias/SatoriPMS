@@ -19,6 +19,7 @@ try:
         UnlockRequest,
         UnlockResponse,
     )
+    from services.event_bus import publish_pms_event
     from services.room_service import calculate_room_stay_price
 except ImportError:
     from apps.api.models.booking import Booking, BookingStatus
@@ -30,6 +31,7 @@ except ImportError:
         UnlockRequest,
         UnlockResponse,
     )
+    from apps.api.services.event_bus import publish_pms_event
     from apps.api.services.room_service import calculate_room_stay_price
 
 LOCK_DURATION_MINUTES = 15
@@ -173,6 +175,11 @@ async def create_booking_lock(
             detail="La habitación no está disponible para el rango de fechas solicitado (conflicto GiST RN-02)",
         ) from exc
 
+    publish_pms_event(
+        "booking.locked",
+        {"bookingId": booking.id, "roomId": room.id, "roomNumber": room.number},
+    )
+
     return LockResponse(
         booking_id=booking.id,
         room_id=room.id,
@@ -207,6 +214,10 @@ async def release_booking_lock(
         booking.status = BookingStatus.EXPIRADA.value
         await db.commit()
         await db.refresh(booking)
+        publish_pms_event(
+            "booking.unlocked",
+            {"bookingId": booking.id, "roomId": booking.room_id},
+        )
 
     return UnlockResponse(booking_id=booking.id, status=booking.status)
 

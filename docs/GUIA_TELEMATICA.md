@@ -383,7 +383,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 | `P1` | Migración Alembic `004`: cuartos `1–9`, tarifas reales y tablas operativas | `AGY` | [x] |
 | `P2` | RBAC estricto con JWT y clave interna `X-Service-Key` en todos los routers | `AGY` | [x] |
 | `P3` | Habitaciones `1–9` editables sin colisión `Room.id` vs `Room.number` | `AGY` | [x] |
-| `P4` | Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) | `AGY` | [ ] |
+| `P4` | Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) | `AGY` | [x] |
 | `P5` | Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel | `AGY` | [ ] |
 | `P6` | Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) | `AGY` | [ ] |
 | `P7` | Reconciliación flujo n8n `V10` (Wompi `ec8eace` sin Redis) y prueba Meta live | `AGY` | [ ] |
@@ -463,7 +463,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 
 ---
 
-### `P4` — Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) (`MÍO`)
+### `P4` — Scheduler 60 s (`APScheduler`), puerto Wompi sandbox y SSE tiempo real (`HU-03`) (`AGY`)
 - **Objetivo:** incorporar `APScheduler` en `main.py` ejecutando cada 60 s la expiración de `BLOQUEADA_TEMPORAL` vencidas + notificación a n8n; consolidar adaptador **Wompi** tras puerto de pasarela con validación HMAC/checksum e idempotencia; exponer flujo SSE (`/api/v1/events/stream`) para actualización en tiempo real de calendario y reservas.
 - **Archivos afectados:** `apps/api/requirements.txt`, `apps/api/main.py`, `apps/api/services/payment_service.py`, `apps/api/routers/payments.py`, `apps/api/routers/events_stream.py` (nuevo), `tests/test_payment_webhook.py`, `tests/test_booking_lock.py`, `docs/aprendizaje/P4.md`.
 - **Criterio de aceptación:** tras vencer `expires_at`, el job marca `EXPIRADA` en <= 60 s y emite evento SSE; el webhook de Wompi rechaza firmas inválidas con `401` e ignora duplicados con `200`.
@@ -475,7 +475,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 - **Checklist manual:**
   1. Abrir dos pestañas en **Calendario / Reservas**, confirmar una reserva en una pestaña y observar actualización automática en la otra sin recargar.
   2. Enviar webhook de prueba sin firma válida al endpoint de pagos y verificar rechazo `401`.
-- **Casilla:** `[ ]` Completado y verificado.
+- **Casilla:** `[x]` Completado y verificado.
 - **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
 
 ---

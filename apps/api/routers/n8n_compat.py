@@ -22,6 +22,7 @@ try:
     from schemas.booking import LockRequest
     from services.audit_service import record_audit
     from services.booking_service import create_booking_lock
+    from services.event_bus import publish_pms_event
     from services.payment_service import generate_group_code
     from services.room_service import (
         calculate_room_stay_price,
@@ -41,6 +42,7 @@ except ImportError:
     from apps.api.schemas.booking import LockRequest
     from apps.api.services.audit_service import record_audit
     from apps.api.services.booking_service import create_booking_lock
+    from apps.api.services.event_bus import publish_pms_event
     from apps.api.services.payment_service import generate_group_code
     from apps.api.services.room_service import (
         calculate_room_stay_price,
@@ -505,6 +507,7 @@ async def confirm_bookings_batch(
         ) from exc
 
     remaining = (total_group_price - group_paid).quantize(Decimal("0.01"))
+    publish_pms_event("booking.confirmed", {"code": group_code})
     return {
         "reservationGroupId": str(group_uuid),
         "code": group_code,
@@ -683,6 +686,7 @@ async def cancel_booking_group(
         },
     )
     await db.commit()
+    publish_pms_event("booking.cancelled", {"code": resolved_code})
 
     return {
         "code": resolved_code,

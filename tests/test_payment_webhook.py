@@ -145,3 +145,64 @@ async def test_webhook_valid_signature_confirms_booking_and_idempotency_skips_du
             )
         )
         assert count_res.scalar_one() == 1
+
+
+@pytest.mark.asyncio
+async def test_wompi_event_checksum_webhook_and_sandbox_checkout_link() -> None:
+    """Verifica validación de checksum oficial Wompi (transaction.updated) y puerto de checkout link (P4)."""
+    booking_id = await _create_locked_booking_for_webhook()
+    old_secret = settings.WOMPI_EVENTS_SECRET
+    settings.WOMPI_EVENTS_SECRET = "test_wompi_events_secret_2026"
+    try:
+        tx_id = f"wompi-tx-{booking_id}"
+        tx_status = "APPROVED"
+        cents = 12000000
+        timestamp = 1795136000
+        checksum = hashlib.sha256(
+            f"{tx_id}{tx_status}{cents}{timestamp}{settings.WOMPI_EVENTS_SECRET}".encode("utf-8")
+        ).hexdigest()
+
+        wompi_payload = json.dumps(
+            {
+                "event": "transaction.updated",
+                "timestamp": timestamp,
+                "data": {
+                    "transaction": {
+                        "id": tx_id,
+                        "status": tx_status,
+                        "amount_in_cents": cents,
+                        "reference": str(booking_id),
+                    }
+                },
+                "signature": {
+                    "properties": [
+                        "transaction.id",
+                        "transaction.status",
+                        "transaction.amount_in_cents",
+                    ],
+                    "checksum": checksum,
+                },
+            }
+        ).encode("utf-8")
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.post(
+                "/api/v1/payments/webhook",
+                content=wompi_payload,
+                headers={"X-Event-Checksum": checksum},
+            )
+            assert res.status_code == 200
+            assert res.json()["status"] == "confirmed"
+            assert res.json()["payment_status"] == "partial"
+
+            link_res = await client.post(
+                "/api/v1/payments/checkout-link",
+                headers={"X-Service-Key": settings.N8N_INTERNAL_API_KEY},
+                json={"reference": "TS-TEST1", "amount": 290000},
+            )
+            assert link_res.status_code == 200
+            assert link_res.json()["provider"] == "sandbox"
+            assert "TS-TEST1" in link_res.json()["checkoutUrl"]
+    finally:
+        settings.WOMPI_EVENTS_SECRET = old_secret

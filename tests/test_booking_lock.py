@@ -12,6 +12,7 @@ from apps.api.core.config import settings
 from apps.api.core.database import AsyncSessionLocal
 from apps.api.main import app
 from apps.api.models import Booking, BookingStatus, Guest, Room
+from apps.api.services.expiration_service import expire_stale_booking_locks
 
 _SVC_HEADERS = {"X-Service-Key": settings.N8N_INTERNAL_API_KEY}
 
@@ -153,3 +154,45 @@ async def test_concurrent_http_lock_requests_return_one_200_and_nine_409() -> No
 
     assert statuses.count(200) == 1
     assert statuses.count(409) == 9
+
+
+@pytest.mark.asyncio
+async def test_scheduler_expiration_batch_and_sse_stream_auth() -> None:
+    """Verifica el job periódico expire_stale_booking_locks y el canal SSE /api/v1/events/stream (P4)."""
+    guest_id, room_id = await _prepare_room_4()
+    async with AsyncSessionLocal() as session:
+        stale = Booking(
+            guest_id=guest_id,
+            room_id=room_id,
+            check_in=date(2026, 12, 26),
+            check_out=date(2026, 12, 28),
+            status=BookingStatus.BLOQUEADA_TEMPORAL.value,
+            expires_at=datetime.now(timezone.utc) - timedelta(minutes=3),
+            adults=2,
+            total_price=Decimal("420000.00"),
+        )
+        session.add(stale)
+        await session.commit()
+        stale_id = stale.id
+
+    expired = await expire_stale_booking_locks()
+    assert any(item["bookingId"] == stale_id for item in expired)
+
+    async with AsyncSessionLocal() as session:
+        updated = await session.get(Booking, stale_id)
+        assert updated is not None
+        assert updated.status == BookingStatus.EXPIRADA.value
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        unauth_sse = await client.get("/api/v1/events/stream?once=true")
+        assert unauth_sse.status_code == 401
+
+        login_res = await client.post(
+            "/api/v1/auth/login",
+            json={"username": "recepcion", "password": "recepcion123"},
+        )
+        token = login_res.json()["access_token"]
+        sse_res = await client.get(f"/api/v1/events/stream?once=true&token={token}")
+        assert sse_res.status_code == 200
+        assert "event: connected" in sse_res.text

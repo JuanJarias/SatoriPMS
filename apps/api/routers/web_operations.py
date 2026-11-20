@@ -19,6 +19,7 @@ try:
     from models.room import Room
     from models.user import User, UserRole
     from services.audit_service import record_audit
+    from services.event_bus import publish_pms_event
     from services.payment_service import generate_group_code
 except ImportError:
     from apps.api.core.database import get_db
@@ -32,6 +33,7 @@ except ImportError:
     from apps.api.models.room import Room
     from apps.api.models.user import User, UserRole
     from apps.api.services.audit_service import record_audit
+    from apps.api.services.event_bus import publish_pms_event
     from apps.api.services.payment_service import generate_group_code
 
 router = APIRouter(tags=["Web Operations (M4)"])
@@ -156,6 +158,7 @@ async def check_in_booking(
         },
     )
     await db.commit()
+    publish_pms_event("booking.checkin", {"code": code, "rooms": room_numbers})
 
     return {
         "id": first.id,
@@ -220,6 +223,7 @@ async def check_out_booking(
         },
     )
     await db.commit()
+    publish_pms_event("booking.checkout", {"code": code, "rooms": room_numbers})
 
     return {
         "id": first.id,
@@ -554,6 +558,7 @@ async def update_room_operational_status(
     )
     await db.commit()
     await db.refresh(room)
+    publish_pms_event("room.status", {"roomId": room.id, "status": new_status})
     return _serialize_room(room)
 
 

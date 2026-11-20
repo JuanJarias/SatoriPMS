@@ -1,6 +1,7 @@
 """Configuración de entorno mediante Pydantic Settings."""
 
 from pathlib import Path
+import sys
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -73,3 +74,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+sys.modules.setdefault("core.config", sys.modules[__name__])
+sys.modules.setdefault("apps.api.core.config", sys.modules[__name__])
