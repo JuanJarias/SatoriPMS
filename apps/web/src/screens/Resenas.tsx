@@ -139,14 +139,26 @@ export function Resenas() {
           summary?.placeName || 'Hotel Satori - Sevilla Valle del Cauca'
         }. Modo estricto de solo lectura.`}
         actions={
-          <Button
-            variant="secondary"
-            onClick={() => fetchReviews(true)}
-            disabled={loading || refreshing}
-            icon={<RefreshCw size={15} className={cn(refreshing && 'animate-spin')} />}
-          >
-            {refreshing ? 'Actualizando…' : 'Actualizar desde Google'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {summary?.googleReviewsUrl && (
+              <a
+                href={summary.googleReviewsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-forest-800 px-4 text-xs font-semibold text-white hover:bg-forest-900 transition-colors"
+              >
+                Ver comentarios en Google
+              </a>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => fetchReviews(true)}
+              disabled={loading || refreshing}
+              icon={<RefreshCw size={15} className={cn(refreshing && 'animate-spin')} />}
+            >
+              {refreshing ? 'Actualizando…' : 'Actualizar desde Google'}
+            </Button>
+          </div>
         }
       />
 
@@ -401,40 +413,16 @@ export function Resenas() {
                 </div>
               )}
             </>
-          ) : (
+          ) : totalCount === 0 ? (
             <Card className="p-8">
               <EmptyState
                 icon={<AlertCircle size={32} className="text-terra-600" />}
-                title={
-                  summary?.total
-                    ? 'Resumen real cargado sin llave de Google Places API'
-                    : 'Pendiente de conexión o llave de Google Places API'
-                }
+                title="No fue posible cargar las reseñas en este momento"
               >
-                <div className="space-y-3">
-                  <p>
-                    {summary?.placesApiConfigured
-                      ? 'No se recibieron comentarios individuales desde Google Places API en este momento.'
-                      : summary?.total
-                        ? `El resumen oficial (${averageRating ?? '—'} ★ y ${totalCount} opiniones con distribución exacta por estrellas) se extrajo en vivo desde el perfil público de Google Travel sin necesitar tarjeta ni API Key. Los textos individuales dentro del panel requieren GOOGLE_PLACES_API_KEY (Places API New).`
-                        : `Sin GOOGLE_PLACES_API_KEY configurada y sin respuesta de Google Travel en este momento (Place ID: ${
-                            summary?.placeId || 'ChIJQRr4FV2zOY4RvqM_8_EfzsY'
-                          }).`}
-                  </p>
-                  {summary?.googleReviewsUrl && (
-                    <a
-                      href={summary.googleReviewsUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg bg-forest-800 px-4 py-2 text-xs font-semibold text-white hover:bg-forest-900 transition-colors"
-                    >
-                      Abrir opiniones escritas en Google Reviews
-                    </a>
-                  )}
-                </div>
+                Verifica tu conexión a internet o abre el perfil oficial en Google Reviews usando el botón superior.
               </EmptyState>
             </Card>
-          )}
+          ) : null}
         </>
       )}
     </div>
