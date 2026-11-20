@@ -2,12 +2,12 @@ name: CI — Lint, Tests & Build
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, integracion-fastapi, develop]
   pull_request:
-    branches: [main]
+    branches: [main, integracion-fastapi]
 
 jobs:
-  # ── Frontend ──────────────────────────────────────────────
+  # ── Frontend (TypeScript + Vite) ──────────────────────────
   frontend:
     name: Frontend (React + Vite)
     runs-on: ubuntu-latest
@@ -30,9 +30,9 @@ jobs:
       - name: Build
         run: npm run build
 
-  # ── Chatbot (flujo n8n + suites en memoria) ───────────────
+  # ── Chatbot (flujo n8n V10 sin Redis + suites en memoria) ─
   chatbot:
-    name: Chatbot (integridad del flujo y pruebas)
+    name: Chatbot (integridad V10 y suites)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,8 +42,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Integridad del flujo V9
-        run: python3 tests/chatbot/verify_n8n_flow_integrity.py flows/n8n/V9_ChatbotReservas.json
+      - name: Integridad del flujo V10 (sin Redis)
+        run: python3 tests/chatbot/verify_n8n_flow_integrity.py flows/n8n/V10_ChatbotReservas.json
 
       - name: Suite integral del chatbot (en memoria)
         run: node tests/chatbot/suite_pruebas_chatbot.js
@@ -51,7 +51,7 @@ jobs:
       - name: Pruebas de cobro Wompi (en memoria)
         run: node tests/chatbot/test_pago_wompi_v9.js
 
-  # ── Backend ───────────────────────────────────────────────
+  # ── Backend (FastAPI + PostgreSQL 16) ─────────────────────
   backend:
     name: Backend (Python 3.12 + FastAPI)
     runs-on: ubuntu-latest
@@ -85,5 +85,55 @@ jobs:
         run: pip install -r apps/api/requirements.txt
 
       # conftest.py crea y migra la base aislada satoripms_test
-      - name: Run tests
+      - name: Run pytest
         run: pytest
+
+  # ── Frontend E2E (Playwright contra FastAPI + PostgreSQL) ─
+  e2e:
+    name: E2E (Playwright + FastAPI + Postgres 16)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: satori
+          POSTGRES_PASSWORD: satori_dev
+          POSTGRES_DB: satoripms
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql+psycopg://satori:satori_dev@localhost:5432/satoripms
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install backend & frontend dependencies
+        run: |
+          pip install -r apps/api/requirements.txt
+          cd apps/web && npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E suite
+        working-directory: apps/web
+        run: npm run test:e2e

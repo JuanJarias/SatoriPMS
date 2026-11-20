@@ -30,9 +30,13 @@ Thumbs.db
 logs/
 npm-debug.log*
 
-# ── Cobertura de pruebas ─────────────────────────────────
+# ── Cobertura y reportes E2E ─────────────────────────────
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 
 
 # ── Logs de conversaciones locales (solo para desarrollo) ──

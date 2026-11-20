@@ -387,7 +387,7 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 | `P5` | Google Places API real + CRUD DB Tienda, Café, Eventos, Egresos, Usuarios y Excel | `AGY` | [x] |
 | `P6` | Integración completa de las 12 pantallas React (sin `INITIAL_*` ni auth mock) | `AGY` | [x] |
 | `P7` | Reconciliación flujo n8n `V10` (Wompi `ec8eace` sin Redis) y prueba Meta live | `AGY` | [x] |
-| `P8` | Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 | `AGY` | [ ] |
+| `P8` | Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 | `AGY` | [x] |
 | `P9` | Docker prod (Nginx HTTPS, R2 `pg_dump`, Sentry) y limpieza del repositorio | `AGY` | [ ] |
 | `P10` | Respaldo `origin/main`, merge `--no-ff` de `migracion-fastapi` a `main` y tag `v1.0.0` | `AGY` | [ ] |
 
@@ -533,19 +533,19 @@ Plan paso a paso acordado tras la auditoría de las Fases 0 y 1 para entregar **
 
 ---
 
-### `P8` — Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 (`GUIADO`)
+### `P8` — Suite E2E Frontend con Playwright, ampliación `pytest` y CI Postgres 16 (`AGY`)
 - **Objetivo:** instalar `@playwright/test` en `apps/web`, escribir pruebas E2E contra API + PostgreSQL real (`satoripms_test`) cubriendo Login JWT, RBAC multi-rol, colisión `409`, edición número `1–9`, cargo a folio y descarga `.xlsx`; ampliar `pytest` con todos los endpoints nuevos; actualizar `.github/workflows/ci.yml` con servicio `postgres:16` efímero, `alembic upgrade head`, `pytest`, `npm run build` y Playwright.
-- **Archivos afectados:** `apps/web/package.json`, `apps/web/playwright.config.ts`, `apps/web/tests/e2e/*.spec.ts`, `tests/test_*.py`, `.github/workflows/ci.yml`, `docs/aprendizaje/P8.md`.
-- **Criterio de aceptación:** 100% de `pytest` y Playwright E2E pasan localmente con 0 saltos ni mocks ficticios en flujos críticos, y el workflow de CI contempla `migracion-fastapi` y `main`.
+- **Archivos afectados:** `apps/web/package.json`, `apps/web/playwright.config.ts`, `apps/web/tests/e2e/*.spec.ts`, `tests/backend/test_*.py`, `.github/workflows/ci.yml`, `scripts/run_e2e_api.py`, `docs/aprendizaje/P8.md`.
+- **Criterio de aceptación:** 100% de `pytest` y Playwright E2E pasan localmente con 0 saltos ni mocks ficticios en flujos críticos, y el workflow de CI contempla `integracion-fastapi` y `main`.
 - **Comandos:**
   ```bash
   .venv/bin/pytest -v
-  cd apps/web && npm run build && npx playwright test
+  cd apps/web && npm run build && npm run test:e2e
   ```
 - **Checklist manual:**
-  1. Ejecutar `npx playwright test` y revisar reporte sin errores de consola ni 500 de API.
+  1. Ejecutar `npm run test:e2e` en `apps/web` y revisar 4/4 aprobadas sin errores.
   2. Verificar que ningún test dejó basura en `satoripms`.
-- **Casilla:** `[ ]` Completado y verificado.
+- **Casilla:** `[x]` Completado y verificado.
 - **Pausa:** Esperar `"OK"` del dueño antes de commit/push a `migracion-fastapi`.
 
 ---

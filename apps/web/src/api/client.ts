@@ -1,6 +1,6 @@
-const baseURL = (import.meta as ImportMeta & {
+const baseURL = ((import.meta as ImportMeta & {
   env: { VITE_API_URL?: string };
-}).env.VITE_API_URL ?? 'http://localhost:8080';
+}).env.VITE_API_URL ?? '').trim();
 
 export function getApiBaseUrl(): string {
   return baseURL || window.location.origin;
