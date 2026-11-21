@@ -16,18 +16,21 @@ docker info >/dev/null && echo "Docker listo sin sudo"
 
 ### B. Instalar y autenticar `zrok2`
 En este equipo `zrok2` todavía no está instalado ni habilitado:
-1. Descarga el binario Linux (`amd64`) desde [releases de zrok](https://github.com/openzrok/zrok/releases) e instálalo en `/usr/local/bin/zrok2` (con `chmod +x`).
-2. Habilita tu cuenta:
+1. Instala `zrok2` en Fedora:
+   ```bash
+   curl -sSLf https://get.openziti.io/install.bash | sudo bash -s zrok2
+   zrok2 version
+   ```
+2. Habilita tu cuenta (token desde [my.zrok.io](https://my.zrok.io)):
    ```bash
    zrok2 enable <TU_ZROK_ENABLE_TOKEN>
    ```
 3. **Clave para evitar conflicto de dominio (`409` / permiso denegado):**
-   - El valor actual de `N8N_PUBLIC_URL` en `.env` solo lo puede abrir la cuenta `zrok2` que reservó ese nombre.
-   - Si usas tu propia cuenta `zrok2`, reserva un nombre nuevo una sola vez:
+   - El valor previo en `.env` solo lo puede abrir la cuenta que reclamó ese nombre, o cambia al de tu cuenta eligiendo un nombre único (ej. `satoridemo2026`):
      ```bash
-     zrok2 reserve public http://127.0.0.1:5678 -n satoridemofinal
+     zrok2 share public 5678 -n "public:satoridemo2026" --headless
      ```
-     y actualiza `N8N_PUBLIC_URL=https://<share_asignado>.shares.zrok.io/` en `.env`.
+     *(Verifica que imprima `https://satoridemo2026.shares.zrok.io`, corta con `Ctrl+C` y pon `N8N_PUBLIC_URL=https://satoridemo2026.shares.zrok.io/` en `.env`; `start-dev.sh` lo abrirá solo).*
 
 ### C. Configurar llaves reales de Wompi en `.env`
 Los valores `...xxxxxxxx` del ejemplo **no sirven**. Edita `.env` y reemplaza por las llaves reales (Consola Wompi → *Desarrolladores → Programación*):

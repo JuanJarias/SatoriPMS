@@ -68,9 +68,26 @@ docker info >/dev/null && echo "Docker listo"
      cloudflared tunnel --url http://localhost:5678
      ```
   3. Copia la URL `https://xxxx.trycloudflare.com/` que imprime y pégala en `N8N_PUBLIC_URL=` en `.env`.
-- **Opción B (`zrok2` — URL fija si la reservas):**
-  1. Descarga `zrok2` desde releases oficiales hacia `/usr/local/bin/zrok2` (`chmod +x`).
-  2. Ejecuta `zrok2 enable <TU_TOKEN>` y reserva tu subdominio (`zrok2 reserve public http://127.0.0.1:5678 -n satoridemo`), poniendo `N8N_PUBLIC_URL=https://satoridemo.shares.zrok.io/` en `.env`. *(El script `start-dev.sh` abrirá este túnel automáticamente).*
+- **Opción B (`zrok2` — URL fija integrada en `start-dev.sh`, recomendada si quieres conservar el mismo dominio):**
+  1. Instala `zrok2` en Fedora con el script oficial de OpenZiti (o RPM desde releases de GitHub `openziti/zrok`):
+     ```bash
+     curl -sSLf https://get.openziti.io/install.bash | sudo bash -s zrok2
+     zrok2 version
+     ```
+  2. Crea una cuenta gratis en [my.zrok.io](https://my.zrok.io), copia tu **Account Token** y habilita tu portátil:
+     ```bash
+     zrok2 enable <TU_ACCOUNT_TOKEN>
+     ```
+  3. Elige un subdominio único (ej. `satorijarias`) y pruébalo 5 segundos para verificar la URL que te asigna (`https://satorijarias.shares.zrok.io`):
+     ```bash
+     zrok2 share public 5678 -n "public:satorijarias" --headless
+     ```
+     *(Detén con `Ctrl+C` cuando confirmes la URL).*
+  4. Pon esa URL exacta en `.env`:
+     ```env
+     N8N_PUBLIC_URL=https://satorijarias.shares.zrok.io/
+     ```
+     A partir de ese momento, `./scripts/start-dev.sh` abre ese mismo túnel en segundo plano automáticamente al arrancar.
 
 ### Paso 2 · Actualizar `.env` con tus llaves reales
 Asegúrate de tener actualizados en `.env`:
