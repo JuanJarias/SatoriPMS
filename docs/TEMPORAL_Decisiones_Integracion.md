@@ -34,6 +34,55 @@ Ese script verifica herramientas y `.env`, levanta PostgreSQL, la API FastAPI (a
 
 **Si `.env` no existe:** `start-dev.sh` lo crea desde `.env.example` y se detiene. Genera entonces `JWT_SECRET` y `SATORI_SERVICE_KEY` con `openssl rand -hex 32` (dos valores distintos) y escríbelos en `.env`. **No inventes** llaves de Meta, Wompi ni Gemini: déjalas como están y avísale a tu usuario cuáles faltan para que el chatbot funcione de verdad.
 
+#### Procedimiento autónomo exacto para levantar toda la infraestructura + `zrok2` (listo para demo)
+
+Cuando el usuario pida *"levanta toda la infraestructura junto con `zrok2` y déjalo listo para mostrar"*, ejecuta esta secuencia exacta sin quedarte a medias:
+
+1. **Arranque inicial:**
+   ```bash
+   ./scripts/start-dev.sh
+   ```
+   Esto levanta `satori_postgres`, `satori_api`, `satori_n8n`, el túnel `zrok2` (`n8n-chatbot` → `localhost:5678`) y la web React + Vite (`localhost:5173`).
+
+2. **Si `zrok2` falla con `HTTP 502` (error `409 shareConflict` por share huérfano):**
+   - Revisa `.dev/tunnel.log`, `pgrep -a zrok` y `zrok2 overview`.
+   - Si el log dice `[409] shareConflict "name 'n8n-chatbot' in namespace 'public' is in use by share '<SHARE_ID>'"` (ocurre cuando una ejecución anterior de `zrok2` quedó huérfana en el servidor de zrok):
+     ```bash
+     zrok2 delete share <SHARE_ID>
+     ./scripts/start-dev.sh
+     ```
+   - Verifica que el túnel público responda `HTTP 200` en `https://n8n-chatbot.shares.zrok.io`. *(Si alguna vez se necesita abrir manualmente fuera del script: `zrok2 share public 5678 -n public:n8n-chatbot --headless`.)*
+
+3. **Verificación integral incluyendo Meta WhatsApp:**
+   ```bash
+   ./scripts/status-dev.sh
+   ```
+   - Confirma que `satori_postgres`, `satori_api` y `satori_n8n` estén `running` (`healthy`), que `web` y `zrok2` tengan PID activo, y que el bloque **WhatsApp en Meta** muestre:
+     - Token válido (revisa la hora de vencimiento).
+     - App **Torre Satori PMS** suscrita a la cuenta de WhatsApp Business.
+     - Número `+1 555-180-9141` en estado `CONNECTED`, calidad `GREEN`.
+   - **Si `WHATSAPP_TOKEN` expiró** (`Session has expired`): pídele al usuario pegar un token nuevo en `.env` (`WHATSAPP_TOKEN=...`) y **recrea tanto `n8n` como `api`** (ambos envían mensajes a Meta):
+     ```bash
+     docker compose --profile n8n up -d --force-recreate n8n api
+     ```
+   - Espera ~6 segundos a que `satori_n8n` y `satori_api` terminen de iniciar (mientras arrancan, `zrok2` devolverá temporalmente `HTTP 502`) y vuelve a correr `./scripts/status-dev.sh` hasta confirmar `[activo]` en todos los enlaces.
+
+4. **Qué hacer cuando NO llegan los mensajes a WhatsApp (causas reales y cómo se solucionaron):**
+   - **Caso A — Mensajes manuales desde la bandeja web aparecen como `Registro local` y no llegan al celular:**
+     - **Por qué pasaba:** El endpoint `POST /api/v1/conversations/{id}/messages` (`apps/api/routers/conversations.py`) solo despacha a Meta Graph API si `settings.WHATSAPP_TOKEN` y `settings.WHATSAPP_PHONE_ID` existen en el entorno de `satori_api`. Antes `docker-compose.yml` no pasaba esas variables al contenedor `api`, por lo que `dispatched_whatsapp` quedaba en `False` (`Registro local`).
+     - **Solución y verificación:** `services.api.environment` en `docker-compose.yml` debe incluir `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID` y `WHATSAPP_GRAPH_VERSION`. Confírmalo con `docker exec satori_api env | grep WHATSAPP`. Si actualizas el token en `.env`, recrea `api` junto con `n8n` (`docker compose --profile n8n up -d --force-recreate n8n api`). Al responder desde la web, cada mensaje debe quedar marcado como **`WhatsApp OK`**.
+   - **Caso B — El bot de n8n no responde mensajes entrantes de WhatsApp:**
+     - **Por qué pasaba:** (1) `WHATSAPP_TOKEN` temporal expirado o `satori_n8n` sin recrear tras editar `.env`; (2) app en Meta Developers en **Modo de desarrollo** (Meta sí ejecuta el `GET` de verificación `hub.challenge`, pero bloquea los `POST` reales de WhatsApp y solo entrega el botón **Probar**); (3) app desuscrita de la WABA o campo `messages` sin suscribir; (4) flujo sin publicar o con `versionId` en caché en n8n `2.47.3`.
+     - **Diagnóstico y solución en orden:**
+       1. Verifica que `zrok2` entregue `GET` y `POST` a n8n usando `-4` (evita falsos timeouts IPv6 de ~90 s):
+          ```bash
+          curl -s -4 -w "\nHTTP:%{http_code}\n" "https://n8n-chatbot.shares.zrok.io/webhook/whatsapp-webhook?hub.mode=subscribe&hub.verify_token=SatoriPMS_WebhookVerifyToken&hub.challenge=99999"
+          curl -s -4 -X POST -H "Content-Type: application/json" -d '{"object":"whatsapp_business_account","entry":[]}' -w "\nHTTP:%{http_code}\n" "https://n8n-chatbot.shares.zrok.io/webhook/whatsapp-webhook"
+          ```
+          (`GET` debe devolver `99999` / `200`; `POST` debe devolver `{"message":"Workflow was started"}` / `200`. Si da `404`, publica el flujo con `./scripts/sync-n8n-flow.sh`.)
+       2. Revisa si Meta está entregando webhooks `POST` mirando `docker exec satori_n8n tail -n 40 /home/node/.n8n/n8nEventLog.log`. Si solo llegan `GET` y ningún `POST`, revisa en Meta Developers que la app esté en **Modo activo (Live)**, que el campo `messages` esté **Suscritos** y que `./scripts/status-dev.sh` muestre la app suscrita a la WABA.
+       3. Si sí llegan `POST` y la ejecución figura `success` pero no llega el mensaje al celular, recuerda que los nodos HTTP de WhatsApp en n8n tienen `onError: continueRegularOutput`: inspecciona la ejecución en n8n (`http://localhost:5678`) o en `/home/node/.n8n/database.sqlite` (`execution_data`) para ver el error exacto de Meta Graph API (p. ej. `401` token vencido o `131030` número receptor no autorizado en modo prueba).
+
 ### Paso 3 · Si algo falla, investiga a fondo y reporta TODAS las razones
 
 No te quedes con el primer error. Haz un diagnóstico completo y entrégale a tu usuario una lista ordenada donde cada causa lleve **evidencia** (la línea exacta del log) y **cómo corregirla**. Revisa como mínimo:
